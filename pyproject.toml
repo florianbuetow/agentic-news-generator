@@ -1,0 +1,15 @@
+[project]
+name = "agentic-news-generator"
+version = "0.1.0"
+description = "An AI-powered news generator that creates news articles using autonomous agents"
+requires-python = ">=3.12"
+dependencies = [
+    "anthropic>=0.40.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
