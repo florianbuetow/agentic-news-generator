@@ -21,6 +21,32 @@ class ChannelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class LLMConfig(BaseModel):
+    """Configuration for an individual LLM connection via litellm."""
+
+    model: str = Field(
+        ...,
+        description="litellm model string (e.g., 'openai/gpt-4', 'anthropic/claude-3-5-sonnet', 'openai/local-model' for LM Studio)",
+    )
+    api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
+    api_key_env: str = Field(..., description="Environment variable name for API key")
+    context_window: int = Field(..., description="Model context window size in tokens")
+    max_tokens: int = Field(..., description="Maximum tokens for response/completion")
+    temperature: float = Field(..., description="Sampling temperature (0.0-1.0)")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicSegmentationConfig(BaseModel):
+    """Configuration for topic segmentation agent system."""
+
+    agent_llm: LLMConfig = Field(..., description="LLM config for segmentation agent")
+    critic_llm: LLMConfig = Field(..., description="LLM config for critic agent")
+    retry_limit: int = Field(..., description="Maximum retry attempts")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class Config:
     """Configuration class that loads and provides access to config.yaml."""
 
@@ -37,6 +63,10 @@ class Config:
             ValueError: If channel configurations are invalid or missing required fields.
         """
         self._load(config_path)
+
+        # Validate topic_segmentation section if present
+        if "topic_segmentation" in self._data:
+            self._topic_segmentation = self._validate_topic_segmentation()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -144,3 +174,31 @@ class Config:
             if channel.name == name:
                 return channel
         raise KeyError(f"No channel found with name: {name}")
+
+    def _validate_topic_segmentation(self) -> TopicSegmentationConfig:
+        """Validate topic segmentation configuration.
+
+        Returns:
+            Validated TopicSegmentationConfig instance.
+
+        Raises:
+            ValueError: If topic segmentation configuration is invalid.
+        """
+        try:
+            return TopicSegmentationConfig.model_validate(self._data["topic_segmentation"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Topic segmentation configuration validation failed: {error_messages}") from e
+
+    def get_topic_segmentation_config(self) -> TopicSegmentationConfig:
+        """Get topic segmentation configuration.
+
+        Returns:
+            TopicSegmentationConfig instance.
+
+        Raises:
+            KeyError: If topic_segmentation section is not configured.
+        """
+        if not hasattr(self, "_topic_segmentation"):
+            raise KeyError("Missing required key 'topic_segmentation' in config file")
+        return self._topic_segmentation
