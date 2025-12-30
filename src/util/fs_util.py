@@ -1,5 +1,6 @@
 """File system utility functions for common operations."""
 
+import json
 from pathlib import Path
 
 
@@ -120,3 +121,22 @@ class FSUtil:
             directory: Path to the directory.
         """
         directory.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def write_json_file(file_path: Path, data: object, create_parents: bool) -> None:
+        """Write data to a JSON file.
+
+        Args:
+            file_path: Path where the JSON file should be written.
+            data: Data to serialize to JSON (must be JSON-serializable).
+            create_parents: If True, create parent directories if they don't exist.
+
+        Raises:
+            OSError: If the file cannot be written.
+            TypeError: If the data is not JSON-serializable.
+        """
+        if create_parents:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        json_content = json.dumps(data, indent=2, ensure_ascii=False)
+        file_path.write_text(json_content, encoding="utf-8")
