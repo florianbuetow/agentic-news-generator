@@ -18,7 +18,7 @@ channels:
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio
   agent_llm:
-    model: openai/your-model-name  # Use openai/ prefix for LM Studio models
+    model: your-model-name
     api_base: http://127.0.0.1:1234/v1
     api_key_env: LMSTUDIO_API_KEY
     context_window: 262144
@@ -27,7 +27,7 @@ topic_segmentation:
 
   # Critic Agent LLM - using same LM Studio instance
   critic_llm:
-    model: openai/your-model-name  # Use openai/ prefix for LM Studio models
+    model: your-model-name
     api_base: http://127.0.0.1:1234/v1
     api_key_env: LMSTUDIO_API_KEY
     context_window: 262144
