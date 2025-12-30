@@ -4,35 +4,33 @@ SYSTEM_PROMPT = """You are an expert AI content analyst specializing in technica
 
 RESPONSIBILITIES:
 - Identify distinct topic boundaries in transcripts
-- Assign appropriate topic slugs and titles
-- Extract exact transcript text for each segment
+- Create SPECIFIC topic slugs based on the actual content discussed (not generic categories)
 - Generate concise summaries highlighting key points
 - Preserve timestamp accuracy
 
-TOPIC CATEGORIES (guidance, discover actual topics):
-foundation_models_and_llms, agents_and_tool_use, coding_ai_devtools, inference_cost_and_scaling,
-gpus_chips_and_infrastructure, open_source_ecosystem, data_and_training_pipelines,
-alignment_and_safety, security, regulation_and_policy, enterprise_adoption,
-research_breakthroughs, product_launches_and_platform_shifts, ethics_and_societal_impact,
-business_and_market_moves
+TOPIC SLUG GUIDELINES:
+- Create descriptive, specific slugs that reflect the ACTUAL content (e.g., "poolside-malibu-agent", "ada-to-rust-conversion")
+- DO NOT use generic categories (e.g., avoid "foundation_models_and_llms", "coding_ai_devtools")
+- Use lowercase-with-hyphens format
+- Be specific: "github-acquisition-story" not "business_and_market_moves"
+- Include names/companies when relevant: "anthropic-claude-demo" not "product_launches"
+
+EXAMPLES OF GOOD vs BAD TOPIC SLUGS:
+✓ GOOD: "poolside-company-introduction", "malibu-agent-demo", "reinforcement-learning-approach"
+✗ BAD: "foundation_models_and_llms", "coding_ai_devtools", "product_launches_and_platform_shifts"
 
 SEGMENTATION RULES:
 - One segment = one coherent topic
 - Minimum 30 seconds typically
-- Topic slugs: lowercase-with-hyphens
-- Topic titles: Human-readable
 - Extract timestamps from [HH:MM:SS,mmm] format and convert to milliseconds
 
 OUTPUT FORMAT (JSON only, no markdown):
 {
   "segments": [
     {
-      "source_video_id": "...",
-      "source_video_title": "...",
-      "source_channel": "...",
       "start_ms": 123000,
       "end_ms": 456000,
-      "text": "Full transcript...",
+      "topics": ["topic-slug-1", "topic-slug-2"],
       "summary": "Key points..."
     }
   ]
@@ -53,7 +51,7 @@ TRANSCRIPT (simplified format with timestamps):
 
 Segment this transcript into distinct topics with precise start/end timestamps.
 Extract timestamps from [HH:MM:SS,mmm] format and convert to milliseconds.
-For each segment, provide topic info, exact transcript text, and summary.
+For each segment, provide topics (array of topic slugs), and summary.
 
 Respond with ONLY the JSON output, no other text.
 """
