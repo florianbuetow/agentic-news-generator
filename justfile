@@ -33,6 +33,13 @@ run:
     @uv run src/main.py
     @echo ""
 
+# Download YouTube videos from channels in config.yaml
+download:
+    @echo ""
+    @printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
+    @uv run scripts/yt-downloader.py
+    @echo ""
+
 # Destroy the virtual environment
 destroy:
     @echo ""
