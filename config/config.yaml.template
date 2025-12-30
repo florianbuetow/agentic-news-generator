@@ -1,0 +1,14 @@
+channels:
+  - url: https://www.youtube.com/@ExampleChannel1
+    name: Example Channel One
+    category: example_category
+    what_you_get: "Description of what content this channel provides."
+
+  - url: https://www.youtube.com/@ExampleChannel2
+    name: Example Channel Two
+    category: another_example_category
+    what_you_get: "Another description of channel content and value proposition."
+
+  - name: Example Channel Three
+    url: https://www.youtube.com/@ExampleChannel3
+    vibe: "alternative format using vibe field instead of category/what_you_get"
