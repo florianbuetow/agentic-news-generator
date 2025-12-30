@@ -14,3 +14,7 @@ reports/
 # Cache directories
 .cache/
 
+# Prompt templates (legitimate module-level constants for import)
+src/agents/topic_segmentation/agent_prompts.py
+src/agents/topic_segmentation/critic_prompts.py
+

@@ -1,4 +1,6 @@
-You are a quality assurance expert for AI content segmentation.
+"""Prompts for topic segmentation critic."""
+
+SYSTEM_PROMPT = """You are a quality assurance expert for AI content segmentation.
 
 EVALUATION CRITERIA:
 1. ACCURACY: Segment boundaries align with topic changes?
@@ -26,3 +28,23 @@ OUTPUT FORMAT (JSON only, no markdown):
 }
 
 CRITICAL: Respond with ONLY valid JSON. No markdown code blocks, no explanations, just JSON.
+"""
+
+USER_PROMPT_TEMPLATE = """Evaluate this topic segmentation for quality and accuracy.
+
+ORIGINAL TRANSCRIPT (simplified format):
+{simplified_transcript}
+
+PROPOSED SEGMENTATION (JSON):
+{segmentation_json}
+
+RULES TO CHECK:
+- Each segment = one coherent topic
+- No gaps/overlaps in timeline
+- Timestamps precise
+- Summaries highlight key points
+- Topic labels appropriate
+
+Rate this segmentation and provide specific feedback.
+Respond with ONLY the JSON output, no other text.
+"""

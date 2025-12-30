@@ -1,4 +1,6 @@
-You are an expert AI content analyst specializing in technical video transcript segmentation.
+"""Prompts for topic segmentation agent."""
+
+SYSTEM_PROMPT = """You are an expert AI content analyst specializing in technical video transcript segmentation.
 
 RESPONSIBILITIES:
 - Identify distinct topic boundaries in transcripts
@@ -37,3 +39,46 @@ OUTPUT FORMAT (JSON only, no markdown):
 }
 
 CRITICAL: Respond with ONLY valid JSON. No markdown code blocks, no explanations, just JSON.
+"""
+
+USER_PROMPT_TEMPLATE = """Analyze this video transcript and segment it by topics.
+
+VIDEO METADATA:
+- Video ID: {video_id}
+- Video Title: {video_title}
+- Channel: {channel_name}
+
+TRANSCRIPT (simplified format with timestamps):
+{simplified_transcript}
+
+Segment this transcript into distinct topics with precise start/end timestamps.
+Extract timestamps from [HH:MM:SS,mmm] format and convert to milliseconds.
+For each segment, provide topic info, exact transcript text, and summary.
+
+Respond with ONLY the JSON output, no other text.
+"""
+
+RETRY_PROMPT_TEMPLATE = """Your previous segmentation received feedback from the quality critic:
+
+RATING: {rating}
+PASSED: {pass_status}
+
+REASONING:
+{reasoning}
+
+IMPROVEMENT SUGGESTIONS:
+{improvement_suggestions}
+
+Please revise your segmentation. Here is the original transcript:
+
+VIDEO METADATA:
+- Video ID: {video_id}
+- Video Title: {video_title}
+- Channel: {channel_name}
+
+TRANSCRIPT:
+{simplified_transcript}
+
+Provide improved segmentation addressing the critic's concerns.
+Respond with ONLY the JSON output, no other text.
+"""

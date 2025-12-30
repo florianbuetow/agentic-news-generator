@@ -2,11 +2,11 @@
 
 import json
 import os
-from pathlib import Path
 
 from litellm import completion
 from pydantic import ValidationError
 
+from src.agents.topic_segmentation.critic_prompts import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from src.agents.topic_segmentation.models import AgentSegmentationResponse, CriticRating
 from src.config import LLMConfig
 
@@ -14,23 +14,18 @@ from src.config import LLMConfig
 class TopicSegmentationCritic:
     """Critic agent that evaluates segmentation quality."""
 
-    def __init__(self, llm_config: LLMConfig, prompts_dir: Path) -> None:
+    def __init__(self, llm_config: LLMConfig) -> None:
         """Initialize the critic agent.
 
         Args:
             llm_config: LLM configuration for this agent.
-            prompts_dir: Directory containing prompt files.
 
         Raises:
-            FileNotFoundError: If prompt files are missing.
             KeyError: If required environment variables are missing.
         """
         self._llm_config = llm_config
-        self._prompts_dir = prompts_dir
-
-        # Load prompts
-        self._system_prompt = self._load_prompt("critic_prompt_system.txt")
-        self._user_prompt_template = self._load_prompt("critic_prompt_user.txt")
+        self._system_prompt = SYSTEM_PROMPT
+        self._user_prompt_template = USER_PROMPT_TEMPLATE
 
         # Get API key from environment
         api_key = os.environ.get(llm_config.api_key_env)
@@ -85,20 +80,3 @@ class TopicSegmentationCritic:
             return CriticRating.model_validate(response_data)
         except (json.JSONDecodeError, ValidationError) as e:
             raise ValueError(f"Critic produced invalid response: {e}\nResponse: {response_text}") from e
-
-    def _load_prompt(self, filename: str) -> str:
-        """Load a prompt file.
-
-        Args:
-            filename: Name of the prompt file.
-
-        Returns:
-            Prompt text content.
-
-        Raises:
-            FileNotFoundError: If prompt file doesn't exist.
-        """
-        prompt_path = self._prompts_dir / filename
-        if not prompt_path.exists():
-            raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
-        return prompt_path.read_text(encoding="utf-8")

@@ -22,11 +22,7 @@ def main() -> None:
         sys.exit(1)
 
     # Initialize orchestrator
-    prompts_dir = Path(__file__).parent.parent / "prompts" / "topic_segmentation"
-    orchestrator = TopicSegmentationOrchestrator(
-        config=ts_config,
-        prompts_dir=prompts_dir,
-    )
+    orchestrator = TopicSegmentationOrchestrator(config=ts_config)
 
     # Find SRT files
     transcripts_dir = Path(__file__).parent.parent / "data" / "output" / "transcripts"

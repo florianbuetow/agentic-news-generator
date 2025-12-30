@@ -1,7 +1,5 @@
 """Orchestrator for topic segmentation agent workflow."""
 
-from pathlib import Path
-
 from src.agents.topic_segmentation.agent import TopicSegmentationAgent
 from src.agents.topic_segmentation.critic import TopicSegmentationCritic
 from src.agents.topic_segmentation.models import SegmentationAttempt, SegmentationResult
@@ -11,24 +9,21 @@ from src.config import TopicSegmentationConfig
 class TopicSegmentationOrchestrator:
     """Orchestrates the multi-agent topic segmentation workflow."""
 
-    def __init__(self, config: TopicSegmentationConfig, prompts_dir: Path) -> None:
+    def __init__(self, config: TopicSegmentationConfig) -> None:
         """Initialize the orchestrator.
 
         Args:
             config: Topic segmentation configuration.
-            prompts_dir: Directory containing prompt files.
 
         Raises:
-            FileNotFoundError: If prompt files are missing.
             KeyError: If required environment variables are missing.
         """
         self._config = config
-        self._prompts_dir = prompts_dir
 
         # Initialize agents
-        self._agent = TopicSegmentationAgent(llm_config=config.agent_llm, prompts_dir=prompts_dir)
+        self._agent = TopicSegmentationAgent(llm_config=config.agent_llm)
 
-        self._critic = TopicSegmentationCritic(llm_config=config.critic_llm, prompts_dir=prompts_dir)
+        self._critic = TopicSegmentationCritic(llm_config=config.critic_llm)
 
     def segment_transcript(
         self,
