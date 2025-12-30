@@ -14,6 +14,7 @@ def process_transcript_file(
     transcript_file: Path,
     channel_name: str,
     orchestrator: TopicSegmentationOrchestrator,
+    output_dir: Path,
 ) -> tuple[bool, str | None]:
     """Process a single transcript file.
 
@@ -21,6 +22,7 @@ def process_transcript_file(
         transcript_file: Path to the transcript file.
         channel_name: Name of the channel.
         orchestrator: Topic segmentation orchestrator.
+        output_dir: Base output directory for topic segmentation results.
 
     Returns:
         Tuple of (success, error_message).
@@ -50,12 +52,25 @@ def process_transcript_file(
         if result.success:
             if not result.best_attempt:
                 raise ValueError("Successful result must have best_attempt")
-            num_segments = len(result.best_attempt.response.segments)
-            segment_summaries = [seg.summary for seg in result.best_attempt.response.segments]
+            segments = result.best_attempt.response.segments
+            num_segments = len(segments)
             print(f"      ✓ Success after {len(result.attempts)} attempt(s)")
             print(f"      Detected {num_segments} topic segment(s):")
-            for i, summary in enumerate(segment_summaries, 1):
-                print(f"        {i}. {summary}")
+            for i, seg in enumerate(segments, 1):
+                topics_str = ", ".join(seg.topics)
+                print(f"        {i}. [{topics_str}] {seg.summary}")
+
+            # Save result to JSON file
+            output_file = output_dir / channel_name / f"{video_id}.json"
+            output_data = {
+                "video_id": video_id,
+                "video_title": video_id,
+                "channel_name": channel_name,
+                "segments": [seg.model_dump() for seg in segments],
+            }
+            FSUtil.write_json_file(output_file, output_data, create_parents=True)
+            print(f"      Saved to: {output_file}")
+
             return (True, None)
 
         # Handle failure
@@ -76,12 +91,14 @@ def process_transcript_file(
 def process_channel(
     channel_folder: Path,
     orchestrator: TopicSegmentationOrchestrator,
+    output_dir: Path,
 ) -> tuple[int, int, list[tuple[str, str]]]:
     """Process all transcript files in a channel.
 
     Args:
         channel_folder: Path to the channel folder.
         orchestrator: Topic segmentation orchestrator.
+        output_dir: Base output directory for topic segmentation results.
 
     Returns:
         Tuple of (success_count, failure_count, failures).
@@ -108,7 +125,7 @@ def process_channel(
     failures: list[tuple[str, str]] = []
 
     for transcript_file in transcript_files:
-        success, error = process_transcript_file(transcript_file, channel_name, orchestrator)
+        success, error = process_transcript_file(transcript_file, channel_name, orchestrator, output_dir)
         if success:
             success_count += 1
         else:
@@ -142,6 +159,10 @@ def main() -> None:
         print("Please run the preprocessor first: uv run src/processing/srt_preprocessor.py")
         sys.exit(1)
 
+    # Create output directory for topic segmentation results
+    output_dir = Path(__file__).parent.parent / "data" / "downloads" / "transcripts-topics"
+    FSUtil.ensure_directory_exists(output_dir)
+
     # Find all channel folders
     try:
         channel_folders = FSUtil.find_directories(transcripts_dir, exclude_hidden=True)
@@ -161,7 +182,7 @@ def main() -> None:
     all_failures: list[tuple[str, str]] = []
 
     for channel_folder in channel_folders:
-        success, failure, failures = process_channel(channel_folder, orchestrator)
+        success, failure, failures = process_channel(channel_folder, orchestrator, output_dir)
         total_success += success
         total_failure += failure
         all_failures.extend(failures)
