@@ -19,12 +19,9 @@ class SRTSubtitle(BaseModel):
 class TopicBlock(BaseModel):
     """Single topic segment from a video."""
 
-    source_video_id: str = Field(..., description="Unique video identifier")
-    source_video_title: str = Field(..., description="Video title")
-    source_channel: str = Field(..., description="YouTube channel name")
     start_ms: int = Field(..., description="Segment start time in milliseconds")
     end_ms: int = Field(..., description="Segment end time in milliseconds")
-    text: str = Field(..., description="Full transcript text for this segment")
+    topics: list[str] = Field(..., description="Topic slugs for this segment")
     summary: str = Field(..., description="AI-generated summary of segment")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
