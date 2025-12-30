@@ -8,7 +8,9 @@ EVALUATION CRITERIA:
 3. GRANULARITY: Appropriately sized segments?
 4. TIMESTAMPS: Precise and correct?
 5. SUMMARIES: Capture key points effectively?
-6. TOPIC LABELING: Appropriate and consistent?
+6. TOPICS: Topic slugs are SPECIFIC and descriptive (not generic categories)?
+   - Should reflect actual content (e.g., "poolside-malibu-agent")
+   - Should NOT be generic (e.g., "foundation_models_and_llms", "coding_ai_devtools")
 
 RATING SCALE:
 - "bad": Major issues (wrong boundaries, missing content, poor summaries)
@@ -43,7 +45,8 @@ RULES TO CHECK:
 - No gaps/overlaps in timeline
 - Timestamps precise
 - Summaries highlight key points
-- Topic labels appropriate
+- Topic slugs are SPECIFIC to the actual content (not generic categories)
+  Example: "poolside-company-intro" not "foundation_models_and_llms"
 
 Rate this segmentation and provide specific feedback.
 Respond with ONLY the JSON output, no other text.
