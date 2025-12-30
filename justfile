@@ -1,29 +1,241 @@
-# Default target: list all available recipes
-default:
+# Default recipe: show available commands
+_default:
     @just --list
 
-# Initialize the project and install dependencies
-init:
+# Show help information
+help:
     @echo ""
-    @echo "Creating project directories..."
-    @mkdir -p src scripts prompts data/input data/output
-    @echo "Installing dependencies with uv..."
-    @uv sync
-    @echo "Project initialized successfully!"
+    @clear
+    @echo ""
+    @printf "\033[0;34m=== agentic-news-generator ===\033[0m\n"
+    @echo ""
+    @echo "Available commands:"
+    @just --list
     @echo ""
 
-# Run the main program
+# Initialize the development environment
+init:
+    @echo ""
+    @printf "\033[0;34m=== Initializing Development Environment ===\033[0m\n"
+    @mkdir -p reports/coverage
+    @mkdir -p reports/security
+    @mkdir -p reports/pyright
+    @mkdir -p reports/deptry
+    @echo "Installing Python dependencies..."
+    @uv sync --all-extras
+    @printf "\033[0;32m✓ Development environment ready\033[0m\n"
+    @echo ""
+
+# Run the main application
 run:
     @echo ""
+    @printf "\033[0;34m=== Running Application ===\033[0m\n"
     @uv run src/main.py
     @echo ""
 
-# Remove generated files and cache
-clean:
+# Destroy the virtual environment
+destroy:
     @echo ""
-    @echo "Cleaning up generated files..."
-    @rm -rf __pycache__ .pytest_cache .mypy_cache
-    @find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
-    @find . -type f -name "*.pyc" -delete 2>/dev/null || true
-    @echo "Cleanup complete!"
+    @printf "\033[0;34m=== Destroying Virtual Environment ===\033[0m\n"
+    @rm -rf .venv
+    @printf "\033[0;32m✓ Virtual environment removed\033[0m\n"
     @echo ""
+
+# Check code style and formatting (read-only)
+code-style:
+    @echo ""
+    @printf "\033[0;34m=== Checking Code Style ===\033[0m\n"
+    @uv run ruff check .
+    @echo ""
+    @uv run ruff format --check .
+    @echo ""
+    @printf "\033[0;32m✓ Style checks passed\033[0m\n"
+    @echo ""
+
+# Auto-fix code style and formatting
+code-format:
+    @echo ""
+    @printf "\033[0;34m=== Formatting Code ===\033[0m\n"
+    @uv run ruff check . --fix
+    @echo ""
+    @uv run ruff format .
+    @echo ""
+    @printf "\033[0;32m✓ Code formatted\033[0m\n"
+    @echo ""
+
+# Run static type checking with mypy
+code-typecheck:
+    @echo ""
+    @printf "\033[0;34m=== Running Type Checks ===\033[0m\n"
+    @uv run mypy src/
+    @echo ""
+    @printf "\033[0;32m✓ Type checks passed\033[0m\n"
+    @echo ""
+
+# Run strict type checking with Pyright (LSP-based)
+code-lspchecks:
+    @echo ""
+    @printf "\033[0;34m=== Running Pyright Type Checks ===\033[0m\n"
+    @mkdir -p reports/pyright
+    @uv run pyright --project pyrightconfig.json > reports/pyright/pyright.txt 2>&1 || true
+    @uv run pyright --project pyrightconfig.json
+    @echo ""
+    @printf "\033[0;32m✓ Pyright checks passed\033[0m\n"
+    @echo "  Report: reports/pyright/pyright.txt"
+    @echo ""
+
+# Run security checks with bandit
+code-security:
+    @echo ""
+    @printf "\033[0;34m=== Running Security Checks ===\033[0m\n"
+    @mkdir -p reports/security
+    @uv run bandit -c pyproject.toml -r src -f txt -o reports/security/bandit.txt || true
+    @uv run bandit -c pyproject.toml -r src
+    @echo ""
+    @printf "\033[0;32m✓ Security checks passed\033[0m\n"
+    @echo ""
+
+# Check dependency hygiene with deptry
+code-deptry:
+    @echo ""
+    @printf "\033[0;34m=== Checking Dependencies ===\033[0m\n"
+    @mkdir -p reports/deptry
+    @uv run deptry src
+    @echo ""
+    @printf "\033[0;32m✓ Dependency checks passed\033[0m\n"
+    @echo ""
+
+# Generate code statistics with pygount
+code-stats:
+    @echo ""
+    @printf "\033[0;34m=== Code Statistics ===\033[0m\n"
+    @mkdir -p reports
+    @uv run pygount src/ tests/ scripts/ prompts/ *.md *.toml --suffix=py,md,txt,toml,yaml,yml --format=summary
+    @echo ""
+    @uv run pygount src/ tests/ scripts/ prompts/ *.md *.toml --suffix=py,md,txt,toml,yaml,yml --format=summary > reports/code-stats.txt
+    @printf "\033[0;32m✓ Report saved to reports/code-stats.txt\033[0m\n"
+    @echo ""
+
+# Check spelling in code and documentation
+code-spell:
+    @echo ""
+    @printf "\033[0;34m=== Checking Spelling ===\033[0m\n"
+    @uv run codespell src tests scripts prompts *.md *.toml
+    @echo ""
+    @printf "\033[0;32m✓ Spelling checks passed\033[0m\n"
+    @echo ""
+
+# Scan dependencies for known vulnerabilities
+code-audit:
+    @echo ""
+    @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
+    @uv run pip-audit
+    @echo ""
+    @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
+    @echo ""
+
+# Run Semgrep static analysis
+code-semgrep:
+    @echo ""
+    @printf "\033[0;34m=== Running Semgrep Static Analysis ===\033[0m\n"
+    @uv run semgrep --config config/semgrep/ --error src
+    @echo ""
+    @printf "\033[0;32m✓ Semgrep checks passed\033[0m\n"
+    @echo ""
+
+# Run unit tests only (fast)
+test:
+    #!/usr/bin/env bash
+    set +e
+    echo ""
+    printf "\033[0;34m=== Running Unit Tests ===\033[0m\n"
+    uv run pytest tests/ -v
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 5 ]; then
+        printf "\033[0;33m⚠ No tests found (this is OK)\033[0m\n"
+        EXIT_CODE=0
+    fi
+    echo ""
+    exit $EXIT_CODE
+
+# Run unit tests with coverage report and threshold check
+test-coverage: init
+    @echo ""
+    @printf "\033[0;34m=== Running Unit Tests with Coverage ===\033[0m\n"
+    @uv run pytest tests/ -v \
+        --cov=src \
+        --cov-report=html:reports/coverage/html \
+        --cov-report=term \
+        --cov-report=xml:reports/coverage/coverage.xml \
+        --cov-fail-under=80
+    @echo ""
+    @printf "\033[0;32m✓ Coverage threshold met\033[0m\n"
+    @echo "  HTML: reports/coverage/html/index.html"
+    @echo ""
+
+# Run ALL validation checks (verbose)
+ci:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Running CI Checks ===\033[0m\n"
+    echo ""
+    just init
+    just code-format
+    just code-style
+    just code-typecheck
+    just code-security
+    just code-deptry
+    just code-spell
+    just code-semgrep
+    just code-audit
+    just test
+    just code-lspchecks
+    echo ""
+    printf "\033[0;32m✓ All CI checks passed\033[0m\n"
+    echo ""
+
+# Run ALL validation checks silently (only show output on errors)
+ci-quiet:
+    #!/usr/bin/env bash
+    set -e
+    printf "\033[0;34m=== Running CI Checks (Quiet Mode) ===\033[0m\n"
+    TMPFILE=$(mktemp)
+    trap "rm -f $TMPFILE" EXIT
+
+    just init > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Init failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Init passed\033[0m\n"
+
+    just code-format > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-format failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-format passed\033[0m\n"
+
+    just code-style > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-style failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-style passed\033[0m\n"
+
+    just code-typecheck > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-typecheck failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-typecheck passed\033[0m\n"
+
+    just code-security > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-security failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-security passed\033[0m\n"
+
+    just code-deptry > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-deptry failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-deptry passed\033[0m\n"
+
+    just code-spell > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-spell failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-spell passed\033[0m\n"
+
+    just code-semgrep > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-semgrep failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-semgrep passed\033[0m\n"
+
+    just code-audit > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-audit failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-audit passed\033[0m\n"
+
+    just test > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Test failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Test passed\033[0m\n"
+
+    just code-lspchecks > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-lspchecks failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-lspchecks passed\033[0m\n"
+
+    echo ""
+    printf "\033[0;32m✓ All CI checks passed\033[0m\n"
+    echo ""
