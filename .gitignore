@@ -214,3 +214,9 @@ __marimo__/
 
 # Copier answers file
 .copier-answers.yml
+
+# Project-specific configuration files
+config/config.yaml
+
+# Documentation files
+docs/
