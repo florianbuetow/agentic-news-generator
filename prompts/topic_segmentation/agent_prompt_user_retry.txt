@@ -1,0 +1,23 @@
+Your previous segmentation received feedback from the quality critic:
+
+RATING: {rating}
+PASSED: {pass_status}
+
+REASONING:
+{reasoning}
+
+IMPROVEMENT SUGGESTIONS:
+{improvement_suggestions}
+
+Please revise your segmentation. Here is the original transcript:
+
+VIDEO METADATA:
+- Video ID: {video_id}
+- Video Title: {video_title}
+- Channel: {channel_name}
+
+TRANSCRIPT:
+{simplified_transcript}
+
+Provide improved segmentation addressing the critic's concerns.
+Respond with ONLY the JSON output, no other text.
