@@ -131,7 +131,8 @@ find "$AUDIO_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; d
             --language en \
             --hallucination-silence-threshold "$HALLUCINATION_SILENCE_THRESHOLD" \
             --compression-ratio-threshold "$COMPRESSION_RATIO_THRESHOLD" \
-            --initial-prompt "$initial_prompt"
+            --initial-prompt "$initial_prompt" \
+            --word-timestamps True
 
         if [ $? -eq 0 ]; then
             # Move all generated files to the transcripts directory
