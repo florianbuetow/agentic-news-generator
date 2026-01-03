@@ -61,6 +61,7 @@ class TopicSegmentationCritic:
         )
 
         # Call litellm
+        print("        [Critic] Calling LLM API...")
         response = completion(
             model=self._llm_config.model,
             api_base=self._llm_config.api_base,
@@ -68,15 +69,25 @@ class TopicSegmentationCritic:
             messages=[{"role": "system", "content": self._system_prompt}, {"role": "user", "content": user_message}],
             temperature=self._llm_config.temperature,
             max_tokens=self._llm_config.max_tokens,
+            timeout=600,
+            stream=False,
         )
 
+        print("        [Critic] Received LLM response, extracting content...")
         response_text = response.choices[0].message.content
         if response_text is None:
             raise ValueError("Critic produced empty response")
 
+        print(f"        [Critic] Response length: {len(response_text)} chars")
+
         # Parse and validate
         try:
+            print("        [Critic] Parsing JSON...")
             response_data = json.loads(response_text)
-            return CriticRating.model_validate(response_data)
+            print("        [Critic] Validating with Pydantic...")
+            validated = CriticRating.model_validate(response_data)
+            print(f"        [Critic] ✓ Validation successful, rating: {validated.rating}, pass: {validated.pass_}")
+            return validated
         except (json.JSONDecodeError, ValidationError) as e:
+            print(f"        [Critic] ✗ Validation failed: {e}")
             raise ValueError(f"Critic produced invalid response: {e}\nResponse: {response_text}") from e

@@ -1,8 +1,10 @@
 """Orchestrator for topic segmentation agent workflow."""
 
+from collections.abc import Callable
+
 from src.agents.topic_segmentation.agent import TopicSegmentationAgent
 from src.agents.topic_segmentation.critic import TopicSegmentationCritic
-from src.agents.topic_segmentation.models import SegmentationAttempt, SegmentationResult
+from src.agents.topic_segmentation.models import AgentSegmentationResponse, SegmentationAttempt, SegmentationResult
 from src.config import TopicSegmentationConfig
 
 
@@ -27,18 +29,15 @@ class TopicSegmentationOrchestrator:
 
     def segment_transcript(
         self,
-        video_id: str,
-        video_title: str,
-        channel_name: str,
         simplified_transcript: str,
+        on_agent_response: Callable[[int, AgentSegmentationResponse], None],
     ) -> SegmentationResult:
         """Segment a transcript with agent-critic feedback loop.
 
         Args:
-            video_id: Unique video identifier.
-            video_title: Video title.
-            channel_name: YouTube channel name.
             simplified_transcript: Simplified format transcript.
+            on_agent_response: Callback invoked after each successful agent response.
+                Takes attempt number and agent response as arguments.
 
         Returns:
             Complete segmentation result with all attempts tracked.
@@ -47,6 +46,8 @@ class TopicSegmentationOrchestrator:
         retry_limit = self._config.retry_limit
 
         for attempt_num in range(1, retry_limit + 1):
+            print(f"      [Orchestrator] Starting attempt {attempt_num}/{retry_limit}")
+
             # Determine if this is a retry
             retry_feedback = None
             if attempt_num > 1:
@@ -66,9 +67,6 @@ class TopicSegmentationOrchestrator:
             # Attempt segmentation
             try:
                 agent_response = self._agent.segment(
-                    video_id=video_id,
-                    video_title=video_title,
-                    channel_name=channel_name,
                     simplified_transcript=simplified_transcript,
                     retry_feedback=retry_feedback,
                 )
@@ -80,6 +78,9 @@ class TopicSegmentationOrchestrator:
                     best_attempt=self._select_best_attempt(attempts),
                     failure_reason=f"Agent error on attempt {attempt_num}: {e}",
                 )
+
+            # Invoke callback immediately after successful agent response
+            on_agent_response(attempt_num, agent_response)
 
             # Evaluate with critic
             try:
@@ -95,6 +96,12 @@ class TopicSegmentationOrchestrator:
                     best_attempt=self._select_best_attempt(attempts),
                     failure_reason=f"Critic error on attempt {attempt_num}: {e}",
                 )
+
+            # Log critic evaluation
+            print(f"      [Critic] Rating: {critic_rating.rating}, Pass: {critic_rating.pass_}")
+            print(f"      [Critic] Reasoning: {critic_rating.reasoning}")
+            if not critic_rating.pass_:
+                print(f"      [Critic] Suggestions: {critic_rating.improvement_suggestions}")
 
             # Record this attempt
             attempt = SegmentationAttempt(
