@@ -17,39 +17,39 @@ def get_channel_stats(base_dir: Path) -> dict[str, dict[str, int]]:
     """Get statistics for each channel."""
     stats = defaultdict(lambda: {"videos": 0, "audio": 0, "transcripts": 0})
 
-    # Count videos (.mp4 files only, not .info.json)
+    # Count videos (.mp4 files only, not .info.json, and exclude macOS metadata files)
     videos_dir = base_dir / "videos"
     if videos_dir.exists():
         for channel_dir in videos_dir.iterdir():
             if channel_dir.is_dir():
-                video_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".mp4")
+                video_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".mp4" and not f.name.startswith("._"))
                 stats[channel_dir.name]["videos"] = video_count
 
-    # Count audio files (.wav)
+    # Count audio files (.wav, exclude macOS metadata files)
     audio_dir = base_dir / "audio"
     if audio_dir.exists():
         for channel_dir in audio_dir.iterdir():
             if channel_dir.is_dir():
-                audio_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".wav")
+                audio_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".wav" and not f.name.startswith("._"))
                 stats[channel_dir.name]["audio"] = audio_count
 
-    # Count transcripts (.srt files as indicator)
+    # Count transcripts (.srt files as indicator, exclude macOS metadata files)
     transcripts_dir = base_dir / "transcripts"
     if transcripts_dir.exists():
         for channel_dir in transcripts_dir.iterdir():
             if channel_dir.is_dir():
-                transcript_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".srt")
+                transcript_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".srt" and not f.name.startswith("._"))
                 stats[channel_dir.name]["transcripts"] = transcript_count
 
     return dict(stats)
 
 
 def count_archived_videos(archive_dir: Path) -> int:
-    """Count archived videos."""
+    """Count archived videos (exclude macOS metadata files)."""
     videos_dir = archive_dir / "videos"
     if not videos_dir.exists():
         return 0
-    return sum(1 for f in videos_dir.rglob("*.mp4") if f.is_file())
+    return sum(1 for f in videos_dir.rglob("*.mp4") if f.is_file() and not f.name.startswith("._"))
 
 
 def main() -> int:
