@@ -24,6 +24,7 @@ init:
     @mkdir -p reports/security
     @mkdir -p reports/pyright
     @mkdir -p reports/deptry
+    @mkdir -p data/downloads/metadata
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @printf "\033[0;32m✓ Development environment ready\033[0m\n"
@@ -41,6 +42,9 @@ download-videos:
     @echo ""
     @printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
     @uv run scripts/yt-downloader.py
+    @echo ""
+    @printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
+    @bash scripts/move-metadata.sh
     @echo ""
 
 # Convert downloaded videos to WAV audio files
