@@ -35,4 +35,4 @@ topic_segmentation:
     temperature: 0.3
 
   # Retry configuration
-  retry_limit: 3
+  retry_limit: 1

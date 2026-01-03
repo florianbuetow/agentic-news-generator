@@ -8,8 +8,8 @@
 BROWSER="chrome"
 if [ -z "$1" ]; then
     echo "Usage: ./scripts/yt-downloader.sh 'URL' 'OUTPUT_DIR'"
-    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/@channelname/videos' 'data/downloads/video/channelname'"
-    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/watch?v=VIDEO_ID' 'data/downloads/video/channelname'"
+    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/@channelname/videos' 'data/downloads/videos/channelname'"
+    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/watch?v=VIDEO_ID' 'data/downloads/videos/channelname'"
     exit 1
 fi
 

@@ -37,10 +37,31 @@ run:
     @echo ""
 
 # Download YouTube videos from channels in config.yaml
-download:
+download-videos:
     @echo ""
     @printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
     @uv run scripts/yt-downloader.py
+    @echo ""
+
+# Convert downloaded videos to WAV audio files
+extract-audio:
+    @echo ""
+    @printf "\033[0;34m=== Converting Videos to Audio ===\033[0m\n"
+    @bash scripts/convert_to_audio.sh
+    @echo ""
+
+# Transcribe audio files to text
+transcribe:
+    @echo ""
+    @printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
+    @bash scripts/transcribe_audio.sh
+    @echo ""
+
+# Archive processed videos
+archive-videos:
+    @echo ""
+    @printf "\033[0;34m=== Archiving Processed Videos ===\033[0m\n"
+    @bash scripts/archive-videos.sh
     @echo ""
 
 # Destroy the virtual environment
