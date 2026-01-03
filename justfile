@@ -68,6 +68,12 @@ archive-videos:
     @bash scripts/archive-videos.sh
     @echo ""
 
+# Show processing status of downloads
+status:
+    @echo ""
+    @uv run scripts/status.py
+    @echo ""
+
 # Destroy the virtual environment
 destroy:
     @echo ""
