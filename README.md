@@ -398,6 +398,15 @@ This project is in active development. Current implementation status:
 - 🚧 Topic segmentation
 - 🚧 Article generation
 - 🚧 HTML newspaper generation
+- 🚧 Topic ordering based on relevancy ("interests").
+
+__Potential Additions__
+
+- 🤔 Source linking (video timestamps)
+- 🤔 Video image extraction
+- 🤔 Article image embedding
+- 🤔 Inline Audio or Video player with auto skip function.
+
 
 ### Video Processing Features
 
