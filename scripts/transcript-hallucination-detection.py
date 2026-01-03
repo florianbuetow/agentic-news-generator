@@ -141,16 +141,14 @@ def detect_hallucinations_in_file(
     detector: RepetitionDetector,
     window_size: int,
     overlap_percent: float,
-    min_k: int,
 ) -> dict[str, Any]:
     """Process a single SRT file to detect hallucinations.
 
     Args:
         srt_file: Path to SRT file.
-        detector: RepetitionDetector instance.
+        detector: RepetitionDetector instance (configured with min_k, min_repetitions, threshold).
         window_size: Window size in words.
         overlap_percent: Overlap percentage.
-        min_k: Minimum repetition length.
 
     Returns:
         Dictionary with detection results.
@@ -177,9 +175,10 @@ def detect_hallucinations_in_file(
         window_text = " ".join(words[start_idx:end_idx])
 
         # Detect hallucinations (consecutive repetitions) in this window
-        repetitions = detector.detect_hallucinations(window_text, min_k=min_k)
+        # Uses detector's configured min_k, min_repetitions, and threshold
+        repetitions = detector.detect_hallucinations(window_text)
 
-        for rep_start, rep_end, rep_k in repetitions:
+        for rep_start, rep_end, rep_k, rep_count in repetitions:
             # Map window-local indices to global indices
             global_start = start_idx + rep_start
             global_end = start_idx + rep_end
@@ -189,6 +188,9 @@ def detect_hallucinations_in_file(
             original_text = mapper.get_original_text(global_start, global_end)
             cleaned_repetition = " ".join(words[global_start:global_end])
 
+            # Calculate score
+            score = rep_k * rep_count
+
             hallucinations.append(
                 {
                     "window_index": window_idx,
@@ -197,6 +199,8 @@ def detect_hallucinations_in_file(
                     "original_text": original_text.strip(),
                     "cleaned_text": cleaned_repetition,
                     "repetition_length": rep_k,
+                    "repetition_count": rep_count,
+                    "score": score,
                     "repetition_pattern": cleaned_repetition,
                 }
             )
@@ -224,24 +228,22 @@ def process_srt_file(
     detector: RepetitionDetector,
     window_size: int,
     overlap_percent: float,
-    min_k: int,
 ) -> tuple[bool, str | None, int]:
     """Process a single SRT file.
 
     Args:
         srt_file: Path to SRT file.
         output_base_dir: Base directory for output.
-        detector: RepetitionDetector instance.
+        detector: RepetitionDetector instance (configured with min_k, min_repetitions, threshold).
         window_size: Window size in words.
         overlap_percent: Overlap percentage.
-        min_k: Minimum repetition length.
 
     Returns:
         Tuple of (success, error_message, hallucination_count).
     """
     try:
         result = detect_hallucinations_in_file(
-            srt_file, detector, window_size, overlap_percent, min_k
+            srt_file, detector, window_size, overlap_percent
         )
 
         # Create output directory (channel_name/transcript-analysis/)
@@ -294,10 +296,10 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                              # Use defaults (window=100, overlap=30%%)
-  %(prog)s --window-size 50             # Smaller window
-  %(prog)s --overlap-percent 50         # More overlap
-  %(prog)s --window-size 200 --overlap-percent 10  # Large window, less overlap
+  %(prog)s                              # Use defaults (k=1, reps=5, threshold=10)
+  %(prog)s --threshold 15               # More conservative (fewer detections)
+  %(prog)s --threshold 6                # More sensitive (more detections)
+  %(prog)s --min-k 3 --threshold 9      # Longer phrases, lower threshold
         """,
     )
     parser.add_argument(
@@ -315,8 +317,20 @@ Examples:
     parser.add_argument(
         "--min-k",
         type=int,
-        default=3,
-        help="Minimum repetition length in words (default: 3)",
+        default=1,
+        help="Minimum phrase length in words (default: 1, allows single-word patterns)",
+    )
+    parser.add_argument(
+        "--min-repetitions",
+        type=int,
+        default=5,
+        help="Minimum consecutive repetitions for simple patterns (default: 5)",
+    )
+    parser.add_argument(
+        "--threshold",
+        type=int,
+        default=10,
+        help="Product threshold: k * repetitions must exceed this (default: 10)",
     )
     args = parser.parse_args()
 
@@ -329,6 +343,12 @@ Examples:
         return 1
     if args.min_k < 1:
         print("Error: min-k must be >= 1", file=sys.stderr)
+        return 1
+    if args.min_repetitions < 1:
+        print("Error: min-repetitions must be >= 1", file=sys.stderr)
+        return 1
+    if args.threshold < 1:
+        print("Error: threshold must be >= 1", file=sys.stderr)
         return 1
 
     # Find all SRT files
@@ -345,14 +365,19 @@ Examples:
 
     print(f"Found {len(srt_files)} SRT file(s) to process\n")
 
-    # Initialize detector
-    detector = RepetitionDetector()
+    # Initialize detector with CLI arguments
+    detector = RepetitionDetector(
+        min_k=args.min_k,
+        min_repetitions=args.min_repetitions,
+        threshold=args.threshold
+    )
 
     # Process each file
     total_files = 0
     files_with_hallucinations = 0
     total_hallucinations = 0
     failed_files = []
+    all_hallucinations = []  # Collect all for score distribution
 
     for srt_file in srt_files:
         # Display relative path for cleaner output
@@ -365,7 +390,6 @@ Examples:
             detector,
             args.window_size,
             args.overlap_percent,
-            args.min_k,
         )
 
         total_files += 1
@@ -381,7 +405,7 @@ Examples:
                 analysis_dir = transcripts_dir / channel_name / "transcript-analysis"
                 output_file = analysis_dir / f"{srt_file.stem}.json"
 
-                # Read back the JSON to get an example
+                # Read back the JSON to get an example and collect all hallucinations
                 try:
                     import json
 
@@ -389,6 +413,8 @@ Examples:
                         result_data = json.load(f)
                         if result_data["hallucinations_detected"]:
                             example = result_data["hallucinations_detected"][0]
+                            # Collect all hallucinations for score distribution
+                            all_hallucinations.extend(result_data["hallucinations_detected"])
                 except Exception:
                     pass  # If we can't load the example, just skip it
 
@@ -411,6 +437,32 @@ Examples:
         print(f"\nFailed files ({len(failed_files)}):")
         for filename, error in failed_files:
             print(f"  - {filename}: {error}")
+
+    # Print score distribution if we have hallucinations
+    if all_hallucinations:
+        print("\n" + "=" * 50)
+        print("Score Distribution (for threshold tuning)")
+        print("=" * 50)
+        print("Score | Count | Example Pattern")
+        print("------|-------|----------------")
+
+        # Group by score
+        score_counts = {}
+        score_examples = {}
+        for h in all_hallucinations:
+            score = h.get("score", h.get("repetition_length", 0) * h.get("repetition_count", 1))
+            score_counts[score] = score_counts.get(score, 0) + 1
+            if score not in score_examples:
+                score_examples[score] = h["repetition_pattern"][:40]
+
+        # Sort by score and display
+        for score in sorted(score_counts.keys()):
+            count = score_counts[score]
+            example = score_examples[score]
+            print(f"{score:5d} | {count:5d} | {example}")
+
+        print(f"\nCurrent threshold: {args.threshold}")
+        print(f"Patterns with score > {args.threshold} are detected as hallucinations.")
 
     return 1 if failed_files else 0
 
