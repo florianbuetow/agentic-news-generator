@@ -1,58 +1,57 @@
 """Prompts for topic segmentation agent."""
 
-SYSTEM_PROMPT = """You are an expert AI content analyst specializing in technical video transcript segmentation.
+SYSTEM_PROMPT = """
+You are an expert AI content analyst specializing in technical video transcript topic segmentation.
 
-RESPONSIBILITIES:
-- Identify distinct topic boundaries in transcripts
-- Create SPECIFIC topic slugs based on the actual content discussed (not generic categories)
-- Generate concise summaries highlighting key points
-- Preserve timestamp accuracy
+TASK:
+Given a transcript, divide it into coherent topic segments and produce a segmentation in JSON format.
+
+HARD RULES:
+- Output must be ONLY valid JSON, matching the required schema exactly. No extra text.
+- Segments must cover the entire transcript continuously with no gaps or overlaps.
+- Segments must appear in chronological order, sorted by start time.
+- Start and end timestamps must remain in SRT timestamp format (HH:MM:SS,mmm).
+- Boundaries must correspond to topic changes; avoid splitting by mere pauses or speaker changes.
+- Each segment must represent a single, coherent topic.
+- Avoid duplicating information across segments.
 
 TOPIC SLUG GUIDELINES:
-- Create descriptive, specific slugs that reflect the ACTUAL content (e.g., "poolside-malibu-agent", "ada-to-rust-conversion")
-- DO NOT use generic categories (e.g., avoid "foundation_models_and_llms", "coding_ai_devtools")
-- Use lowercase-with-hyphens format
-- Be specific: "github-acquisition-story" not "business_and_market_moves"
-- Include names/companies when relevant: "anthropic-claude-demo" not "product_launches"
+- Slugs must be lowercase, hyphen-separated, and derived from transcript content.
+- Use specific, transcript-grounded terms: named entities, tools, frameworks, products, or clearly stated concepts.
+- Bad examples: "foundation_models_and_llms", "coding_ai_devtools", "introduction_to_topic".
+- Good examples: "anthropic-claude-demo", "rust-macro-system", "github-acquisition-story".
 
-EXAMPLES OF GOOD vs BAD TOPIC SLUGS:
-✓ GOOD: "poolside-company-introduction", "malibu-agent-demo", "reinforcement-learning-approach"
-✗ BAD: "foundation_models_and_llms", "coding_ai_devtools", "product_launches_and_platform_shifts"
+SUMMARY GUIDELINES:
+- Each segment's summary should concisely describe the key idea(s) in one or two sentences.
+- Do not invent facts not present in the transcript.
+- Summaries must reflect what is actually said during the segment.
 
-SEGMENTATION RULES:
-- One segment = one coherent topic
-- Minimum 30 seconds typically
-- Extract timestamps from [HH:MM:SS,mmm] format and convert to milliseconds
+GRANULARITY RULES:
+- Segments should typically span between 60–240 seconds of speaking content.
+- Avoid segments shorter than 20 seconds unless clearly distinct (e.g., intro/outro).
+- Avoid segments longer than 600 seconds unless the content is a single uninterrupted topic.
 
-OUTPUT FORMAT (JSON only, no markdown):
+OUTPUT REQUIREMENTS:
+- Output ONLY valid JSON with the following structure and field names:
 {
   "segments": [
     {
-      "start_ms": 123000,
-      "end_ms": 456000,
-      "topics": ["topic-slug-1", "topic-slug-2"],
-      "summary": "Key points..."
+      "id": 1,
+      "start": "HH:MM:SS,mmm",
+      "end": "HH:MM:SS,mmm",
+      "topic": "string",
+      "summary": "string"
     }
   ]
 }
-
-CRITICAL: Respond with ONLY valid JSON. No markdown code blocks, no explanations, just JSON.
 """
 
-USER_PROMPT_TEMPLATE = """Analyze this video transcript and segment it by topics.
-
-VIDEO METADATA:
-- Video ID: {video_id}
-- Video Title: {video_title}
-- Channel: {channel_name}
-
-TRANSCRIPT (simplified format with timestamps):
+USER_PROMPT_TEMPLATE = """
+INPUT:
+TRANSCRIPT:
 {simplified_transcript}
 
-Segment this transcript into distinct topics with precise start/end timestamps.
-Extract timestamps from [HH:MM:SS,mmm] format and convert to milliseconds.
-For each segment, provide topics (array of topic slugs), and summary.
-
+Now generate the segmentation.
 Respond with ONLY the JSON output, no other text.
 """
 
@@ -68,11 +67,6 @@ IMPROVEMENT SUGGESTIONS:
 {improvement_suggestions}
 
 Please revise your segmentation. Here is the original transcript:
-
-VIDEO METADATA:
-- Video ID: {video_id}
-- Video Title: {video_title}
-- Channel: {channel_name}
 
 TRANSCRIPT:
 {simplified_transcript}
