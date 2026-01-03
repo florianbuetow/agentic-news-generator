@@ -22,6 +22,7 @@ class TestLLMConfig:
             context_window=262144,
             max_tokens=32000,
             temperature=0.7,
+            context_window_threshold=90,
         )
         assert config.model == "qwen3-30b-a3b-thinking-2507-mlx@8bit"
         assert config.api_base == "http://127.0.0.1:1234/v1"
@@ -29,6 +30,7 @@ class TestLLMConfig:
         assert config.context_window == 262144
         assert config.max_tokens == 32000
         assert config.temperature == 0.7
+        assert config.context_window_threshold == 90
 
     def test_valid_llm_config_with_none_api_base(self) -> None:
         """Test valid LLM configuration with None api_base."""
@@ -39,10 +41,12 @@ class TestLLMConfig:
             context_window=200000,
             max_tokens=4096,
             temperature=0.5,
+            context_window_threshold=85,
         )
         assert config.model == "anthropic/claude-3-5-sonnet-20241022"
         assert config.api_base is None
         assert config.api_key_env == "ANTHROPIC_API_KEY"
+        assert config.context_window_threshold == 85
 
     def test_missing_model_field(self) -> None:
         """Test LLM config with missing model field."""
@@ -208,9 +212,86 @@ class TestLLMConfig:
             context_window=100000,
             max_tokens=2048,
             temperature=0.7,
+            context_window_threshold=90,
         )
         with pytest.raises(ValidationError):
             config.temperature = 0.5
+
+    def test_missing_context_window_threshold_field(self) -> None:
+        """Test LLM config with missing context_window_threshold field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key_env": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window_threshold",) and err["type"] == "missing" for err in errors)
+
+    def test_context_window_threshold_below_zero(self) -> None:
+        """Test LLM config with context_window_threshold below 0."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key_env": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": -1,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window_threshold",) and err["type"] == "greater_than_equal" for err in errors)
+
+    def test_context_window_threshold_above_100(self) -> None:
+        """Test LLM config with context_window_threshold above 100."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key_env": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 101,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window_threshold",) and err["type"] == "less_than_equal" for err in errors)
+
+    def test_context_window_threshold_boundary_values(self) -> None:
+        """Test LLM config with context_window_threshold at boundary values (0 and 100)."""
+        # Test 0
+        config_0 = LLMConfig(
+            model="test-model",
+            api_base="http://localhost:1234/v1",
+            api_key_env="API_KEY",
+            context_window=100000,
+            max_tokens=2048,
+            temperature=0.7,
+            context_window_threshold=0,
+        )
+        assert config_0.context_window_threshold == 0
+
+        # Test 100
+        config_100 = LLMConfig(
+            model="test-model",
+            api_base="http://localhost:1234/v1",
+            api_key_env="API_KEY",
+            context_window=100000,
+            max_tokens=2048,
+            temperature=0.7,
+            context_window_threshold=100,
+        )
+        assert config_100.context_window_threshold == 100
 
 
 class TestTopicSegmentationConfig:
@@ -225,6 +306,7 @@ class TestTopicSegmentationConfig:
             context_window=262144,
             max_tokens=32000,
             temperature=0.7,
+            context_window_threshold=90,
         )
         critic_llm = LLMConfig(
             model="test-critic-model",
@@ -233,6 +315,7 @@ class TestTopicSegmentationConfig:
             context_window=262144,
             max_tokens=32000,
             temperature=0.3,
+            context_window_threshold=90,
         )
         config = TopicSegmentationConfig(
             agent_llm=agent_llm,
@@ -252,6 +335,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
+            "context_window_threshold": 90,
         }
         with pytest.raises(ValidationError) as exc_info:
             TopicSegmentationConfig.model_validate({"critic_llm": critic_llm_dict, "retry_limit": 3})
@@ -267,6 +351,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
+            "context_window_threshold": 90,
         }
         with pytest.raises(ValidationError) as exc_info:
             TopicSegmentationConfig.model_validate({"agent_llm": agent_llm_dict, "retry_limit": 3})
@@ -282,6 +367,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
+            "context_window_threshold": 90,
         }
         critic_llm_dict = {
             "model": "test-critic-model",
@@ -290,6 +376,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
+            "context_window_threshold": 90,
         }
         with pytest.raises(ValidationError) as exc_info:
             TopicSegmentationConfig.model_validate({"agent_llm": agent_llm_dict, "critic_llm": critic_llm_dict})
@@ -305,6 +392,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
+            "context_window_threshold": 90,
         }
         critic_llm_dict = {
             "model": "test-critic-model",
@@ -313,6 +401,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
+            "context_window_threshold": 90,
         }
         with pytest.raises(ValidationError) as exc_info:
             TopicSegmentationConfig.model_validate(
@@ -330,6 +419,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
+            "context_window_threshold": 90,
         }
         critic_llm_dict = {
             "model": "test-critic-model",
@@ -338,6 +428,7 @@ class TestTopicSegmentationConfig:
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
+            "context_window_threshold": 90,
         }
         with pytest.raises(ValidationError) as exc_info:
             TopicSegmentationConfig.model_validate(
@@ -360,6 +451,7 @@ class TestTopicSegmentationConfig:
             context_window=262144,
             max_tokens=32000,
             temperature=0.7,
+            context_window_threshold=90,
         )
         critic_llm = LLMConfig(
             model="test-critic-model",
@@ -368,6 +460,7 @@ class TestTopicSegmentationConfig:
             context_window=262144,
             max_tokens=32000,
             temperature=0.3,
+            context_window_threshold=90,
         )
         config = TopicSegmentationConfig(
             agent_llm=agent_llm,
@@ -400,6 +493,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.7,
+                    "context_window_threshold": 90,
                 },
                 "critic_llm": {
                     "model": "test-model",
@@ -408,6 +502,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.3,
+                    "context_window_threshold": 90,
                 },
                 "retry_limit": 3,
             },
@@ -504,6 +599,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.7,
+                    "context_window_threshold": 90,
                 },
                 "critic_llm": {
                     "model": "test-model",
@@ -512,6 +608,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.3,
+                    "context_window_threshold": 90,
                 },
                 # Missing retry_limit
             },

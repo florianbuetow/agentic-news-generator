@@ -33,6 +33,12 @@ class LLMConfig(BaseModel):
     context_window: int = Field(..., description="Model context window size in tokens")
     max_tokens: int = Field(..., description="Maximum tokens for response/completion")
     temperature: float = Field(..., description="Sampling temperature (0.0-1.0)")
+    context_window_threshold: int = Field(
+        ...,
+        description="Percentage threshold (0-100) for context window usage before raising an error",
+        ge=0,
+        le=100,
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from src.agents.topic_segmentation.agent_prompts import RETRY_PROMPT_TEMPLATE, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from src.agents.topic_segmentation.models import AgentSegmentationResponse
+from src.agents.topic_segmentation.token_validator import validate_token_usage
 from src.config import LLMConfig
 
 
@@ -66,13 +67,30 @@ class TopicSegmentationAgent:
                 simplified_transcript=simplified_transcript,
             )
 
-        # Call litellm
+        # Validate token usage before calling LLM
+        messages = [{"role": "system", "content": self._system_prompt}, {"role": "user", "content": user_message}]
+
+        try:
+            token_count = validate_token_usage(
+                messages=messages,
+                context_window=self._llm_config.context_window,
+                threshold=self._llm_config.context_window_threshold,
+            )
+            print(
+                f"        [Agent] Token count: {token_count:,} tokens "
+                f"({token_count / self._llm_config.context_window * 100:.1f}% of context window)"
+            )
+        except ValueError as e:
+            print(f"        [Agent] ✗ Token validation failed: {e}")
+            raise
+
+        # Call litellm (use the same 'messages' variable)
         print("        [Agent] Calling LLM API...")
         response = completion(
             model=self._llm_config.model,
             api_base=self._llm_config.api_base,
             api_key=self._api_key,
-            messages=[{"role": "system", "content": self._system_prompt}, {"role": "user", "content": user_message}],
+            messages=messages,  # Reuse the messages we validated
             temperature=self._llm_config.temperature,
             max_tokens=self._llm_config.max_tokens,
             timeout=600,
