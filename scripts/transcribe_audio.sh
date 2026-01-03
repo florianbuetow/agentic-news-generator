@@ -160,6 +160,10 @@ find "$AUDIO_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; d
         # Clean up temp directory
         rm -rf "$temp_dir"
 
+        # Pause between transcriptions to avoid overwhelming the system
+        echo "    ⏸️  Pausing for 5 seconds before next transcription..."
+        sleep 5
+
         echo "  ---"
     done < <(find "$channel_dir" -maxdepth 1 -type f -name "*.wav" -print0 2>/dev/null)
 
