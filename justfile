@@ -71,6 +71,13 @@ archive-videos:
     @bash scripts/archive-videos.sh
     @echo ""
 
+# Analyze transcripts for hallucinations
+analyze-transcripts:
+    @echo ""
+    @printf "\033[0;34m=== Analyzing Transcripts for Hallucinations ===\033[0m\n"
+    @uv run scripts/transcript-hallucination-detection.py
+    @echo ""
+
 # Show processing status of downloads
 status:
     @echo ""
