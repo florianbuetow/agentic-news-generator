@@ -97,16 +97,23 @@ def main() -> int:
 
     # Print per-channel breakdown if there are channels
     if channel_stats:
-        print("=" * 80)
+        print("=" * 90)
         print("PER-CHANNEL BREAKDOWN")
-        print("=" * 80)
+        print("=" * 90)
         print()
-        print(f"{'Channel':<50} {'Videos':>8} {'Audio':>8} {'Trans':>8}")
-        print("-" * 80)
+        print(f"{'Channel':<50} {'Videos':>8} {'Audio':>8} {'Trans':>8} {'%':>7}")
+        print("-" * 90)
 
         for channel_name in sorted(channel_stats.keys()):
             stats = channel_stats[channel_name]
-            print(f"{channel_name:<50} {stats['videos']:>8} {stats['audio']:>8} {stats['transcripts']:>8}")
+            # Calculate completion percentage: (audio + transcripts) / (videos * 2) * 100
+            completion_pct = ((stats["audio"] + stats["transcripts"]) / (stats["videos"] * 2)) * 100 if stats["videos"] > 0 else 0.0
+            print(f"{channel_name:<50} {stats['videos']:>8} {stats['audio']:>8} {stats['transcripts']:>8} {completion_pct:>6.1f}%")
+
+        # Add total row
+        print("-" * 90)
+        total_completion_pct = ((total_audio + total_transcripts) / (total_videos * 2)) * 100 if total_videos > 0 else 0.0
+        print(f"{'TOTAL':<50} {total_videos:>8} {total_audio:>8} {total_transcripts:>8} {total_completion_pct:>6.1f}%")
 
     print()
     return 0
