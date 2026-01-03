@@ -292,6 +292,52 @@ print(f"Trimmed 125.0s → Original {original_time:.2f}s")
 - **Precise mapping**: `aselect` filter ensures exact timestamp alignment with detected intervals
 - **Video referencing**: Accurate reconstruction of original video timestamps for topic segmentation
 
+### Topic Segmentation: Token Usage Monitoring
+
+The topic segmentation pipeline includes proactive token usage monitoring to prevent context window overflow and silent failures during LLM API calls.
+
+**How It Works:**
+- **Pre-flight validation**: Before each LLM API call (agent and critic), the system counts tokens using tiktoken
+- **Threshold enforcement**: Raises `ContextWindowExceededError` when token usage exceeds the configured threshold
+- **Observability**: Logs token count and percentage for every API call for monitoring
+
+**Configuration** (in `config/config.yaml`):
+```yaml
+topic_segmentation:
+  agent_llm:
+    context_window: 262144              # Model's maximum context window
+    context_window_threshold: 90        # Raise error at 90% usage (0-100)
+
+  critic_llm:
+    context_window: 262144
+    context_window_threshold: 90
+```
+
+**Example Output:**
+```
+[Agent] Token count: 185,432 tokens (70.7% of context window)
+[Agent] Calling LLM API...
+```
+
+**When Threshold Exceeded:**
+```
+[Agent] ✗ Token validation failed: Token usage (250,000 tokens) exceeds 90% threshold
+(235,929 tokens) of context window (262,144 tokens). Current usage: 95.4%
+```
+
+**Benefits:**
+- **Early failure detection**: Catch issues before wasting time on API calls that will fail
+- **Clear diagnostics**: Know exactly why processing failed and by how much
+- **Cost savings**: Avoid wasted API calls on paid services (Claude API, GPT-4, etc.)
+- **Visibility**: Track token usage trends across transcripts to identify problematic videos
+- **Configurable**: Tune threshold per deployment (0-100%) based on your needs
+
+**Technical Details:**
+- Uses tiktoken library with `o200k_base` encoding (GPT-4o compatible)
+- Runs locally with no external API costs
+- Compatible with existing error handling (ValueError → SegmentationResult with success=False)
+- Comprehensive test coverage with 44 tests for validation logic
+
 ## Development
 
 ### Development Guidelines
