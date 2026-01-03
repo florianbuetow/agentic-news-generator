@@ -19,9 +19,10 @@ class SRTSubtitle(BaseModel):
 class TopicBlock(BaseModel):
     """Single topic segment from a video."""
 
-    start_ms: int = Field(..., description="Segment start time in milliseconds")
-    end_ms: int = Field(..., description="Segment end time in milliseconds")
-    topics: list[str] = Field(..., description="Topic slugs for this segment")
+    id: int = Field(..., description="Segment ID (1-indexed)")
+    start: str = Field(..., description="Start timestamp in SRT format (HH:MM:SS,mmm)")
+    end: str = Field(..., description="End timestamp in SRT format (HH:MM:SS,mmm)")
+    topic: str = Field(..., description="Topic (lowercase-with-hyphens)")
     summary: str = Field(..., description="AI-generated summary of segment")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
