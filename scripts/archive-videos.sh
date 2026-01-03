@@ -1,32 +1,28 @@
 #!/bin/bash
 
-# --- Configuration ---
-PROJECT_DIR="/Volumes/2TB/agentic-news-generator.git/florian-topic-segmentation"
-
-# VERBOSE: Set to "true" to show individual operations
-VERBOSE="${VERBOSE:-false}"
-# --- End Configuration ---
+# Source central configuration
+source "$(dirname "$0")/config.sh"
 
 echo "Archiving processed videos"
 echo "=========================================="
 echo ""
 
 # Create archive directory
-mkdir -p "$PROJECT_DIR/data/archive/videos"
+mkdir -p "$ARCHIVE_VIDEOS_DIR"
 
 # Counters
 total_archived=0
 total_audio_deleted=0
 
 # Iterate over all channel folders in transcripts directory
-find "$PROJECT_DIR/data/downloads/transcripts" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
+find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
     channel_name=$(basename "$channel_dir")
 
     echo "Processing channel: $channel_name"
     echo "---"
 
     # Create archive directory for this channel
-    mkdir -p "$PROJECT_DIR/data/archive/videos/$channel_name"
+    mkdir -p "$ARCHIVE_VIDEOS_DIR/$channel_name"
 
     # Counters for this channel
     archived_count=0
@@ -37,12 +33,12 @@ find "$PROJECT_DIR/data/downloads/transcripts" -mindepth 1 -maxdepth 1 -type d |
         base_name=$(basename "$transcript_file" .txt)
 
         # Define paths for audio and video files
-        audio_file="$PROJECT_DIR/data/downloads/audio/$channel_name/$base_name.wav"
+        audio_file="$AUDIO_DIR/$channel_name/$base_name.wav"
 
         # Find the video file with any extension
         video_file=""
         for ext in mp4 webm m4a mov m4v avi mkv flv; do
-            candidate="$PROJECT_DIR/data/downloads/videos/$channel_name/$base_name.$ext"
+            candidate="$VIDEOS_DIR/$channel_name/$base_name.$ext"
             if [ -f "$candidate" ]; then
                 video_file="$candidate"
                 break
@@ -61,7 +57,7 @@ find "$PROJECT_DIR/data/downloads/transcripts" -mindepth 1 -maxdepth 1 -type d |
         # Move video file to archive if it exists
         if [ -n "$video_file" ] && [ -f "$video_file" ]; then
             video_filename=$(basename "$video_file")
-            mv "$video_file" "$PROJECT_DIR/data/archive/videos/$channel_name/$video_filename"
+            mv "$video_file" "$ARCHIVE_VIDEOS_DIR/$channel_name/$video_filename"
             archived_count=$((archived_count + 1))
             if [ "$VERBOSE" = "true" ]; then
                 echo "  📦 Archived video: $video_filename"

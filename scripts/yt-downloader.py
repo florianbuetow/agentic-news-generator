@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Python wrapper for yt-downloader.sh that reads channels from config.yaml."""
 
+import random
 import re
 import subprocess
 import sys
@@ -56,15 +57,22 @@ def main() -> None:
         print("No channels found in config.yaml", file=sys.stderr)
         sys.exit(1)
 
+    # Randomize channel order to avoid predictable patterns
+    random.shuffle(channels)
+
     # Track success/failure
     success_count = 0
     failure_count = 0
 
     # Process each channel
     for channel in channels:
+        print()
+        print(f"📺 === [{channel.name}] ===")
+        print()
+
         # Sanitize channel name for directory use
         sanitized_name = sanitize_channel_name(channel.name)
-        output_dir = project_root / "data" / "downloads" / "video" / sanitized_name
+        output_dir = project_root / "data" / "downloads" / "videos" / sanitized_name
 
         print(f"Processing channel: {channel.name} ({channel.url})")
         print(f"  Output directory: {output_dir}")
