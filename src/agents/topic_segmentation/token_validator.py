@@ -1,7 +1,8 @@
 """Token usage validation for LLM API calls."""
 
-import tiktoken
 from typing import Any
+
+import tiktoken
 
 
 class ContextWindowExceededError(ValueError):
