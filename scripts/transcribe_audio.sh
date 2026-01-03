@@ -87,9 +87,9 @@ find "$AUDIO_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; d
                     prompt_source="metadata"
                 fi
             else
-                if [ "$VERBOSE" = "true" ]; then
-                    echo "    ⚠️  Metadata file not found"
-                fi
+                echo "    🚨 ERROR: Metadata file not found: $metadata_file"
+                echo "    💡 Run 'bash scripts/move-metadata.sh' to move .info.json files from videos/ to metadata/"
+                exit 1
             fi
         fi
 
