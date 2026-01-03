@@ -60,6 +60,9 @@ transcribe:
     @printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
     @bash scripts/transcribe_audio.sh
     @echo ""
+    @printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
+    @bash scripts/move-transcript-metadata.sh
+    @echo ""
 
 # Archive processed videos
 archive-videos:
