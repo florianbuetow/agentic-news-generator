@@ -28,9 +28,9 @@ find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_
     archived_count=0
     audio_deleted_count=0
 
-    # Find all .txt transcript files
+    # Find all .srt transcript files (indicates video has been transcribed)
     while IFS= read -r -d '' transcript_file; do
-        base_name=$(basename "$transcript_file" .txt)
+        base_name=$(basename "$transcript_file" .srt)
 
         # Define paths for audio and video files
         audio_file="$AUDIO_DIR/$channel_name/$base_name.wav"
@@ -64,7 +64,7 @@ find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_
             fi
         fi
 
-    done < <(find "$channel_dir" -maxdepth 1 -type f -name "*.txt" -print0 2>/dev/null)
+    done < <(find "$channel_dir" -maxdepth 1 -type f -name "*.srt" -print0 2>/dev/null)
 
     if [ $archived_count -gt 0 ] || [ $audio_deleted_count -gt 0 ]; then
         echo "📦 Archived $archived_count video(s)"
