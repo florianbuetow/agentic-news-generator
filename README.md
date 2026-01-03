@@ -57,6 +57,7 @@ agentic-news-generator/
 - [uv](https://github.com/astral-sh/uv) package manager installed
 - [just](https://github.com/casey/just) command runner installed
 - [FFmpeg](https://ffmpeg.org/) for audio extraction (`brew install ffmpeg`)
+- [jq](https://jqlang.github.io/jq/) for JSON processing (`brew install jq`)
 - Chrome browser (for YouTube cookie authentication with yt-dlp)
 
 ## Setup
@@ -175,6 +176,121 @@ just archive-videos
 - Transcription uses the Whisper large-v3 model for best quality
 - Models are cached in `~/.cache/huggingface/hub/`
 - Archive step frees up disk space by moving videos and deleting intermediate audio
+
+### Anti-Hallucination Transcription Features
+
+The transcription pipeline includes advanced anti-hallucination features to improve transcription quality:
+
+**YouTube Metadata-Based Prompting:**
+- Automatically extracts video title and description from YouTube metadata
+- Builds context-aware prompts: `"This is a YouTube video with the title: [Title]. Description: [Description]"`
+- Helps Whisper understand the content domain and improve accuracy for technical terms
+- Falls back to generic AI/ML prompt if metadata is unavailable
+
+**Anti-Hallucination Parameters:**
+- **`hallucination_silence_threshold: 2.0s`** - When hallucination is detected after 2+ seconds of silence, seeks past the silence and retries transcription
+- **`compression_ratio_threshold: 2.0`** - Stricter threshold (vs default 2.4) to catch gibberish/repetitive outputs
+- **`initial_prompt`** - Dynamic prompt built from YouTube metadata to guide transcription
+
+**Configure Settings** (in `scripts/config.sh`):
+```bash
+# Anti-hallucination settings
+HALLUCINATION_SILENCE_THRESHOLD=2.0    # Seconds (default: 2.0)
+COMPRESSION_RATIO_THRESHOLD=2.0         # Lower = stricter (default: 2.0)
+USE_YOUTUBE_METADATA=true               # Use video metadata in prompts (default: true)
+```
+
+**Disable Metadata Prompting:**
+```bash
+USE_YOUTUBE_METADATA=false just transcribe
+```
+
+### Silence Detection and Removal
+
+The audio extraction script automatically removes silence from videos to improve transcription efficiency and reduce processing time.
+
+**How It Works:**
+1. **Pass 1**: Converts video to audio while detecting silence intervals using FFmpeg's `silencedetect` filter
+2. **Pass 2**: Extracts only speech segments using FFmpeg's `aselect` filter for precise timestamp alignment
+3. **Generates JSON mapping**: Creates `{video}.silence_map.json` with timestamp reconstruction data
+
+**Default Parameters** (configurable in `scripts/convert_to_audio.sh`):
+- **Threshold**: -40dB (moderate - removes clear silence while preserving quiet speech)
+- **Minimum Duration**: 2 seconds (only removes obvious long pauses)
+
+**Output Files:**
+- `data/downloads/audio/{channel}/{video}.wav` - Silence-removed audio
+- `data/downloads/metadata/{channel}/{video}.silence_map.json` - Timestamp mapping
+
+**Disable Silence Removal:**
+```bash
+ENABLE_SILENCE_REMOVAL=false ./scripts/convert_to_audio.sh
+# or
+ENABLE_SILENCE_REMOVAL=false just extract-audio
+```
+
+**Timestamp Reconstruction:**
+
+Use the silence map to convert timestamps from trimmed audio back to original video positions:
+
+```python
+import json
+from pathlib import Path
+
+# Load silence map
+silence_map_path = Path('data/downloads/metadata/AI_Explained/video.silence_map.json')
+with open(silence_map_path) as f:
+    silence_map = json.load(f)
+
+def trimmed_to_original(trimmed_time: float) -> float:
+    """Convert trimmed audio timestamp to original video timestamp."""
+    for seg in silence_map['kept_segments']:
+        if seg['trimmed_start'] <= trimmed_time <= seg['trimmed_end']:
+            offset = trimmed_time - seg['trimmed_start']
+            return seg['original_start'] + offset
+    raise ValueError(f"Timestamp {trimmed_time} not in any kept segment")
+
+# Example: Convert 125.0s in trimmed audio to original video time
+original_time = trimmed_to_original(125.0)
+print(f"Trimmed 125.0s → Original {original_time:.2f}s")
+```
+
+**JSON Schema:**
+
+```json
+{
+  "version": "1.0",
+  "source_video": "video.mp4",
+  "audio_duration_original_seconds": 3600.5,
+  "audio_duration_trimmed_seconds": 3200.3,
+  "silence_threshold_db": -40,
+  "silence_min_duration_seconds": 2.0,
+  "silence_intervals": [
+    {"start_seconds": 120.5, "end_seconds": 125.3, "duration_seconds": 4.8}
+  ],
+  "kept_segments": [
+    {
+      "trimmed_start": 0.0,
+      "trimmed_end": 120.5,
+      "original_start": 0.0,
+      "original_end": 120.5
+    },
+    {
+      "trimmed_start": 120.5,
+      "trimmed_end": 570.1,
+      "original_start": 125.3,
+      "original_end": 574.9
+    }
+  ],
+  "total_silence_removed_seconds": 400.2
+}
+```
+
+**Benefits:**
+- **Faster transcription**: 10-30% time savings from shorter audio
+- **Reduced costs**: Less audio to process with cloud transcription services
+- **Precise mapping**: `aselect` filter ensures exact timestamp alignment with detected intervals
+- **Video referencing**: Accurate reconstruction of original video timestamps for topic segmentation
 
 ## Development
 
