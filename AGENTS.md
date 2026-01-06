@@ -4,6 +4,10 @@
 - **Never assume any default values anywhere**
 - Always be explicit about values, paths, and configurations
 - If a value is not provided, handle it explicitly (raise error, use null, or prompt for input)
+- **Never maintain backwards compatibility when changing code**
+  - Backwards compatibility accumulates technical debt
+  - Make breaking changes cleanly rather than adding compatibility layers
+  - Delete unused code completely instead of keeping it for compatibility
 
 ## Git Commit Guidelines
 - **NEVER include AI attribution in commit messages**
@@ -37,9 +41,13 @@
 - Prompt templates go in `prompts/`
 - **Input data**: `data/input/`
 - **Output data**: `data/output/`
+- **Temporary debug scripts**: `debug/`
+  - Create all temporary test and debugging scripts in `debug/` subfolder
+  - This makes it easy to identify and clean up scripts that are no longer needed
+  - Debug scripts should not be committed to version control
 - **Never create Python files in the project root directory**
   - Wrong: `./test.py`, `./helper.py`
-  - Correct: `./src/helper.py`, `./scripts/test.py`
+  - Correct: `./src/helper.py`, `./scripts/test.py`, `./debug/test_something.py`
 
 ## News Generation
 - Use Claude API via the Anthropic SDK for news generation

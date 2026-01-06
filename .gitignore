@@ -224,3 +224,6 @@ docs/
 
 # Data files
 data/
+
+# Debug scripts (temporary)
+debug/
