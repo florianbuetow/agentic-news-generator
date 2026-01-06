@@ -93,6 +93,29 @@ status:
     @uv run scripts/status.py
     @echo ""
 
+# Launch Jupyter notebook server
+notebooks:
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Launching Jupyter Notebook Server ===\033[0m\n"
+    echo ""
+
+    # Determine OS and set open command
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OPEN_CMD="open"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        OPEN_CMD="xdg-open"
+    else
+        OPEN_CMD="echo"
+        echo "Warning: Unknown OS, cannot auto-open browser"
+    fi
+
+    # Open browser after 5 seconds in background
+    (sleep 5 && $OPEN_CMD "http://localhost:8888/") &
+
+    # Launch notebook server in foreground
+    uv run jupyter notebook --no-browser --NotebookApp.token='' --NotebookApp.password='' notebooks/
+
 # Destroy the virtual environment
 destroy:
     @echo ""

@@ -49,6 +49,9 @@ dev = [
 
     # Git Hooks
     "pre-commit>=3.6.0",
+
+    # Jupyter Notebooks
+    "jupyter>=1.0.0",
 ]
 
 [tool.ruff]
