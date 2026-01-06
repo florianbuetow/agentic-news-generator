@@ -17,6 +17,11 @@ class ChannelConfig(BaseModel):
     name: str = Field(..., description="Name of the channel")
     category: str = Field(..., description="Category classification of the channel")
     description: str = Field(..., description="Description of the channel content and style")
+    download_limiter: int = Field(
+        ...,
+        alias="download-limiter",
+        description="Max videos to download: 0=skip, -1=unlimited, >0=exact limit",
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

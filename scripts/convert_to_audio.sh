@@ -183,6 +183,18 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
             continue
         fi
 
+        # Skip files modified within the last 60 seconds (likely still downloading)
+        current_time=$(date +%s)
+        file_modified_time=$(stat -f %m "$input_file" 2>/dev/null || stat -c %Y "$input_file" 2>/dev/null)
+        time_since_modification=$((current_time - file_modified_time))
+
+        if [ $time_since_modification -lt 60 ]; then
+            if [ "$VERBOSE" = "true" ]; then
+                echo "  ⏸️  Skipping: $filename (modified ${time_since_modification}s ago, waiting for download to complete)"
+            fi
+            continue
+        fi
+
         # Define output file paths
         output_wav="$AUDIO_DIR/$channel_name/$base_name.wav"
         output_json="$METADATA_DIR/$channel_name/$METADATA_AUDIO_SUBDIR/$base_name.silence_map.json"

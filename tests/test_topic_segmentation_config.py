@@ -483,6 +483,7 @@ class TestConfigWithTopicSegmentation:
                     "name": "Test Channel",
                     "category": "test",
                     "description": "Test description",
+                    "download-limiter": 20,
                 }
             ],
             "topic_segmentation": {
@@ -530,6 +531,7 @@ class TestConfigWithTopicSegmentation:
                     "name": "Test Channel",
                     "category": "test",
                     "description": "Test description",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -555,6 +557,7 @@ class TestConfigWithTopicSegmentation:
                     "name": "Test Channel",
                     "category": "test",
                     "description": "Test description",
+                    "download-limiter": 20,
                 }
             ],
             "topic_segmentation": {
@@ -589,6 +592,7 @@ class TestConfigWithTopicSegmentation:
                     "name": "Test Channel",
                     "category": "test",
                     "description": "Test description",
+                    "download-limiter": 20,
                 }
             ],
             "topic_segmentation": {

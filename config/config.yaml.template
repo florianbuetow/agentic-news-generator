@@ -3,16 +3,19 @@ channels:
     name: Example Channel One
     category: example_category
     description: "Description of what content this channel provides."
+    download-limiter: 20  # 0=skip downloads, -1=unlimited (99999), >0=max videos to download
 
   - url: https://www.youtube.com/@ExampleChannel2
     name: Example Channel Two
     category: another_example_category
     description: "Another description of channel content and value proposition."
+    download-limiter: -1  # Unlimited downloads
 
   - name: Example Channel Three
     url: https://www.youtube.com/@ExampleChannel3
     category: example_category_three
     description: "alternative format using vibe field instead of category/what_you_get"
+    download-limiter: 0  # Skip this channel entirely
 
 # Topic Segmentation Agent Configuration
 topic_segmentation:

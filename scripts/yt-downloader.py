@@ -70,17 +70,26 @@ def main() -> None:
         print(f"📺 === [{channel.name}] ===")
         print()
 
+        # Check if downloads are disabled for this channel
+        if channel.download_limiter == 0:
+            print(f"⊘ Skipping {channel.name} (download-limiter: 0)")
+            continue
+
+        # Determine max downloads to pass to bash script
+        max_downloads = 99999 if channel.download_limiter == -1 else channel.download_limiter
+
         # Sanitize channel name for directory use
         sanitized_name = sanitize_channel_name(channel.name)
         output_dir = project_root / "data" / "downloads" / "videos" / sanitized_name
 
         print(f"Processing channel: {channel.name} ({channel.url})")
         print(f"  Output directory: {output_dir}")
+        print(f"  Download limit: {max_downloads}")
 
         try:
-            # Invoke the shell script with the channel URL and output directory
+            # Invoke the shell script with the channel URL, output directory, and max downloads
             result = subprocess.run(
-                [str(shell_script_path), channel.url, str(output_dir)],
+                [str(shell_script_path), channel.url, str(output_dir), str(max_downloads)],
                 check=False,
                 capture_output=False,
             )

@@ -21,26 +21,28 @@ class TestChannelConfig:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
+            "download-limiter": 20,
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.url == "https://www.youtube.com/@test"
         assert channel.name == "Test Channel"
         assert channel.category == "test_category"
         assert channel.description == "Test content"
+        assert channel.download_limiter == 20
 
     def test_missing_required_field(self) -> None:
         """Test that missing required fields raise ValidationError."""
         channel_data = {
             "url": "https://www.youtube.com/@test",
             "name": "Test Channel",
-            # Missing category, description
+            # Missing category, description, download_limiter
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 2  # category, description
+        assert len(errors) == 3  # category, description, download-limiter
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"category", "description"}
+        assert error_fields == {"category", "description", "download-limiter"}
 
     def test_extra_fields_forbidden(self) -> None:
         """Test that extra fields are forbidden due to extra='forbid'."""
@@ -49,6 +51,7 @@ class TestChannelConfig:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
+            "download-limiter": 20,
             "extra_field": "should not be allowed",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -63,6 +66,7 @@ class TestChannelConfig:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
+            "download-limiter": 20,
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
@@ -75,14 +79,14 @@ class TestChannelConfig:
             "url": "https://www.youtube.com/@test",
             "name": "Test Channel",
             "category": "test_category",
-            # Missing description
+            # Missing description, download_limiter
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 1
-        assert errors[0]["loc"][0] == "description"
-        assert "required" in errors[0]["msg"].lower()
+        assert len(errors) == 2
+        error_fields = {error["loc"][0] for error in errors}
+        assert error_fields == {"description", "download-limiter"}
 
     def test_empty_strings_allowed(self) -> None:
         """Test that empty strings are allowed (validation passes but may not be practical)."""
@@ -91,11 +95,13 @@ class TestChannelConfig:
             "name": "",
             "category": "",
             "description": "",
+            "download-limiter": 0,
         }
         # Empty strings are valid str types, so validation passes
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.url == ""
         assert channel.name == ""
+        assert channel.download_limiter == 0
 
 
 class TestConfig:
@@ -110,12 +116,14 @@ class TestConfig:
                     "name": "Test Channel 1",
                     "category": "category1",
                     "description": "Content 1",
+                    "download-limiter": 20,
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
                     "category": "category2",
                     "description": "Content 2",
+                    "download-limiter": 20,
                 },
             ]
         }
@@ -200,7 +208,7 @@ class TestConfig:
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
-                    # Missing category, description
+                    # Missing category, description, download_limiter
                 }
             ]
         }
@@ -222,7 +230,7 @@ class TestConfig:
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
-                    # Missing name, category, description
+                    # Missing name, category, description, download_limiter
                 }
             ]
         }
@@ -244,12 +252,12 @@ class TestConfig:
                 {
                     "url": "https://www.youtube.com/@test1",
                     "name": "Test Channel 1",
-                    # Missing category, description
+                    # Missing category, description, download_limiter
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
-                    # Missing category, description
+                    # Missing category, description, download_limiter
                 },
             ]
         }
@@ -277,12 +285,14 @@ class TestConfig:
                     "name": "Test Channel 1",
                     "category": "category1",
                     "description": "Content 1",
+                    "download-limiter": 20,
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
                     "category": "category2",
                     "description": "Content 2",
+                    "download-limiter": 20,
                 },
             ]
         }
@@ -308,6 +318,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -332,6 +343,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -357,12 +369,14 @@ class TestConfig:
                     "name": "Test Channel 1",
                     "category": "category1",
                     "description": "Content 1",
+                    "download-limiter": 20,
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
                     "category": "category2",
                     "description": "Content 2",
+                    "download-limiter": 20,
                 },
             ]
         }
@@ -388,6 +402,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -412,6 +427,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -435,6 +451,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -458,6 +475,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                     "extra_field": "not allowed",
                 }
             ]
@@ -482,6 +500,7 @@ class TestConfig:
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
             ]
         }
@@ -508,3 +527,115 @@ class TestConfig:
             assert "Missing required key 'channels'" in str(exc_info.value)
         finally:
             temp_path.unlink()
+
+
+class TestChannelConfigDownloadLimiter:
+    """Test cases for the download_limiter field."""
+
+    def test_download_limiter_zero(self) -> None:
+        """Test that download_limiter=0 is valid (skip downloads)."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 0,
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == 0
+
+    def test_download_limiter_unlimited(self) -> None:
+        """Test that download_limiter=-1 is valid (unlimited)."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": -1,
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == -1
+
+    def test_download_limiter_positive(self) -> None:
+        """Test that positive download_limiter values are valid."""
+        test_values = [1, 5, 10, 20, 50, 100, 99999]
+        for value in test_values:
+            channel_data = {
+                "url": "https://www.youtube.com/@test",
+                "name": "Test Channel",
+                "category": "test_category",
+                "description": "Test content",
+                "download-limiter": value,
+            }
+            channel = ChannelConfig.model_validate(channel_data)
+            assert channel.download_limiter == value
+
+    def test_download_limiter_missing(self) -> None:
+        """Test that missing download_limiter raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            # Missing download_limiter
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert errors[0]["loc"][0] == "download-limiter"
+        assert "required" in errors[0]["msg"].lower()
+
+    def test_download_limiter_wrong_type_string(self) -> None:
+        """Test that non-numeric string download_limiter raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": "unlimited",  # Should be int, not string
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert any(error["loc"][0] == "download-limiter" for error in errors)
+
+    def test_download_limiter_wrong_type_float(self) -> None:
+        """Test that float download_limiter raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20.5,  # Should be int, not float
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert any(error["loc"][0] == "download-limiter" for error in errors)
+
+    def test_download_limiter_negative_other_than_minus_one(self) -> None:
+        """Test that negative download_limiter values other than -1 are valid (no restriction)."""
+        # Note: The spec only defines behavior for 0, -1, and >0
+        # But technically any integer is valid from a type perspective
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": -5,
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == -5
+
+    def test_download_limiter_with_hyphen_alias(self) -> None:
+        """Test that download-limiter (with hyphen) is accepted via alias."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,  # Using hyphen as in actual YAML
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == 20

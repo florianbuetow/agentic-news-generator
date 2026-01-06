@@ -8,20 +8,27 @@
 # Source central configuration
 source "$(dirname "$0")/config.sh"
 if [ -z "$1" ]; then
-    echo "Usage: ./scripts/yt-downloader.sh 'URL' 'OUTPUT_DIR'"
-    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/@channelname/videos' 'data/downloads/videos/channelname'"
-    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/watch?v=VIDEO_ID' 'data/downloads/videos/channelname'"
+    echo "Usage: ./scripts/yt-downloader.sh 'URL' 'OUTPUT_DIR' 'MAX_DOWNLOADS'"
+    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/@channelname/videos' 'data/downloads/videos/channelname' '20'"
+    echo "Example: ./scripts/yt-downloader.sh 'https://www.youtube.com/watch?v=VIDEO_ID' 'data/downloads/videos/channelname' '1'"
     exit 1
 fi
 
 if [ -z "$2" ]; then
     echo "Error: OUTPUT_DIR is required"
-    echo "Usage: ./scripts/yt-downloader.sh 'URL' 'OUTPUT_DIR'"
+    echo "Usage: ./scripts/yt-downloader.sh 'URL' 'OUTPUT_DIR' 'MAX_DOWNLOADS'"
+    exit 1
+fi
+
+if [ -z "$3" ]; then
+    echo "Error: MAX_DOWNLOADS is required"
+    echo "Usage: ./scripts/yt-downloader.sh 'URL' 'OUTPUT_DIR' 'MAX_DOWNLOADS'"
     exit 1
 fi
 
 URL="$1"
 OUTPUT_DIR="$2"
+MAX_DOWNLOADS="$3"
 
 # Create output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
@@ -31,12 +38,14 @@ ARCHIVE_FILE="$OUTPUT_DIR/downloaded.txt"
 
 yt-dlp --cookies-from-browser $BROWSER \
        --download-archive "$ARCHIVE_FILE" \
+       --no-abort-on-error \
        --lazy-playlist \
+       --match-filter "availability=public" \
        --match-filters "!is_live" \
-       --max-downloads 1 \
-       --min-sleep-interval 3 \
+       --playlist-items 1-$MAX_DOWNLOADS \
+       --min-sleep-interval 1 \
        --max-sleep-interval 5 \
        --write-info-json \
        -f "bestvideo+(bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio)+best" \
-       -o "$OUTPUT_DIR/%(title)s.%(ext)s" \
+       -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
        "$URL"
