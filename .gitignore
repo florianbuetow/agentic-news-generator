@@ -221,3 +221,6 @@ config/config.yaml
 
 # Documentation files
 docs/
+
+# Data files
+data/
