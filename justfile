@@ -78,6 +78,15 @@ analyze-transcripts:
     @uv run scripts/transcript-hallucination-detection.py
     @echo ""
 
+# Create digest report of transcript hallucination analysis grouped by score
+analyze-transcripts-digest:
+    @echo ""
+    @printf "\033[0;34m=== Creating Transcript Hallucination Digest ===\033[0m\n"
+    @uv run scripts/create-hallucination-digest.py
+    @echo ""
+    @printf "\033[0;32m✓ Digest created: data/output/hallucination_digest.md\033[0m\n"
+    @echo ""
+
 # Show processing status of downloads
 status:
     @echo ""
