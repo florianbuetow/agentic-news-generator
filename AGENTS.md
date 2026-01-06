@@ -50,7 +50,7 @@
   - Correct: `./src/helper.py`, `./scripts/test.py`, `./debug/test_something.py`
 
 ## News Generation
-- Use Claude API via the Anthropic SDK for news generation
+- Use OpenAI compatible API (LM Studio) for news generation
 - Store prompt templates in `prompts/` directory
 - Input topics/sources should be stored in `data/input/`
 - Generated articles should be saved to `data/output/`
