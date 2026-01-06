@@ -1,4 +1,8 @@
 import re
+import unicodedata
+from pathlib import Path
+
+from src.models.hallucination_classifier import HallucinationClassifier
 
 
 class RepetitionDetector:
@@ -8,25 +12,31 @@ class RepetitionDetector:
         self,
         min_k: int = 1,
         min_repetitions: int = 5,
-        threshold: int = 10
+        config_path: Path | None = None
     ):
-        """Initialize RepetitionDetector with default parameters.
+        """Initialize RepetitionDetector with ML classifier.
 
         Args:
             min_k: Minimum phrase length in words (default: 1).
             min_repetitions: Minimum consecutive repetitions (default: 5).
-            threshold: Product threshold for k * repetitions (default: 10).
+            config_path: Path to config.yaml (optional).
         """
         self.min_k = min_k
         self.min_repetitions = min_repetitions
-        self.threshold = threshold
+        self.classifier = HallucinationClassifier(config_path=config_path)
 
     def prepare(self, text: str) -> str:
-        """Normalize whitespace only, preserving capitalization and punctuation.
+        """Normalize whitespace and remove invisible Unicode characters.
 
         This minimal normalization helps distinguish real hallucinations (exact repetitions)
         from natural speech patterns (variations in capitalization/punctuation).
+        Removes invisible formatting characters (RTL/LTR marks, zero-width spaces, etc.)
         """
+        # Remove invisible Unicode formatting characters (category "C" = control/format)
+        # but preserve common whitespace characters
+        text = "".join(ch for ch in text if unicodedata.category(ch)[0] != "C" or ch in "\n\r\t ")
+
+        # Normalize whitespace
         return self._WS.sub(" ", text).strip()
 
     def detect(self, text: str, min_k: int = 3) -> list[list[int]]:
@@ -154,12 +164,9 @@ class RepetitionDetector:
         return repetition_count
 
     def detect_hallucinations(self, text: str) -> list[list[int]]:
-        """Detect hallucinations using product-based threshold.
+        """Detect hallucinations using ML classifier.
 
-        Uses formula: phrase_length * repetition_count > threshold
-        This allows shorter phrases with many reps OR longer phrases with fewer reps.
-
-        Uses the instance's min_k, min_repetitions, and threshold configured in __init__.
+        Uses SVM classifier to determine if repetition pattern is a hallucination.
 
         Args:
             text: Text to analyze.
@@ -177,19 +184,19 @@ class RepetitionDetector:
         cleaned_text = self.prepare(text)
         words = cleaned_text.split()
 
-        # Filter to keep only consecutive repetitions that meet criteria
+        # Filter using ML classifier
         hallucinations = []
         for start, end, k in all_repetitions:
             if self._is_consecutive_repetition(words, start, end):
                 # Count how many times it repeats
                 rep_count = self._count_consecutive_repetitions(words, start, end)
 
-                # Apply both criteria (OR logic):
-                # 1. Meets minimum repetition count, OR
-                # 2. Product of k * rep_count exceeds threshold
-                score = k * rep_count
-                if rep_count >= self.min_repetitions or score > self.threshold:
-                    hallucinations.append([start, end, k, rep_count])
+                # Use ML classifier to determine if this is a hallucination
+                if rep_count >= self.min_repetitions:
+                    is_hallucination = self.classifier.predict(rep_count, k)
+                    if is_hallucination:
+                        hallucinations.append([start, end, k, rep_count])
+                        break  # Stop processing window after first detection
 
         return hallucinations
 
