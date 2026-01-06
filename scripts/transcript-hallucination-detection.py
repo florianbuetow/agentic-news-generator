@@ -146,7 +146,7 @@ def detect_hallucinations_in_file(
 
     Args:
         srt_file: Path to SRT file.
-        detector: RepetitionDetector instance (configured with min_k, min_repetitions, threshold).
+        detector: RepetitionDetector instance (uses SVM classifier for detection).
         window_size: Window size in words.
         overlap_percent: Overlap percentage.
 
@@ -175,7 +175,7 @@ def detect_hallucinations_in_file(
         window_text = " ".join(words[start_idx:end_idx])
 
         # Detect hallucinations (consecutive repetitions) in this window
-        # Uses detector's configured min_k, min_repetitions, and threshold
+        # Uses SVM classifier to determine what's a hallucination
         repetitions = detector.detect_hallucinations(window_text)
 
         for rep_start, rep_end, rep_k, rep_count in repetitions:
@@ -202,6 +202,7 @@ def detect_hallucinations_in_file(
                     "repetition_count": rep_count,
                     "score": score,
                     "repetition_pattern": cleaned_repetition,
+                    "window_text": window_text,
                 }
             )
 
@@ -234,7 +235,7 @@ def process_srt_file(
     Args:
         srt_file: Path to SRT file.
         output_base_dir: Base directory for output.
-        detector: RepetitionDetector instance (configured with min_k, min_repetitions, threshold).
+        detector: RepetitionDetector instance (uses SVM classifier for detection).
         window_size: Window size in words.
         overlap_percent: Overlap percentage.
 
@@ -296,10 +297,9 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                              # Use defaults (k=1, reps=5, threshold=10)
-  %(prog)s --threshold 15               # More conservative (fewer detections)
-  %(prog)s --threshold 6                # More sensitive (more detections)
-  %(prog)s --min-k 3 --threshold 9      # Longer phrases, lower threshold
+  %(prog)s                              # Use defaults (SVM classifier decides)
+  %(prog)s --window-size 200            # Larger window for longer transcripts
+  %(prog)s --overlap-percent 50         # More overlap between windows
         """,
     )
     parser.add_argument(
@@ -314,24 +314,6 @@ Examples:
         default=30.0,
         help="Overlap percentage between windows (default: 30)",
     )
-    parser.add_argument(
-        "--min-k",
-        type=int,
-        default=1,
-        help="Minimum phrase length in words (default: 1, allows single-word patterns)",
-    )
-    parser.add_argument(
-        "--min-repetitions",
-        type=int,
-        default=5,
-        help="Minimum consecutive repetitions for simple patterns (default: 5)",
-    )
-    parser.add_argument(
-        "--threshold",
-        type=int,
-        default=10,
-        help="Product threshold: k * repetitions must exceed this (default: 10)",
-    )
     args = parser.parse_args()
 
     # Validate arguments
@@ -340,15 +322,6 @@ Examples:
         return 1
     if not 0 <= args.overlap_percent < 100:
         print("Error: overlap-percent must be in [0, 100)", file=sys.stderr)
-        return 1
-    if args.min_k < 1:
-        print("Error: min-k must be >= 1", file=sys.stderr)
-        return 1
-    if args.min_repetitions < 1:
-        print("Error: min-repetitions must be >= 1", file=sys.stderr)
-        return 1
-    if args.threshold < 1:
-        print("Error: threshold must be >= 1", file=sys.stderr)
         return 1
 
     # Find all SRT files
@@ -365,12 +338,8 @@ Examples:
 
     print(f"Found {len(srt_files)} SRT file(s) to process\n")
 
-    # Initialize detector with CLI arguments
-    detector = RepetitionDetector(
-        min_k=args.min_k,
-        min_repetitions=args.min_repetitions,
-        threshold=args.threshold
-    )
+    # Initialize detector with defaults (SVM classifier decides what's a hallucination)
+    detector = RepetitionDetector()
 
     # Process each file
     total_files = 0
@@ -441,28 +410,45 @@ Examples:
     # Print score distribution if we have hallucinations
     if all_hallucinations:
         print("\n" + "=" * 50)
-        print("Score Distribution (for threshold tuning)")
+        print("Score Distribution (for analysis)")
         print("=" * 50)
-        print("Score | Count | Example Pattern")
-        print("------|-------|----------------")
 
-        # Group by score
-        score_counts = {}
-        score_examples = {}
-        for h in all_hallucinations:
-            score = h.get("score", h.get("repetition_length", 0) * h.get("repetition_count", 1))
-            score_counts[score] = score_counts.get(score, 0) + 1
-            if score not in score_examples:
-                score_examples[score] = h["repetition_pattern"][:40]
+        # Define score ranges for grouping
+        ranges = [
+            (11, 20, "Low"),
+            (21, 50, "Medium"),
+            (51, 100, "High"),
+            (101, float('inf'), "Very High")
+        ]
 
-        # Sort by score and display
-        for score in sorted(score_counts.keys()):
-            count = score_counts[score]
-            example = score_examples[score]
-            print(f"{score:5d} | {count:5d} | {example}")
+        # Group hallucinations by score range
+        for min_score, max_score, label in ranges:
+            range_hallucinations = [
+                h for h in all_hallucinations
+                if min_score <= h.get("score", h.get("repetition_length", 0) * h.get("repetition_count", 1)) < max_score
+            ]
 
-        print(f"\nCurrent threshold: {args.threshold}")
-        print(f"Patterns with score > {args.threshold} are detected as hallucinations.")
+            if not range_hallucinations:
+                continue
+
+            print(f"\n{label} Score ({min_score}-{max_score-1 if max_score != float('inf') else '∞'}):")
+            print(f"  Total patterns: {len(range_hallucinations)}")
+
+            # Show top 3 unique examples by score
+            seen_patterns = set()
+            examples_shown = 0
+            for h in sorted(range_hallucinations, key=lambda x: x.get("score", 0), reverse=True):
+                pattern = h["repetition_pattern"][:60]
+                if pattern not in seen_patterns and examples_shown < 3:
+                    seen_patterns.add(pattern)
+                    k = h.get("repetition_length", 0)
+                    reps = h.get("repetition_count", 1)
+                    score = h.get("score", k * reps)
+                    print(f"  • Score {score:3d} = k={k:2d} × {reps:2d} reps: \"{pattern}{'...' if len(h['repetition_pattern']) > 60 else ''}\"")
+                    examples_shown += 1
+
+        print("\nUsing SVM classifier for hallucination detection")
+        print("Patterns are classified based on repetition count and sequence length.")
 
     return 1 if failed_files else 0
 
