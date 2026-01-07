@@ -458,6 +458,31 @@ The system is configured via `config/config.yaml`. The configuration defines:
   - Context window thresholds
   - Retry limits
 
+- **Defaults**: Centralized default parameter values
+  - `encoding_name`: Tiktoken encoding for token counting (default: `o200k_base`)
+  - `repetition_min_k`: Minimum phrase length for repetition detection (default: 1)
+  - `repetition_min_repetitions`: Minimum consecutive repetitions (default: 5)
+  - `detect_min_k`: Default min_k for detect() method (default: 3)
+
+### Configuration Philosophy
+
+The project follows a strict "no default parameters" principle: all configuration values must be explicitly provided at call sites. The `defaults` section in `config.yaml` serves as the single source of truth for default values, which are accessed via the `Config` class getter methods:
+
+```python
+from src.config import Config
+
+config = Config(config_path)
+encoding = config.getEncodingName()          # Returns "o200k_base"
+min_k = config.getRepetitionMinK()           # Returns 1
+min_reps = config.getRepetitionMinRepetitions()  # Returns 5
+```
+
+This approach ensures:
+- **Explicit configuration**: No hidden defaults in function signatures
+- **Single source of truth**: All defaults defined in one place (config.yaml)
+- **Easy modification**: Change defaults by editing config.yaml, not code
+- **Clear dependencies**: Call sites explicitly show what configuration they use
+
 See `config/config.yaml` for the current configuration and `config/config.yaml.template` for all available options.
 
 ## Project Status
