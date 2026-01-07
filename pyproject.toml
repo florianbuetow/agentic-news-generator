@@ -180,12 +180,11 @@ severity = "MEDIUM"
 confidence = "MEDIUM"
 
 [tool.deptry]
-# Source scanning - only check src/ directory
+# Source scanning - check src/, scripts/, and notebooks/ directories
 extend_exclude = [
     "build",
     "dist",
     "docs",
-    "scripts",
     "data",
     "reports",
     "notes",
@@ -197,6 +196,7 @@ ignore_notebooks = true
 # First-party modules - tell deptry what belongs to this project
 known_first_party = [
     "src",
+    "config",
 ]
 
 # PEP 621 dev dependency groups - these are NOT runtime dependencies
