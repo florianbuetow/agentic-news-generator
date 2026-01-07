@@ -40,6 +40,11 @@ dev = [
     "pip-audit>=2.7.0",
     "semgrep>=1.144.0",
 
+    # AI Test Detector
+    "autogen-ext[openai]>=0.7.5",
+    "autogen-agentchat>=0.7.5",
+    "requests>=2.25.0",
+
     # Git Hooks
     "pre-commit>=3.6.0",
 ]
