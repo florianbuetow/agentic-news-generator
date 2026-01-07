@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Any
 
 import srt
+import yaml
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from src.util.fs_util import FSUtil
 from src.processing.repetition_detector import RepetitionDetector
+from src.util.fs_util import FSUtil
 
 
 def timedelta_to_srt_timestamp(td: timedelta) -> str:
@@ -33,201 +34,128 @@ def timedelta_to_srt_timestamp(td: timedelta) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
 
 
-def create_sliding_windows(
-    total_words: int, window_size: int, overlap_percent: float
-) -> list[tuple[int, int]]:
-    """Create sliding window boundaries.
-
-    Args:
-        total_words: Total number of words in the text.
-        window_size: Number of words per window.
-        overlap_percent: Percentage of overlap (0-100).
-
-    Returns:
-        List of (start_word_idx, end_word_idx) tuples.
-    """
-    if total_words < window_size:
-        # If text is shorter than window, return single window
-        return [(0, total_words)]
-
-    step_size = int(window_size * (1 - overlap_percent / 100))
-    step_size = max(1, step_size)  # Ensure at least 1 word step
-
-    windows = []
-    start = 0
-    while start < total_words:
-        end = min(start + window_size, total_words)
-        windows.append((start, end))
-
-        if end >= total_words:
-            break
-
-        start += step_size
-
-    return windows
-
-
-class WordToSubtitleMapper:
-    """Maps word positions in cleaned text to SRT subtitle entries."""
-
-    def __init__(self, subtitles: list[srt.Subtitle], detector: RepetitionDetector) -> None:
-        """Initialize mapper with SRT subtitles and repetition detector.
-
-        Args:
-            subtitles: List of parsed SRT subtitle objects.
-            detector: RepetitionDetector instance for text cleaning.
-        """
-        self.subtitles = subtitles
-        self.detector = detector
-        # Build the mapping: word_index -> (subtitle_index, word_offset_in_subtitle)
-        self.word_to_subtitle_map: list[tuple[int, int]] = []
-        self._build_mapping()
-
-    def _build_mapping(self) -> None:
-        """Build mapping from word position to subtitle entry."""
-        for sub_idx, subtitle in enumerate(self.subtitles):
-            # Clean the subtitle text the same way RepetitionDetector does
-            cleaned = self.detector.prepare(subtitle.content)
-            words = cleaned.split()
-
-            # Each word gets mapped to (subtitle_index, word_offset_in_subtitle)
-            for word_offset in range(len(words)):
-                self.word_to_subtitle_map.append((sub_idx, word_offset))
-
-    def get_timestamp_range(
-        self, start_word_idx: int, end_word_idx: int
-    ) -> tuple[timedelta, timedelta]:
-        """Get timestamp range for a word range.
-
-        Args:
-            start_word_idx: Starting word index in the full cleaned text.
-            end_word_idx: Ending word index in the full cleaned text (exclusive).
-
-        Returns:
-            Tuple of (start_timestamp, end_timestamp).
-        """
-        # Get the subtitle containing the start word
-        start_sub_idx, _ = self.word_to_subtitle_map[start_word_idx]
-        start_timestamp = self.subtitles[start_sub_idx].start
-
-        # Get the subtitle containing the end word
-        end_sub_idx, _ = self.word_to_subtitle_map[end_word_idx - 1]
-        end_timestamp = self.subtitles[end_sub_idx].end
-
-        return (start_timestamp, end_timestamp)
-
-    def get_original_text(self, start_word_idx: int, end_word_idx: int) -> str:
-        """Get original text (uncleaned) for a word range.
-
-        Args:
-            start_word_idx: Starting word index.
-            end_word_idx: Ending word index (exclusive).
-
-        Returns:
-            Original text from the SRT subtitles.
-        """
-        start_sub_idx, _ = self.word_to_subtitle_map[start_word_idx]
-        end_sub_idx, _ = self.word_to_subtitle_map[end_word_idx - 1]
-
-        # Collect text from all subtitles in the range
-        texts = [
-            self.subtitles[i].content for i in range(start_sub_idx, end_sub_idx + 1)
-        ]
-        return " ".join(texts)
-
-
 def detect_hallucinations_in_file(
     srt_file: Path,
     detector: RepetitionDetector,
-    window_size: int,
+    min_window_size: int,
     overlap_percent: float,
 ) -> dict[str, Any]:
-    """Process a single SRT file to detect hallucinations.
+    """Process SRT file using SRT-entry-based sliding windows.
 
     Args:
         srt_file: Path to SRT file.
         detector: RepetitionDetector instance (uses SVM classifier for detection).
-        window_size: Window size in words.
+        min_window_size: Minimum window size in words.
         overlap_percent: Overlap percentage.
 
     Returns:
         Dictionary with detection results.
     """
+    from collections import deque
+
     # Read and parse SRT
     srt_content = FSUtil.read_text_file(srt_file)
     subtitles = list(srt.parse(srt_content))
 
-    # Build full text and mapper
-    full_text_parts = [subtitle.content for subtitle in subtitles]
-    full_original_text = " ".join(full_text_parts)
-    cleaned_text = detector.prepare(full_original_text)
+    # Prepare all SRT entries
+    parts = []
+    for subtitle in subtitles:
+        parts.append((subtitle.start, subtitle.end, subtitle.content))
 
-    mapper = WordToSubtitleMapper(subtitles, detector)
-
-    # Create sliding windows
-    words = cleaned_text.split()
-    windows = create_sliding_windows(len(words), window_size, overlap_percent)
-
-    # Process each window
+    # Initialize sliding window
+    window = deque()
+    words_in_window = 0
     hallucinations = []
+    window_idx = 0
 
-    for window_idx, (start_idx, end_idx) in enumerate(windows):
-        window_text = " ".join(words[start_idx:end_idx])
+    # Process entries ONE AT A TIME
+    for i in range(len(parts)):
+        start_ts, end_ts, text = parts[i]
+        words = detector.prepare(text).split()
+        window.append((start_ts, end_ts, text, words))
+        words_in_window += len(words)
 
-        # Detect hallucinations (consecutive repetitions) in this window
-        # Uses SVM classifier to determine what's a hallucination
-        repetitions = detector.detect_hallucinations(window_text)
+        # Detect when window is full OR at end of file
+        if i == len(parts) - 1 or words_in_window >= min_window_size:
+            # DETECT: Concatenate window text and run detection
+            window_text = " ".join([
+                " ".join(words) for _, _, _, words in window
+            ])
 
-        for rep_start, rep_end, rep_k, rep_count in repetitions:
-            # Map window-local indices to global indices
-            global_start = start_idx + rep_start
-            global_end = start_idx + rep_end
+            repetitions = detector.detect_hallucinations(window_text)
 
-            # Get timestamps and text
-            start_ts, end_ts = mapper.get_timestamp_range(global_start, global_end)
-            original_text = mapper.get_original_text(global_start, global_end)
-            cleaned_repetition = " ".join(words[global_start:global_end])
+            # Extract timestamps and text directly from window
+            for rep_start, rep_end, rep_k, rep_count in repetitions:
+                word_offset = 0
+                start_ts = None
+                end_ts = None
+                texts = []
 
-            # Calculate score
-            score = rep_k * rep_count
+                for entry_start_ts, entry_end_ts, entry_text, entry_words in window:
+                    entry_word_count = len(entry_words)
 
-            hallucinations.append(
-                {
+                    # Find start timestamp
+                    if start_ts is None and word_offset <= rep_start < word_offset + entry_word_count:
+                        start_ts = entry_start_ts
+
+                    # Collect text from entries with hallucination
+                    if start_ts is not None and end_ts is None:
+                        texts.append(entry_text)
+
+                    # Find end timestamp
+                    if word_offset < rep_end <= word_offset + entry_word_count:
+                        end_ts = entry_end_ts
+                        break
+
+                    word_offset += entry_word_count
+
+                # Build cleaned text for this hallucination
+                cleaned_repetition = " ".join(window_text.split()[rep_start:rep_end])
+
+                hallucinations.append({
                     "window_index": window_idx,
-                    "start_timestamp": timedelta_to_srt_timestamp(start_ts),
-                    "end_timestamp": timedelta_to_srt_timestamp(end_ts),
-                    "original_text": original_text.strip(),
+                    "window_word_count": words_in_window,
+                    "start_timestamp": timedelta_to_srt_timestamp(start_ts or window[0][0]),
+                    "end_timestamp": timedelta_to_srt_timestamp(end_ts or window[-1][1]),
+                    "original_text": " ".join(texts).strip(),
                     "cleaned_text": cleaned_repetition,
                     "repetition_length": rep_k,
                     "repetition_count": rep_count,
-                    "score": score,
+                    "score": rep_k * rep_count,
                     "repetition_pattern": cleaned_repetition,
                     "window_text": window_text,
-                }
-            )
+                })
+
+            # SHRINK: Remove entries until window is at overlap size
+            while words_in_window > min_window_size * (overlap_percent / 100):
+                _, _, _, words = window.popleft()
+                words_in_window -= len(words)
+
+            window_idx += 1
 
     # Build result
-    result = {
+    total_words = sum(len(detector.prepare(text).split())
+                     for _, _, text in parts)
+
+    return {
         "source_file": str(srt_file),
         "processed_at": datetime.now().isoformat(),
-        "window_size": window_size,
+        "min_window_size": min_window_size,
         "overlap_percent": overlap_percent,
-        "total_windows": len(windows),
+        "total_windows": window_idx + 1,
         "hallucinations_detected": hallucinations,
         "summary": {
             "total_hallucinations": len(hallucinations),
-            "total_words_processed": len(words),
+            "total_words_processed": total_words,
         },
     }
-
-    return result
 
 
 def process_srt_file(
     srt_file: Path,
     output_base_dir: Path,
     detector: RepetitionDetector,
-    window_size: int,
+    min_window_size: int,
     overlap_percent: float,
 ) -> tuple[bool, str | None, int]:
     """Process a single SRT file.
@@ -236,7 +164,7 @@ def process_srt_file(
         srt_file: Path to SRT file.
         output_base_dir: Base directory for output.
         detector: RepetitionDetector instance (uses SVM classifier for detection).
-        window_size: Window size in words.
+        min_window_size: Minimum window size in words.
         overlap_percent: Overlap percentage.
 
     Returns:
@@ -244,7 +172,7 @@ def process_srt_file(
     """
     try:
         result = detect_hallucinations_in_file(
-            srt_file, detector, window_size, overlap_percent
+            srt_file, detector, min_window_size, overlap_percent
         )
 
         # Create output directory (channel_name/transcript-analysis/)
@@ -291,36 +219,62 @@ def print_file_result(
 
 def main() -> int:
     """Main entry point."""
-    # Parse arguments
+    # Load configuration
+    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    if not config_path.exists():
+        print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+        return 1
+
+    # Load raw YAML to access hallucination_detection config
+    with open(config_path, encoding="utf-8") as f:
+        config_data = yaml.safe_load(f)
+
+    # Get hallucination detection config
+    hallucination_config = config_data.get("hallucination_detection", {})
+    config_min_window_size = hallucination_config.get("min_window_size")
+    config_overlap_percent = hallucination_config.get("overlap_percent")
+
+    if config_min_window_size is None or config_overlap_percent is None:
+        print(
+            "Error: hallucination_detection.min_window_size and overlap_percent must be configured in config.yaml",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Parse arguments (allow CLI overrides)
     parser = argparse.ArgumentParser(
         description="Detect hallucinations in SRT transcripts using repetition detection",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                              # Use defaults (SVM classifier decides)
-  %(prog)s --window-size 200            # Larger window for longer transcripts
-  %(prog)s --overlap-percent 50         # More overlap between windows
+  %(prog)s                                  # Use config.yaml settings
+  %(prog)s --min-window-size 1000           # Override window size
+  %(prog)s --overlap-percent 50             # Override overlap percentage
         """,
     )
     parser.add_argument(
-        "--window-size",
+        "--min-window-size",
         type=int,
-        default=100,
-        help="Sliding window size in words (default: 100)",
+        default=None,
+        help=f"Minimum sliding window size in words (default: {config_min_window_size} from config)",
     )
     parser.add_argument(
         "--overlap-percent",
         type=float,
-        default=30.0,
-        help="Overlap percentage between windows (default: 30)",
+        default=None,
+        help=f"Overlap percentage between windows (default: {config_overlap_percent} from config)",
     )
     args = parser.parse_args()
 
-    # Validate arguments
-    if args.window_size < 1:
-        print("Error: window-size must be >= 1", file=sys.stderr)
+    # Use CLI args if provided, otherwise use config
+    min_window_size = args.min_window_size if args.min_window_size is not None else config_min_window_size
+    overlap_percent = args.overlap_percent if args.overlap_percent is not None else config_overlap_percent
+
+    # Validate parameters
+    if min_window_size < 1:
+        print("Error: min-window-size must be >= 1", file=sys.stderr)
         return 1
-    if not 0 <= args.overlap_percent < 100:
+    if not 0 <= overlap_percent < 100:
         print("Error: overlap-percent must be in [0, 100)", file=sys.stderr)
         return 1
 
@@ -331,6 +285,9 @@ Examples:
         return 1
 
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
+
+    # Filter out macOS resource fork files (._* files)
+    srt_files = [f for f in srt_files if not f.name.startswith("._")]
 
     if not srt_files:
         print("No SRT files found in transcripts directory", file=sys.stderr)
@@ -357,8 +314,8 @@ Examples:
             srt_file,
             transcripts_dir,
             detector,
-            args.window_size,
-            args.overlap_percent,
+            min_window_size,
+            overlap_percent,
         )
 
         total_files += 1
@@ -418,7 +375,7 @@ Examples:
             (11, 20, "Low"),
             (21, 50, "Medium"),
             (51, 100, "High"),
-            (101, float('inf'), "Very High")
+            (101, float("inf"), "Very High")
         ]
 
         # Group hallucinations by score range
@@ -444,7 +401,7 @@ Examples:
                     k = h.get("repetition_length", 0)
                     reps = h.get("repetition_count", 1)
                     score = h.get("score", k * reps)
-                    print(f"  • Score {score:3d} = k={k:2d} × {reps:2d} reps: \"{pattern}{'...' if len(h['repetition_pattern']) > 60 else ''}\"")
+                    print(f'  • Score {score:3d} = k={k:2d} × {reps:2d} reps: "{pattern}{'...' if len(h['repetition_pattern']) > 60 else ''}"')
                     examples_shown += 1
 
         print("\nUsing SVM classifier for hallucination detection")

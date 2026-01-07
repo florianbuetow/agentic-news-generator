@@ -27,6 +27,10 @@ def main() -> int:
 
         # Process each JSON file in the analysis directory
         for json_file in analysis_dir.glob("*.json"):
+            # Skip macOS resource fork files
+            if json_file.name.startswith("._"):
+                continue
+
             try:
                 with json_file.open("r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -48,8 +52,9 @@ def main() -> int:
                         "end_timestamp": h["end_timestamp"],
                         "reps": h["repetition_count"],
                         "k": h["repetition_length"],
+                        "window_word_count": h["window_word_count"],
                         "pattern": h["cleaned_text"],
-                        "window": h.get("window_text", h["original_text"])
+                        "window": h["window_text"]
                     })
 
             except Exception as e:
@@ -85,8 +90,9 @@ def main() -> int:
                 f.write(f"End Timestamp: {h['end_timestamp']}\n")
                 f.write(f"Repetitions: {h['reps']}\n")
                 f.write(f"Sequence Length: {h['k']}\n")
+                f.write(f"Window Word Count: {h['window_word_count']}\n")
                 f.write(f"Pattern: {h['pattern']}\n")
-                f.write(f"Window Text:\n")
+                f.write("Window Text:\n")
                 f.write(f"{h['window']}\n\n")
                 f.write("---\n\n")
 
