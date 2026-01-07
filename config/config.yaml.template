@@ -17,6 +17,11 @@ channels:
     description: "alternative format using vibe field instead of category/what_you_get"
     download-limiter: 0  # Skip this channel entirely
 
+# Hallucination Detection Configuration
+hallucination_detection:
+  min_window_size: 500  # Minimum sliding window size in words
+  overlap_percent: 25.0  # Overlap percentage between windows (0-100)
+
 # Topic Segmentation Agent Configuration
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio
