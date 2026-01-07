@@ -6,24 +6,46 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+import yaml
+
 
 def main() -> int:  # noqa: C901
     """Generate hallucination digest grouped by file."""
-    # Find all analysis JSON files
-    transcripts_dir = Path(__file__).parent.parent / "data" / "downloads" / "transcripts"
+    # Load configuration
+    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    if not config_path.exists():
+        print(f"Error: Config file not found: {config_path}", file=sys.stderr)
+        return 1
 
-    if not transcripts_dir.exists():
-        print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
+    with open(config_path, encoding="utf-8") as f:
+        config_data = yaml.safe_load(f)
+
+    # Get hallucination detection output directory
+    hallucination_config = config_data.get("hallucination_detection", {})
+    config_output_dir = hallucination_config.get("output_dir")
+
+    if config_output_dir is None:
+        print(
+            "Error: hallucination_detection.output_dir must be configured in config.yaml",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Find all analysis JSON files
+    transcripts_hallucinations_dir = Path(__file__).parent.parent / config_output_dir
+
+    if not transcripts_hallucinations_dir.exists():
+        print(f"Error: Hallucination output directory not found: {transcripts_hallucinations_dir}", file=sys.stderr)
         return 1
 
     # Collect all hallucinations grouped by file
     hallucinations_by_file = defaultdict(list)
 
-    # Find all transcript-analysis directories
-    analysis_dirs = list(transcripts_dir.glob("*/transcript-analysis"))
+    # Find all channel directories (each contains hallucination JSON files)
+    analysis_dirs = [d for d in transcripts_hallucinations_dir.glob("*") if d.is_dir()]
 
     for analysis_dir in analysis_dirs:
-        channel_name = analysis_dir.parent.name
+        channel_name = analysis_dir.name
 
         # Process each JSON file in the analysis directory
         for json_file in analysis_dir.glob("*.json"):

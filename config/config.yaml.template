@@ -22,6 +22,9 @@ hallucination_detection:
   min_window_size: 500  # Minimum sliding window size in words
   overlap_percent: 25.0  # Overlap percentage between windows (0-100)
 
+  # Output directory for hallucination detection results
+  output_dir: data/downloads/transcripts-hallucinations
+
 # Topic Segmentation Agent Configuration
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio

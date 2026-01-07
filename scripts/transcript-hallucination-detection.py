@@ -171,9 +171,9 @@ def process_srt_file(
     try:
         result = detect_hallucinations_in_file(srt_file, detector, min_window_size, overlap_percent)
 
-        # Create output directory (channel_name/transcript-analysis/)
+        # Create output directory (channel_name/)
         channel_name = srt_file.parent.name
-        analysis_dir = output_base_dir / channel_name / "transcript-analysis"
+        analysis_dir = output_base_dir / channel_name
         FSUtil.ensure_directory_exists(analysis_dir)
 
         # Write JSON output
@@ -227,10 +227,18 @@ def main() -> int:  # noqa: C901
     hallucination_config = config_data.get("hallucination_detection", {})
     config_min_window_size = hallucination_config.get("min_window_size")
     config_overlap_percent = hallucination_config.get("overlap_percent")
+    config_output_dir = hallucination_config.get("output_dir")
 
     if config_min_window_size is None or config_overlap_percent is None:
         print(
             "Error: hallucination_detection.min_window_size and overlap_percent must be configured in config.yaml",
+            file=sys.stderr,
+        )
+        return 1
+
+    if config_output_dir is None:
+        print(
+            "Error: hallucination_detection.output_dir must be configured in config.yaml",
             file=sys.stderr,
         )
         return 1
@@ -278,6 +286,9 @@ Examples:
         print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
         return 1
 
+    # Hallucination detection output directory from config
+    transcripts_hallucinations_dir = Path(__file__).parent.parent / config_output_dir
+
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
 
     # Filter out macOS resource fork files (._* files)
@@ -311,7 +322,7 @@ Examples:
 
         success, error_msg, hallucination_count = process_srt_file(
             srt_file,
-            transcripts_dir,
+            transcripts_hallucinations_dir,
             detector,
             min_window_size,
             overlap_percent,
@@ -327,7 +338,7 @@ Examples:
             example = None
             if hallucination_count > 0:
                 channel_name = srt_file.parent.name
-                analysis_dir = transcripts_dir / channel_name / "transcript-analysis"
+                analysis_dir = transcripts_hallucinations_dir / channel_name
                 output_file = analysis_dir / f"{srt_file.stem}.json"
 
                 # Read back the JSON to get an example and collect all hallucinations
