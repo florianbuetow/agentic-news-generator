@@ -15,14 +15,14 @@ class TestCountTokensFromMessages:
     def test_count_empty_messages(self) -> None:
         """Test token counting with empty messages list."""
         messages: list[dict[str, str]] = []
-        token_count = count_tokens_from_messages(messages)
+        token_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
         # Should only include response priming overhead
         assert token_count == 3
 
     def test_count_single_message(self) -> None:
         """Test token counting with a single message."""
         messages = [{"role": "system", "content": "You are a helpful assistant."}]
-        token_count = count_tokens_from_messages(messages)
+        token_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
         # Should be > 0 (content + overhead)
         assert token_count > 0
 
@@ -32,7 +32,7 @@ class TestCountTokensFromMessages:
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "Hello, how are you?"},
         ]
-        token_count = count_tokens_from_messages(messages)
+        token_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
         # Should be greater than single message
         assert token_count > 20  # Reasonable minimum for this content
 
@@ -40,7 +40,7 @@ class TestCountTokensFromMessages:
         """Test token counting with long content."""
         long_text = "Hello " * 1000  # Repeat to create longer content
         messages = [{"role": "user", "content": long_text}]
-        token_count = count_tokens_from_messages(messages)
+        token_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
         # Should be proportional to content length
         assert token_count > 1000  # Should have many tokens for long content
 
@@ -62,7 +62,7 @@ class TestValidateTokenUsage:
         threshold = 90
 
         # Should not raise exception
-        token_count = validate_token_usage(messages, context_window, threshold)
+        token_count = validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
         assert token_count > 0
         assert token_count < (context_window * 0.9)
 
@@ -73,7 +73,7 @@ class TestValidateTokenUsage:
         messages = [{"role": "user", "content": large_content}]
 
         # First, get the actual token count
-        actual_count = count_tokens_from_messages(messages)
+        actual_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
 
         # Set context window and threshold such that we exceed it
         # For example, if actual count is 50000, set window to 50000 and threshold to 90%
@@ -82,7 +82,7 @@ class TestValidateTokenUsage:
         threshold = 90  # 90% of actual_count < actual_count
 
         with pytest.raises(ContextWindowExceededError) as exc_info:
-            validate_token_usage(messages, context_window, threshold)
+            validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
 
         # Verify exception attributes
         assert exc_info.value.context_window == context_window
@@ -95,14 +95,14 @@ class TestValidateTokenUsage:
         messages = [{"role": "user", "content": "x" * 100}]
 
         # First, get actual token count
-        actual_count = count_tokens_from_messages(messages)
+        actual_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
 
         # Set context window such that threshold is exactly the token count
         context_window = actual_count
         threshold = 100
 
         # Should not raise (token_count == threshold_tokens)
-        token_count = validate_token_usage(messages, context_window, threshold)
+        token_count = validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
         assert token_count == actual_count
 
     def test_one_token_over_threshold(self) -> None:
@@ -110,7 +110,7 @@ class TestValidateTokenUsage:
         messages = [{"role": "user", "content": "x" * 100}]
 
         # Get actual token count
-        actual_count = count_tokens_from_messages(messages)
+        actual_count = count_tokens_from_messages(messages, encoding_name="o200k_base")
 
         # Set context window such that threshold is one less than token count
         threshold_tokens = actual_count - 1
@@ -118,7 +118,7 @@ class TestValidateTokenUsage:
         threshold = 100
 
         with pytest.raises(ContextWindowExceededError):
-            validate_token_usage(messages, context_window, threshold)
+            validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
 
     def test_zero_threshold(self) -> None:
         """Test validation with 0% threshold."""
@@ -128,7 +128,7 @@ class TestValidateTokenUsage:
 
         # Should raise since any tokens > 0% threshold
         with pytest.raises(ContextWindowExceededError):
-            validate_token_usage(messages, context_window, threshold)
+            validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
 
     def test_hundred_percent_threshold(self) -> None:
         """Test validation with 100% threshold."""
@@ -137,7 +137,7 @@ class TestValidateTokenUsage:
         threshold = 100
 
         # Should pass for reasonable message sizes
-        token_count = validate_token_usage(messages, context_window, threshold)
+        token_count = validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
         assert token_count > 0
         assert token_count <= context_window
 
@@ -149,7 +149,7 @@ class TestValidateTokenUsage:
 
         # Should raise since message likely exceeds small window
         with pytest.raises(ContextWindowExceededError):
-            validate_token_usage(messages, context_window, threshold)
+            validate_token_usage(messages, context_window, threshold, encoding_name="o200k_base")
 
 
 class TestContextWindowExceededError:
