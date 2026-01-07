@@ -20,7 +20,7 @@ class TestCountConsecutiveRepetitions:
         words = detector.prepare(text).split()
 
         # "hello world" appears at [0:2] and [2:4]
-        count = detector._count_consecutive_repetitions(words, 0, 2)
+        count = detector.count_consecutive_repetitions(words, 0, 2)
         assert count == 2
 
     def test_three_repetitions(self):
@@ -29,7 +29,7 @@ class TestCountConsecutiveRepetitions:
         text = "abc abc abc"
         words = detector.prepare(text).split()
 
-        count = detector._count_consecutive_repetitions(words, 0, 1)
+        count = detector.count_consecutive_repetitions(words, 0, 1)
         assert count == 3
 
     def test_fifteen_repetitions(self):
@@ -39,7 +39,7 @@ class TestCountConsecutiveRepetitions:
         words = detector.prepare(text).split()
 
         # Pattern is 3 words: "like," "you" "know,"
-        count = detector._count_consecutive_repetitions(words, 0, 3)
+        count = detector.count_consecutive_repetitions(words, 0, 3)
         assert count == 15
 
     def test_non_consecutive_returns_one(self):
@@ -49,7 +49,7 @@ class TestCountConsecutiveRepetitions:
         words = detector.prepare(text).split()
 
         # "apple" appears at [0] and [2], but not consecutively
-        count = detector._count_consecutive_repetitions(words, 0, 1)
+        count = detector.count_consecutive_repetitions(words, 0, 1)
         assert count == 1
 
     def test_forty_repetitions_yeah(self):
@@ -59,7 +59,7 @@ class TestCountConsecutiveRepetitions:
         text = " ".join(["Yeah."] * 40)
         words = detector.prepare(text).split()
 
-        count = detector._count_consecutive_repetitions(words, 0, 1)
+        count = detector.count_consecutive_repetitions(words, 0, 1)
         assert count == 40
 
 
@@ -75,7 +75,7 @@ class TestDetectHallucinations:
 
         assert len(results) > 0
         # Should detect the pattern
-        start, end, k, rep_count = results[0]
+        _start, _end, k, rep_count = results[0]
         assert k == 3  # "you" "know," "like,"
         assert rep_count == 15
         assert k * rep_count == 45  # Score should be 45
@@ -119,7 +119,7 @@ class TestDetectHallucinations:
 
         # Should be detected as hallucination by SVM (k=3, reps=15)
         assert len(results) > 0
-        start, end, k, rep_count = results[0]
+        _start, _end, k, rep_count = results[0]
         assert k == 3  # 3-word phrase
         assert rep_count == 15  # 15 repetitions
 
@@ -142,7 +142,7 @@ class TestDetectHallucinations:
 
         # Should be detected as hallucination
         assert len(results_11) > 0
-        start, end, k, rep_count = results_11[0]
+        _start, _end, k, rep_count = results_11[0]
         assert k == 1  # Single word
         assert rep_count == 11  # 11 repetitions
 
@@ -203,7 +203,7 @@ class TestDetectHallucinations:
         # Should detect the "and," pattern
         assert len(results) > 0
 
-        start, end, k, rep_count = results[0]
+        _start, _end, k, rep_count = results[0]
         assert k == 1  # Single word
         assert rep_count >= 40
         score = k * rep_count
@@ -227,7 +227,7 @@ class TestDetectHallucinations:
 
         # Find the longest detected pattern
         max_score_result = max(results, key=lambda r: r[2] * r[3])
-        start, end, k, rep_count = max_score_result
+        _start, _end, k, rep_count = max_score_result
 
         # Should have detected multiple repetitions
         assert rep_count >= 5, f"Expected at least 5 repetitions, got {rep_count}"
@@ -261,7 +261,7 @@ class TestDetectHallucinations:
 
         # Find the longest detected pattern
         max_score_result = max(results, key=lambda r: r[2] * r[3])
-        start, end, k, rep_count = max_score_result
+        _start, _end, k, rep_count = max_score_result
 
         # Should have detected multiple repetitions
         assert rep_count >= 5, f"Expected at least 5 repetitions, got {rep_count}"
@@ -300,7 +300,7 @@ class TestDetectHallucinations:
 
         # Find the longest detected pattern
         max_score_result = max(results, key=lambda r: r[2] * r[3])
-        start, end, k, rep_count = max_score_result
+        _start, _end, k, rep_count = max_score_result
 
         # Should have detected many repetitions
         assert rep_count >= 5, f"Expected at least 5 repetitions, got {rep_count}"
@@ -315,7 +315,7 @@ class TestDetectHallucinations:
 
         results = detector.detect_hallucinations(text)
         assert len(results) > 0
-        start, end, k, rep_count = results[0]
+        _start, _end, k, rep_count = results[0]
         assert k == 1
         assert rep_count == 11
         assert k * rep_count == 11
@@ -594,7 +594,7 @@ class TestDetectHallucinations:
         results = detector.detect_hallucinations(text)
 
         assert len(results) > 0
-        start, end, k, rep_count = results[0]
+        _start, _end, k, rep_count = results[0]
         assert k * rep_count == 11
 
 
@@ -696,7 +696,7 @@ class TestConstructorParameters:
         # Pattern meets min_repetitions (4 >= 3), classifier evaluates it
         # k=3, reps=4 - classifier determines if hallucination
         if len(results) > 0:
-            start, end, k, rep_count = results[0]
+            _start, _end, k, rep_count = results[0]
             assert k == 3  # 3-word phrase
             assert rep_count == 4  # 4 repetitions
 
@@ -714,7 +714,7 @@ class TestConstructorParameters:
         results_low = detector_low.detect_hallucinations(text)
         # k=3, reps=4 - classifier determines the result
         if len(results_low) > 0:
-            start, end, k, rep_count = results_low[0]
+            _start, _end, k, rep_count = results_low[0]
             assert k == 3
             assert rep_count == 4
 
@@ -734,7 +734,7 @@ class TestConstructorParameters:
 
         # min_k=1 should detect the 3-word pattern (k=3, reps=15)
         assert len(results_1) > 0, "min_k=1 should detect 3-word pattern"
-        start, end, k, rep_count = results_1[0]
+        _start, _end, k, rep_count = results_1[0]
         assert k == 3  # 3-word phrase
         assert rep_count == 15  # 15 repetitions
 
