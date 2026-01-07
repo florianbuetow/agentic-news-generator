@@ -9,22 +9,24 @@ from pydantic import ValidationError
 from src.agents.topic_segmentation.agent_prompts import RETRY_PROMPT_TEMPLATE, SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from src.agents.topic_segmentation.models import AgentSegmentationResponse
 from src.agents.topic_segmentation.token_validator import validate_token_usage
-from src.config import LLMConfig
+from src.config import Config, LLMConfig
 
 
 class TopicSegmentationAgent:
     """Agent that segments video transcripts by topics."""
 
-    def __init__(self, llm_config: LLMConfig) -> None:
+    def __init__(self, llm_config: LLMConfig, config: Config) -> None:
         """Initialize the topic segmentation agent.
 
         Args:
             llm_config: LLM configuration for this agent.
+            config: Full application configuration.
 
         Raises:
             KeyError: If required environment variables are missing.
         """
         self._llm_config = llm_config
+        self._config = config
         self._system_prompt = SYSTEM_PROMPT
         self._user_prompt_template = USER_PROMPT_TEMPLATE
         self._retry_prompt_template = RETRY_PROMPT_TEMPLATE
@@ -75,6 +77,7 @@ class TopicSegmentationAgent:
                 messages=messages,
                 context_window=self._llm_config.context_window,
                 threshold=self._llm_config.context_window_threshold,
+                encoding_name=self._config.getEncodingName(),
             )
             print(
                 f"        [Agent] Token count: {token_count:,} tokens "
