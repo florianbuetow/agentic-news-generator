@@ -1,6 +1,5 @@
 """Tests for the RepetitionDetector class."""
 
-
 from src.processing.repetition_detector import RepetitionDetector
 
 
@@ -333,7 +332,7 @@ class TestDetectHallucinations:
         assert len(results_5) > 0
         # Should find a pattern with score > 10 and reps >= 5
         found = False
-        for start, end, k, rep_count in results_5:
+        for _start, _end, k, rep_count in results_5:
             if k * rep_count > 10 and rep_count >= 5:
                 found = True
                 break
@@ -484,7 +483,7 @@ class TestDetectHallucinations:
         # If detected, score should be around 12
         if results:
             found = False
-            for start, end, k, rep_count in results:
+            for _start, _end, k, rep_count in results:
                 score = k * rep_count
                 if score >= 12:
                     found = True
@@ -523,7 +522,7 @@ class TestDetectHallucinations:
         assert len(results) > 0
         # Find the longest pattern
         max_score = 0
-        for start, end, k, rep_count in results:
+        for _start, _end, k, rep_count in results:
             score = k * rep_count
             max_score = max(max_score, score)
         # With 10 repetitions, score should be high
@@ -615,7 +614,7 @@ class TestDetectBasic:
         # Should prioritize "apple banana cherry" (k=3) at position 0
         # over shorter subpatterns
         found_k3 = False
-        for start, end, k in results:
+        for start, _end, k in results:
             if start == 0 and k >= 3:
                 found_k3 = True
                 break
@@ -734,5 +733,5 @@ class TestConstructorParameters:
 
         # min_k=5 should NOT find 3-word patterns (but might find longer accidental patterns)
         # Verify no 3-word pattern in results
-        for start, end, k, rep_count in results_5:
+        for _start, _end, k, _rep_count in results_5:
             assert k >= 5, f"min_k=5 should only find patterns with k >= 5, found k={k}"
