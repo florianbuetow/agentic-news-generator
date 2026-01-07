@@ -12,13 +12,13 @@ class RepetitionDetector:
 
     _WS = re.compile(r"\s+")
 
-    def __init__(self, min_k: int = 1, min_repetitions: int = 5, config_path: Path | None = None) -> None:
+    def __init__(self, min_k: int, min_repetitions: int, config_path: Path) -> None:
         """Initialize RepetitionDetector with ML classifier.
 
         Args:
-            min_k: Minimum phrase length in words (default: 1).
-            min_repetitions: Minimum consecutive repetitions (default: 5).
-            config_path: Path to config.yaml (optional).
+            min_k: Minimum phrase length in words.
+            min_repetitions: Minimum consecutive repetitions.
+            config_path: Path to config.yaml.
         """
         self.min_k = min_k
         self.min_repetitions = min_repetitions
@@ -38,7 +38,7 @@ class RepetitionDetector:
         # Normalize whitespace
         return self._WS.sub(" ", text).strip()
 
-    def detect(self, text: str, min_k: int = 3) -> list[list[int]]:
+    def detect(self, text: str, min_k: int) -> list[list[int]]:
         """Detects repetitions and returns a list of [start, end, k].
 
         If multiple k exist for the same start point, only the largest k is kept.
@@ -217,7 +217,17 @@ class RepetitionDetector:
 
 # --- Example ---
 if __name__ == "__main__":
-    detector = RepetitionDetector()
+    from pathlib import Path
+
+    from src.config import Config
+
+    config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
+    config = Config(config_path)
+    detector = RepetitionDetector(
+        min_k=config.getRepetitionMinK(),
+        min_repetitions=config.getRepetitionMinRepetitions(),
+        config_path=config.getConfigPath(),
+    )
 
     print("=== Formula-Based Hallucination Detection ===\n")
 
