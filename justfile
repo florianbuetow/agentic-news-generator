@@ -111,6 +111,7 @@ notebooks:
 
     # Launch notebook server in foreground
     uv run jupyter notebook --no-browser --NotebookApp.token='' --NotebookApp.password='' notebooks/
+    echo ""
 
 # Destroy the virtual environment
 destroy:
@@ -140,6 +141,13 @@ code-format:
     @uv run ruff format .
     @echo ""
     @printf "\033[0;32m✓ Code formatted\033[0m\n"
+    @echo ""
+
+# Check config.yaml matches template structure
+code-config:
+    @echo ""
+    @printf "\033[0;34m=== Checking Config Structure ===\033[0m\n"
+    @uv run scripts/check/config_template.py
     @echo ""
 
 # Run static type checking with mypy
@@ -260,6 +268,7 @@ ci:
     printf "\033[0;34m=== Running CI Checks ===\033[0m\n"
     echo ""
     just init
+    just code-config
     just code-format
     just code-style
     just code-typecheck
@@ -278,6 +287,7 @@ ci:
 ci-quiet:
     #!/usr/bin/env bash
     set -e
+    echo ""
     printf "\033[0;34m=== Running CI Checks (Quiet Mode) ===\033[0m\n"
     TMPFILE=$(mktemp)
     trap "rm -f $TMPFILE" EXIT
