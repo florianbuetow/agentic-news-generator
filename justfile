@@ -37,6 +37,13 @@ run:
     @uv run src/main.py
     @echo ""
 
+# Compile markdown articles into articles.js
+compile-articles:
+    @echo ""
+    @printf "\033[0;34m=== Compiling Articles ===\033[0m\n"
+    @uv run scripts/compile_articles.py
+    @echo ""
+
 # Generate static newspaper website
 newspaper-generate:
     #!/usr/bin/env bash
