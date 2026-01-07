@@ -72,7 +72,7 @@ archive-videos:
     @echo ""
 
 # Analyze transcripts for hallucinations
-analyze-transcripts:
+analyze-transcripts-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Analyzing Transcripts for Hallucinations ===\033[0m\n"
     @uv run scripts/transcript-hallucination-detection.py
