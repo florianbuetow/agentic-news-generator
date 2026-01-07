@@ -204,6 +204,10 @@ reports/
 .cursorignore
 .cursorindexingignore
 
+# Claude Code
+#  Claude Code local configuration and settings
+.claude/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
