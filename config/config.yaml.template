@@ -1,3 +1,18 @@
+# Project directories
+paths:
+  data_dir: ./data/
+  data_downloads_dir: ./data/downloads
+  data_downloads_videos_dir: ./data/downloads/videos/
+  data_downloads_transcripts_dir: ./data/downloads/transcripts
+  data_downloads_transcripts_hallucinations_dir: ./data/downloads/transcripts-hallucinations
+  data_downloads_audio_dir: ./data/downloads/audio
+  data_downloads_metadata_dir: ./data/downloads/metadata
+  data_output_dir: ./data/output/
+  data_input_dir: ./data/input/
+  data_temp_dir: ./data/temp
+  data_archive_dir: ./data/archive
+  data_archive_videos_dir: ./data/archive/videos
+
 channels:
   - url: https://www.youtube.com/@ExampleChannel1
     name: Example Channel One
@@ -22,8 +37,13 @@ hallucination_detection:
   min_window_size: 500  # Minimum sliding window size in words
   overlap_percent: 25.0  # Overlap percentage between windows (0-100)
 
-  # Output directory for hallucination detection results
-  output_dir: data/downloads/transcripts-hallucinations
+  # Output directory for hallucination detection results (relative to data_dir)
+  output_dir: downloads/transcripts-hallucinations
+
+  # SVM model coefficients (auto-generated from training)
+  coef_repetitions: 0.8888460000
+  coef_sequence_length: 0.6665380000
+  intercept: -6.7770510000
 
 # Topic Segmentation Agent Configuration
 topic_segmentation:
@@ -35,6 +55,7 @@ topic_segmentation:
     context_window: 262144
     max_tokens: 32000
     temperature: 0.7
+    context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
 
   # Critic Agent LLM - using same LM Studio instance
   critic_llm:
@@ -44,6 +65,17 @@ topic_segmentation:
     context_window: 262144
     max_tokens: 32000
     temperature: 0.3
+    context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
 
   # Retry configuration
   retry_limit: 1
+
+# Default parameter values
+defaults:
+  # Token validation defaults
+  encoding_name: "o200k_base"  # Tiktoken encoding for token counting
+
+  # Repetition detection defaults
+  repetition_min_k: 1  # Minimum phrase length for detection
+  repetition_min_repetitions: 5  # Minimum consecutive repetitions
+  detect_min_k: 3  # Default min_k for detect() method
