@@ -1,4 +1,4 @@
-"""Standalone Hallucination Classifier - Linear Model
+"""Standalone Hallucination Classifier - Linear Model.
 
 Auto-generated from trained logistic regression model.
 No ML library dependencies required for inference.
@@ -56,11 +56,7 @@ class HallucinationClassifier:
         Returns:
             Decision score (positive = hallucination, negative = normal).
         """
-        return (
-            self.coef_repetitions * repetitions
-            + self.coef_sequence_length * sequence_length
-            + self.intercept
-        )
+        return self.coef_repetitions * repetitions + self.coef_sequence_length * sequence_length + self.intercept
 
     def predict_proba(self, repetitions: float, sequence_length: float) -> float:
         """Compute probability of hallucination using sigmoid function.
@@ -97,5 +93,4 @@ if __name__ == "__main__":
         score = classifier.decision_function(reps, seq_len)
 
         result = "✓ HALLUCINATION" if is_hall else "○ NORMAL"
-        print(f"{result} | reps={reps:2d} len={seq_len:2d} | "
-              f"prob={prob:.3f} score={score:+.2f} | {description}")
+        print(f"{result} | reps={reps:2d} len={seq_len:2d} | prob={prob:.3f} score={score:+.2f} | {description}")

@@ -1,4 +1,4 @@
-"""Standalone Hallucination Classifier - Quadratic Model
+"""Standalone Hallucination Classifier - Quadratic Model.
 
 Auto-generated from trained logistic regression model with polynomial features (degree=2).
 No ML library dependencies required for inference.
@@ -71,8 +71,8 @@ class HallucinationClassifier:
         # Compute polynomial features
         rep = repetitions
         len_val = sequence_length
-        rep_squared = repetitions ** 2
-        len_squared = sequence_length ** 2
+        rep_squared = repetitions**2
+        len_squared = sequence_length**2
         interaction = repetitions * sequence_length
 
         # Compute decision function
@@ -123,5 +123,4 @@ if __name__ == "__main__":
         score = classifier.decision_function(reps, seq_len)
 
         result = "✓ HALLUCINATION" if is_hall else "○ NORMAL"
-        print(f"{result} | reps={reps:2d} len={seq_len:2d} | "
-              f"prob={prob:.3f} score={score:+.2f} | {description}")
+        print(f"{result} | reps={reps:2d} len={seq_len:2d} | prob={prob:.3f} score={score:+.2f} | {description}")
