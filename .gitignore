@@ -216,6 +216,9 @@ __marimo__/
 # Copier answers file
 .copier-answers.yml
 
+# Claude Code - exclude settings.local.json in all subdirectories
+**/settings.local.json
+
 # Frontend / Nuxt.js
 frontend/newspaper/node_modules/
 frontend/newspaper/.nuxt/
