@@ -10,6 +10,24 @@ from pydantic import ValidationError
 from src.config import Config, LLMConfig, TopicSegmentationConfig
 
 
+def get_valid_paths_config() -> dict[str, str]:
+    """Return a valid paths configuration dictionary for tests."""
+    return {
+        "data_dir": "./data/",
+        "data_downloads_dir": "./data/downloads",
+        "data_downloads_videos_dir": "./data/downloads/videos/",
+        "data_downloads_transcripts_dir": "./data/downloads/transcripts",
+        "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
+        "data_downloads_audio_dir": "./data/downloads/audio",
+        "data_downloads_metadata_dir": "./data/downloads/metadata",
+        "data_output_dir": "./data/output/",
+        "data_input_dir": "./data/input/",
+        "data_temp_dir": "./data/temp",
+        "data_archive_dir": "./data/archive",
+        "data_archive_videos_dir": "./data/archive/videos",
+    }
+
+
 class TestLLMConfig:
     """Tests for LLMConfig model."""
 
@@ -477,6 +495,7 @@ class TestConfigWithTopicSegmentation:
     def test_load_config_with_topic_segmentation(self) -> None:
         """Test loading config with topic_segmentation section."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -525,6 +544,7 @@ class TestConfigWithTopicSegmentation:
     def test_load_config_without_topic_segmentation(self) -> None:
         """Test loading config without topic_segmentation section."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -533,7 +553,7 @@ class TestConfigWithTopicSegmentation:
                     "description": "Test description",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -551,6 +571,7 @@ class TestConfigWithTopicSegmentation:
     def test_invalid_topic_segmentation_config(self) -> None:
         """Test loading config with invalid topic_segmentation section."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -586,6 +607,7 @@ class TestConfigWithTopicSegmentation:
     def test_topic_segmentation_with_missing_retry_limit(self) -> None:
         """Test topic_segmentation config with missing retry_limit."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",

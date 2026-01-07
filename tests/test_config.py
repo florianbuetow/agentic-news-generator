@@ -11,6 +11,24 @@ from pydantic import ValidationError
 from src.config import ChannelConfig, Config
 
 
+def get_valid_paths_config() -> dict[str, str]:
+    """Return a valid paths configuration dictionary for tests."""
+    return {
+        "data_dir": "./data/",
+        "data_downloads_dir": "./data/downloads",
+        "data_downloads_videos_dir": "./data/downloads/videos/",
+        "data_downloads_transcripts_dir": "./data/downloads/transcripts",
+        "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
+        "data_downloads_audio_dir": "./data/downloads/audio",
+        "data_downloads_metadata_dir": "./data/downloads/metadata",
+        "data_output_dir": "./data/output/",
+        "data_input_dir": "./data/input/",
+        "data_temp_dir": "./data/temp",
+        "data_archive_dir": "./data/archive",
+        "data_archive_videos_dir": "./data/archive/videos",
+    }
+
+
 class TestChannelConfig:
     """Test cases for the ChannelConfig Pydantic model."""
 
@@ -110,6 +128,7 @@ class TestConfig:
     def test_load_valid_config(self) -> None:
         """Test loading a valid configuration file."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
@@ -125,7 +144,7 @@ class TestConfig:
                     "description": "Content 2",
                     "download-limiter": 20,
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -175,7 +194,7 @@ class TestConfig:
 
     def test_channels_not_list(self) -> None:
         """Test that channels not being a list raises ValueError."""
-        config_data = {"channels": "not a list"}
+        config_data = {"paths": get_valid_paths_config(), "channels": "not a list"}
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
             temp_path = Path(f.name)
@@ -189,7 +208,7 @@ class TestConfig:
 
     def test_empty_channels_list(self) -> None:
         """Test that an empty channels list is valid."""
-        config_data: dict[str, list[dict[str, Any]]] = {"channels": []}
+        config_data: dict[str, Any] = {"paths": get_valid_paths_config(), "channels": []}
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
             temp_path = Path(f.name)
@@ -204,13 +223,14 @@ class TestConfig:
     def test_channel_missing_required_field(self) -> None:
         """Test that channel missing required fields raises ValueError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     # Missing category, description, download_limiter
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -227,12 +247,13 @@ class TestConfig:
     def test_channel_missing_name_field(self) -> None:
         """Test that channel missing name field uses index in error message."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     # Missing name, category, description, download_limiter
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -248,6 +269,7 @@ class TestConfig:
     def test_multiple_validation_errors(self) -> None:
         """Test that multiple channel validation errors are all reported."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
@@ -259,7 +281,7 @@ class TestConfig:
                     "name": "Test Channel 2",
                     # Missing category, description, download_limiter
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -279,6 +301,7 @@ class TestConfig:
     def test_get_channel_valid_index(self) -> None:
         """Test getting a channel by valid index."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
@@ -294,7 +317,7 @@ class TestConfig:
                     "description": "Content 2",
                     "download-limiter": 20,
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -312,6 +335,7 @@ class TestConfig:
     def test_get_channel_negative_index(self) -> None:
         """Test that negative index raises IndexError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -320,7 +344,7 @@ class TestConfig:
                     "description": "Content",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -337,6 +361,7 @@ class TestConfig:
     def test_get_channel_index_too_large(self) -> None:
         """Test that index too large raises IndexError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -345,7 +370,7 @@ class TestConfig:
                     "description": "Content",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -363,6 +388,7 @@ class TestConfig:
     def test_get_channel_by_name_valid(self) -> None:
         """Test getting a channel by valid name."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
@@ -378,7 +404,7 @@ class TestConfig:
                     "description": "Content 2",
                     "download-limiter": 20,
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -396,6 +422,7 @@ class TestConfig:
     def test_get_channel_by_name_not_found(self) -> None:
         """Test that non-existent channel name raises KeyError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -404,7 +431,7 @@ class TestConfig:
                     "description": "Content",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -421,6 +448,7 @@ class TestConfig:
     def test_get_channel_by_name_case_sensitive(self) -> None:
         """Test that channel name lookup is case-sensitive."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -429,7 +457,7 @@ class TestConfig:
                     "description": "Content",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -445,6 +473,7 @@ class TestConfig:
     def test_channel_with_wrong_type(self) -> None:
         """Test that channel with wrong field type raises ValueError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": 123,  # Should be string
@@ -453,7 +482,7 @@ class TestConfig:
                     "description": "Content",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -469,6 +498,7 @@ class TestConfig:
     def test_channel_with_extra_field(self) -> None:
         """Test that channel with extra field raises ValueError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -478,7 +508,7 @@ class TestConfig:
                     "download-limiter": 20,
                     "extra_field": "not allowed",
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -494,6 +524,7 @@ class TestConfig:
     def test_config_path_as_string(self) -> None:
         """Test that config_path can be provided as a string."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
@@ -502,7 +533,7 @@ class TestConfig:
                     "description": "Content",
                     "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
