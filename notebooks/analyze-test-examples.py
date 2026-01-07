@@ -15,6 +15,7 @@ from pathlib import Path
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 
 # Test examples extracted from tests/test_repetition_detector.py
@@ -285,8 +286,9 @@ def analyze_text(text: str, detector: RepetitionDetector) -> tuple[int, int, int
 def main() -> int:
     """Main entry point."""
     # Initialize detector with default parameters
-    detector = RepetitionDetector(min_k=1, min_repetitions=5)
-
+    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config = Config(config_path)
+    detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=config.getConfigPath())
     # Prepare output file
     output_file = Path(__file__).parent.parent / "data" / "analyze" / "hallucinations" / "test_examples_analysis.csv"
     output_file.parent.mkdir(parents=True, exist_ok=True)

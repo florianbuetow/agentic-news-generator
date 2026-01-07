@@ -13,6 +13,7 @@ import yaml
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 from src.util.fs_util import FSUtil
 
@@ -288,8 +289,13 @@ Examples:
 
     print(f"Found {len(srt_files)} SRT file(s) to process\n")
 
-    # Initialize detector with defaults (SVM classifier decides what's a hallucination)
-    detector = RepetitionDetector()
+    # Initialize detector (SVM classifier decides what's a hallucination)
+    config = Config(config_path)
+    detector = RepetitionDetector(
+        min_k=config.getRepetitionMinK(),
+        min_repetitions=config.getRepetitionMinRepetitions(),
+        config_path=config.getConfigPath(),
+    )
 
     # Process each file
     total_files = 0
