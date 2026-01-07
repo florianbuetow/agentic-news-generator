@@ -58,6 +58,27 @@ class TopicSegmentationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class PathsConfig(BaseModel):
+    """Configuration for all project directory paths."""
+
+    data_dir: str = Field(..., description="Root data directory path", min_length=1)
+    data_downloads_dir: str = Field(..., description="Downloads directory path", min_length=1)
+    data_downloads_videos_dir: str = Field(..., description="Downloaded videos directory path", min_length=1)
+    data_downloads_transcripts_dir: str = Field(..., description="Transcripts directory path", min_length=1)
+    data_downloads_transcripts_hallucinations_dir: str = Field(
+        ..., description="Transcript hallucinations analysis directory path", min_length=1
+    )
+    data_downloads_audio_dir: str = Field(..., description="Audio files directory path", min_length=1)
+    data_downloads_metadata_dir: str = Field(..., description="Metadata files directory path", min_length=1)
+    data_output_dir: str = Field(..., description="Output directory path", min_length=1)
+    data_input_dir: str = Field(..., description="Input directory path", min_length=1)
+    data_temp_dir: str = Field(..., description="Temporary files directory path", min_length=1)
+    data_archive_dir: str = Field(..., description="Archive directory path", min_length=1)
+    data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class Config:
     """Configuration class that loads and provides access to config.yaml."""
 
@@ -71,10 +92,13 @@ class Config:
             FileNotFoundError: If the config file doesn't exist.
             yaml.YAMLError: If the YAML file is invalid.
             KeyError: If required keys are missing from the config.
-            ValueError: If channel configurations are invalid or missing required fields.
+            ValueError: If channel configurations or paths are invalid or missing required fields.
         """
         self.config_path = Path(config_path)
         self._load(config_path)
+
+        # Validate paths section (required)
+        self._paths = self._validate_paths()
 
         # Validate topic_segmentation section if present
         if "topic_segmentation" in self._data:
@@ -202,6 +226,25 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Topic segmentation configuration validation failed: {error_messages}") from e
 
+    def _validate_paths(self) -> PathsConfig:
+        """Validate paths configuration.
+
+        Returns:
+            Validated PathsConfig instance.
+
+        Raises:
+            KeyError: If paths section is missing.
+            ValueError: If paths configuration is invalid or contains empty paths.
+        """
+        if "paths" not in self._data:
+            raise KeyError("Missing required key 'paths' in config file")
+
+        try:
+            return PathsConfig.model_validate(self._data["paths"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Paths configuration validation failed: {error_messages}") from e
+
     def get_topic_segmentation_config(self) -> TopicSegmentationConfig:
         """Get topic segmentation configuration.
 
@@ -247,3 +290,99 @@ class Config:
     def getConfigPath(self) -> Path:
         """Get the path to config.yaml."""
         return self.config_path
+
+    def getDataDir(self) -> Path:
+        """Get the data directory path.
+
+        Returns:
+            Path object pointing to the data directory (relative or absolute).
+        """
+        return Path(self._paths.data_dir)
+
+    def getDataDownloadsDir(self) -> Path:
+        """Get the data downloads directory path.
+
+        Returns:
+            Path object pointing to the data/downloads directory.
+        """
+        return Path(self._paths.data_downloads_dir)
+
+    def getDataDownloadsVideosDir(self) -> Path:
+        """Get the data downloads videos directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/videos directory.
+        """
+        return Path(self._paths.data_downloads_videos_dir)
+
+    def getDataDownloadsTranscriptsDir(self) -> Path:
+        """Get the data downloads transcripts directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/transcripts directory.
+        """
+        return Path(self._paths.data_downloads_transcripts_dir)
+
+    def getDataDownloadsTranscriptsHallucinationsDir(self) -> Path:
+        """Get the data downloads transcripts hallucinations directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/transcripts-hallucinations directory.
+        """
+        return Path(self._paths.data_downloads_transcripts_hallucinations_dir)
+
+    def getDataDownloadsAudioDir(self) -> Path:
+        """Get the data downloads audio directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/audio directory.
+        """
+        return Path(self._paths.data_downloads_audio_dir)
+
+    def getDataDownloadsMetadataDir(self) -> Path:
+        """Get the data downloads metadata directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/metadata directory.
+        """
+        return Path(self._paths.data_downloads_metadata_dir)
+
+    def getDataOutputDir(self) -> Path:
+        """Get the data output directory path.
+
+        Returns:
+            Path object pointing to the data/output directory.
+        """
+        return Path(self._paths.data_output_dir)
+
+    def getDataInputDir(self) -> Path:
+        """Get the data input directory path.
+
+        Returns:
+            Path object pointing to the data/input directory.
+        """
+        return Path(self._paths.data_input_dir)
+
+    def getDataTempDir(self) -> Path:
+        """Get the data temp directory path.
+
+        Returns:
+            Path object pointing to the data/temp directory.
+        """
+        return Path(self._paths.data_temp_dir)
+
+    def getDataArchiveDir(self) -> Path:
+        """Get the data archive directory path.
+
+        Returns:
+            Path object pointing to the data/archive directory.
+        """
+        return Path(self._paths.data_archive_dir)
+
+    def getDataArchiveVideosDir(self) -> Path:
+        """Get the data archive videos directory path.
+
+        Returns:
+            Path object pointing to the data/archive/videos directory.
+        """
+        return Path(self._paths.data_archive_videos_dir)
