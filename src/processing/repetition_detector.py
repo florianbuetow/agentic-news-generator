@@ -2,8 +2,8 @@
 
 import re
 import unicodedata
-from pathlib import Path
 
+from src.config import Config
 from src.models.hallucination_classifier import HallucinationClassifier
 
 
@@ -12,17 +12,17 @@ class RepetitionDetector:
 
     _WS = re.compile(r"\s+")
 
-    def __init__(self, min_k: int, min_repetitions: int, config_path: Path) -> None:
+    def __init__(self, min_k: int, min_repetitions: int, config: Config) -> None:
         """Initialize RepetitionDetector with ML classifier.
 
         Args:
             min_k: Minimum phrase length in words.
             min_repetitions: Minimum consecutive repetitions.
-            config_path: Path to config.yaml.
+            config: Config object with hallucination detection settings.
         """
         self.min_k = min_k
         self.min_repetitions = min_repetitions
-        self.classifier = HallucinationClassifier(config_path=config_path)
+        self.classifier = HallucinationClassifier(config=config)
 
     def prepare(self, text: str) -> str:
         """Normalize whitespace and remove invisible Unicode characters.
@@ -213,88 +213,3 @@ class RepetitionDetector:
             else:
                 break
         return length
-
-
-# --- Example ---
-if __name__ == "__main__":
-    from pathlib import Path
-
-    from src.config import Config
-
-    config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
-    config = Config(config_path)
-    detector = RepetitionDetector(
-        min_k=config.getRepetitionMinK(),
-        min_repetitions=config.getRepetitionMinRepetitions(),
-        config_path=config.getConfigPath(),
-    )
-
-    print("=== Formula-Based Hallucination Detection ===\n")
-
-    # Example 1: Massive loop - CLEAR hallucination
-    hallucination_text = " ".join(["you know, like,"] * 15)
-    results = detector.detect_hallucinations(hallucination_text)
-    print("Example 1: Massive loop (TRUE HALLUCINATION)")
-    print("  Text: 'you know, like,' repeated 15 times")
-    if results:
-        start, end, k, rep_count = results[0]
-        score = k * rep_count
-        print(f"  Pattern length (k): {k}")
-        print(f"  Repetition count: {rep_count}")
-        print(f"  Score: {k} × {rep_count} = {score}")
-        print(f"  Result: {score} > 10 ✓ DETECTED\n")
-    else:
-        print("  Result: NOT DETECTED (unexpected)\n")
-
-    # Example 2: Natural stutter - should be FILTERED
-    natural_stutter = "as like a, as like a, an object schema"
-    results = detector.detect_hallucinations(natural_stutter)
-    print("Example 2: Natural stutter (FALSE POSITIVE)")
-    print(f"  Text: {natural_stutter}")
-    # Check if it was detected by the basic detect() method
-    basic_results = detector.detect(natural_stutter, min_k=1)
-    if basic_results:
-        for start, end, k in basic_results:
-            words = detector.prepare(natural_stutter).split()
-            if detector.is_consecutive_repetition(words, start, end):
-                rep_count = detector.count_consecutive_repetitions(words, start, end)
-                score = k * rep_count
-                print(f"  Pattern length (k): {k}")
-                print(f"  Repetition count: {rep_count}")
-                print(f"  Score: {k} × {rep_count} = {score}")
-                print(f"  Result: {score} < 10 ✓ FILTERED\n")
-                break
-    if not results:
-        print("  Result: Correctly filtered (score too low)\n")
-
-    # Example 3: Ambiguous 3x repetition - should be FILTERED
-    ambiguous = "for this work, for this work, for this work, the xi"
-    results = detector.detect_hallucinations(ambiguous)
-    print("Example 3: Ambiguous 3x repetition")
-    print(f"  Text: {ambiguous}")
-    basic_results = detector.detect(ambiguous, min_k=1)
-    if basic_results:
-        for start, end, k in basic_results:
-            words = detector.prepare(ambiguous).split()
-            if detector.is_consecutive_repetition(words, start, end):
-                rep_count = detector.count_consecutive_repetitions(words, start, end)
-                score = k * rep_count
-                print(f"  Pattern length (k): {k}")
-                print(f"  Repetition count: {rep_count}")
-                print(f"  Score: {k} × {rep_count} = {score}")
-                if score > 10:
-                    print(f"  Result: {score} > 10 ✓ DETECTED\n")
-                else:
-                    print(f"  Result: {score} < 10 ✓ FILTERED (natural speech)\n")
-                break
-
-    print("\n=== Threshold Tuning Examples ===\n")
-    print("Threshold | k=3, reps=2 | k=3, reps=3 | k=3, reps=5 | k=1, reps=11")
-    print("----------|-------------|-------------|-------------|-------------")
-    for thresh in [6, 9, 10, 15]:
-        results_row: list[str] = []
-        for k, reps in [(3, 2), (3, 3), (3, 5), (1, 11)]:
-            score = k * reps
-            detected = "✓" if (reps >= 5 or score > thresh) else "✗"
-            results_row.append(f"{detected} ({score})")
-        print(f"    {thresh:2d}    | {results_row[0]:^11} | {results_row[1]:^11} | {results_row[2]:^11} | {results_row[3]:^11}")
