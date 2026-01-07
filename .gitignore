@@ -226,7 +226,7 @@ frontend/newspaper/.output/
 frontend/newspaper/.nitro/
 frontend/newspaper/.cache
 frontend/newspaper/.data
-frontend/newspaper/dist/
+frontend/newspaper/dist
 frontend/newspaper/logs/
 frontend/newspaper/package-lock.json
 frontend/newspaper/.fleet
@@ -235,3 +235,6 @@ frontend/newspaper/.env.*
 
 # Data files
 data/
+
+# Config files (use config.yaml.template to create your own)
+config/config.yaml

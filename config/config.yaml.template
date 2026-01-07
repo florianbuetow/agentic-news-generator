@@ -12,3 +12,22 @@ channels:
   - name: Example Channel Three
     url: https://www.youtube.com/@ExampleChannel3
     vibe: "alternative format using vibe field instead of category/what_you_get"
+
+article_compiler:
+  input_dir: "data/input/newspaper/articles"
+  output_file: "data/input/newspaper/articles.js"
+  min_articles: 21
+  date_format: "%Y-%m-%d"
+
+  paragraphs:
+    hero_count: 2
+    secondary_count: 2
+    featured_count: 1
+
+  images:
+    extract_first: true
+    fallback_url: null
+
+  links:
+    base_path: "/articles/"
+    slug_from_filename: true
