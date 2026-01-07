@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# ruff: noqa: N803, N806
 """Train a linear classifier to distinguish hallucinations from normal speech.
 
 This script:
@@ -40,9 +41,7 @@ def load_dataset(csv_path: Path) -> tuple[np.ndarray, np.ndarray]:
     return X, y
 
 
-def train_model(
-    X: np.ndarray, y: np.ndarray, cv_folds: int = 5
-) -> tuple[LogisticRegression, float, float]:
+def train_model(X: np.ndarray, y: np.ndarray, cv_folds: int = 5) -> tuple[LogisticRegression, float, float]:
     """Train logistic regression model with cross-validation.
 
     Args:
@@ -141,10 +140,7 @@ def plot_decision_boundary(
     intercept = model.intercept_[0]
 
     # Add model equation to plot
-    equation_text = (
-        f"Decision Boundary:\n"
-        f"{coef[0]:.3f} × repetitions + {coef[1]:.3f} × sequence_length + {intercept:.3f} = 0"
-    )
+    equation_text = f"Decision Boundary:\n{coef[0]:.3f} × repetitions + {coef[1]:.3f} × sequence_length + {intercept:.3f} = 0"
     ax.text(
         0.02,
         0.98,
@@ -159,8 +155,7 @@ def plot_decision_boundary(
     ax.set_xlabel("Repetitions (Number of Consecutive Repetitions)", fontsize=12)
     ax.set_ylabel("Sequence Length (k = words in repeated phrase)", fontsize=12)
     ax.set_title(
-        "Linear Classifier: Hallucination Detection Decision Boundary\n"
-        "Using Logistic Regression with Cross-Validation",
+        "Linear Classifier: Hallucination Detection Decision Boundary\nUsing Logistic Regression with Cross-Validation",
         fontsize=14,
         fontweight="bold",
     )
@@ -337,8 +332,8 @@ def main() -> int:
     X, y = load_dataset(csv_path)
     print(f"  Samples: {len(X)}")
     print(f"  Features: {X.shape[1]} (repetitions, sequence_length)")
-    print(f"  Hallucinations: {y.sum()} ({y.sum()/len(y)*100:.1f}%)")
-    print(f"  Normal speech: {(1-y).sum()} ({(1-y).sum()/len(y)*100:.1f}%)")
+    print(f"  Hallucinations: {y.sum()} ({y.sum() / len(y) * 100:.1f}%)")
+    print(f"  Normal speech: {(1 - y).sum()} ({(1 - y).sum() / len(y) * 100:.1f}%)")
     print()
 
     # Train model with cross-validation
@@ -384,9 +379,7 @@ def main() -> int:
 
     # Generate standalone classifier
     print("Generating standalone classifier (no ML dependencies)...")
-    generate_standalone_classifier(
-        model, standalone_path, "Logistic Regression (Linear)", mean_score, train_accuracy
-    )
+    generate_standalone_classifier(model, standalone_path, "Logistic Regression (Linear)", mean_score, train_accuracy)
     print()
 
     # Generate visualization
