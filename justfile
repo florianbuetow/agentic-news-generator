@@ -179,7 +179,7 @@ code-deptry:
     @echo ""
     @printf "\033[0;34m=== Checking Dependencies ===\033[0m\n"
     @mkdir -p reports/deptry
-    @uv run deptry src
+    @uv run deptry .
     @echo ""
     @printf "\033[0;32m✓ Dependency checks passed\033[0m\n"
     @echo ""
