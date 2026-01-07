@@ -59,7 +59,7 @@ class RepetitionDetector:
         suffixes.sort(key=lambda x: tokens[x:])
 
         # 3. Find all raw repetitions
-        raw_results = []
+        raw_results: list[list[int]] = []
         i = 0
         while i < len(suffixes) - 1:
             j = i + 1
@@ -84,7 +84,7 @@ class RepetitionDetector:
         # We sort by start index (ascending) and then by k (descending)
         raw_results.sort(key=lambda x: (x[0], -x[2]))
 
-        final_results = []
+        final_results: list[list[int]] = []
         last_start = -1
         last_end = -1
 
@@ -105,7 +105,7 @@ class RepetitionDetector:
 
         return final_results
 
-    def _is_consecutive_repetition(self, words: list[str], start: int, end: int) -> bool:
+    def is_consecutive_repetition(self, words: list[str], start: int, end: int) -> bool:
         """Check if a phrase repeats immediately after itself.
 
         Args:
@@ -129,7 +129,7 @@ class RepetitionDetector:
         # Check if they're identical
         return phrase == next_phrase
 
-    def _count_consecutive_repetitions(self, words: list[str], start: int, end: int) -> int:
+    def count_consecutive_repetitions(self, words: list[str], start: int, end: int) -> int:
         """Count how many times a phrase repeats consecutively.
 
         Args:
@@ -178,11 +178,11 @@ class RepetitionDetector:
         words = cleaned_text.split()
 
         # Filter using ML classifier
-        hallucinations = []
+        hallucinations: list[list[int]] = []
         for start, end, k in all_repetitions:
-            if self._is_consecutive_repetition(words, start, end):
+            if self.is_consecutive_repetition(words, start, end):
                 # Count how many times it repeats
-                rep_count = self._count_consecutive_repetitions(words, start, end)
+                rep_count = self.count_consecutive_repetitions(words, start, end)
 
                 # Use ML classifier to determine if this is a hallucination
                 if rep_count >= self.min_repetitions:
@@ -194,8 +194,8 @@ class RepetitionDetector:
         return hallucinations
 
     def _tokenize(self, words: list[str]) -> tuple[list[int], dict[str, int]]:
-        vocab = {}
-        tokens = []
+        vocab: dict[str, int] = {}
+        tokens: list[int] = []
         next_id = 0
         for word in words:
             if word not in vocab:
@@ -256,8 +256,8 @@ if __name__ == "__main__":
     if basic_results:
         for start, end, k in basic_results:
             words = detector.prepare(natural_stutter).split()
-            if detector._is_consecutive_repetition(words, start, end):
-                rep_count = detector._count_consecutive_repetitions(words, start, end)
+            if detector.is_consecutive_repetition(words, start, end):
+                rep_count = detector.count_consecutive_repetitions(words, start, end)
                 score = k * rep_count
                 print(f"  Pattern length (k): {k}")
                 print(f"  Repetition count: {rep_count}")
@@ -276,8 +276,8 @@ if __name__ == "__main__":
     if basic_results:
         for start, end, k in basic_results:
             words = detector.prepare(ambiguous).split()
-            if detector._is_consecutive_repetition(words, start, end):
-                rep_count = detector._count_consecutive_repetitions(words, start, end)
+            if detector.is_consecutive_repetition(words, start, end):
+                rep_count = detector.count_consecutive_repetitions(words, start, end)
                 score = k * rep_count
                 print(f"  Pattern length (k): {k}")
                 print(f"  Repetition count: {rep_count}")
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     print("Threshold | k=3, reps=2 | k=3, reps=3 | k=3, reps=5 | k=1, reps=11")
     print("----------|-------------|-------------|-------------|-------------")
     for thresh in [6, 9, 10, 15]:
-        results_row = []
+        results_row: list[str] = []
         for k, reps in [(3, 2), (3, 3), (3, 5), (1, 11)]:
             score = k * reps
             detected = "✓" if (reps >= 5 or score > thresh) else "✗"
