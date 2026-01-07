@@ -40,6 +40,7 @@ def detect_hallucinations_in_file(
     detector: RepetitionDetector,
     min_window_size: int,
     overlap_percent: float,
+    data_dir: Path,
 ) -> dict[str, Any]:
     """Process SRT file using SRT-entry-based sliding windows.
 
@@ -48,6 +49,7 @@ def detect_hallucinations_in_file(
         detector: RepetitionDetector instance (uses SVM classifier for detection).
         min_window_size: Minimum window size in words.
         overlap_percent: Overlap percentage.
+        data_dir: Path to data directory for calculating relative paths.
 
     Returns:
         Dictionary with detection results.
@@ -135,8 +137,14 @@ def detect_hallucinations_in_file(
     # Build result
     total_words = sum(len(detector.prepare(text).split()) for _, _, text in parts)
 
+    # Calculate relative path from data_dir (use POSIX format for cross-platform)
+    try:
+        relative_source = srt_file.relative_to(data_dir)
+    except ValueError as e:
+        raise ValueError(f"Source file {srt_file} is not under data directory {data_dir}") from e
+
     return {
-        "source_file": str(srt_file),
+        "source_file": str(relative_source.as_posix()),
         "processed_at": datetime.now().isoformat(),
         "min_window_size": min_window_size,
         "overlap_percent": overlap_percent,
@@ -155,6 +163,7 @@ def process_srt_file(
     detector: RepetitionDetector,
     min_window_size: int,
     overlap_percent: float,
+    data_dir: Path,
 ) -> tuple[bool, str | None, int]:
     """Process a single SRT file.
 
@@ -164,12 +173,13 @@ def process_srt_file(
         detector: RepetitionDetector instance (uses SVM classifier for detection).
         min_window_size: Minimum window size in words.
         overlap_percent: Overlap percentage.
+        data_dir: Path to data directory for calculating relative paths.
 
     Returns:
         Tuple of (success, error_message, hallucination_count).
     """
     try:
-        result = detect_hallucinations_in_file(srt_file, detector, min_window_size, overlap_percent)
+        result = detect_hallucinations_in_file(srt_file, detector, min_window_size, overlap_percent, data_dir)
 
         # Create output directory (channel_name/)
         channel_name = srt_file.parent.name
@@ -218,6 +228,10 @@ def main() -> int:  # noqa: C901
     if not config_path.exists():
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1
+
+    # Load Config class for data_dir
+    config = Config(config_path)
+    data_dir = Path(__file__).parent.parent / config.getDataDir()
 
     # Load raw YAML to access hallucination_detection config
     with open(config_path, encoding="utf-8") as f:
@@ -280,14 +294,14 @@ Examples:
         print("Error: overlap-percent must be in [0, 100)", file=sys.stderr)
         return 1
 
-    # Find all SRT files
-    transcripts_dir = Path(__file__).parent.parent / "data" / "downloads" / "transcripts"
+    # Find all SRT files (using data_dir from config)
+    transcripts_dir = data_dir / "downloads" / "transcripts"
     if not transcripts_dir.exists():
         print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
         return 1
 
-    # Hallucination detection output directory from config
-    transcripts_hallucinations_dir = Path(__file__).parent.parent / config_output_dir
+    # Hallucination detection output directory from config (config_output_dir is relative to data_dir)
+    transcripts_hallucinations_dir = data_dir / config_output_dir
 
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
 
@@ -301,7 +315,6 @@ Examples:
     print(f"Found {len(srt_files)} SRT file(s) to process\n")
 
     # Initialize detector (SVM classifier decides what's a hallucination)
-    config = Config(config_path)
     detector = RepetitionDetector(
         min_k=config.getRepetitionMinK(),
         min_repetitions=config.getRepetitionMinRepetitions(),
@@ -326,6 +339,7 @@ Examples:
             detector,
             min_window_size,
             overlap_percent,
+            data_dir,
         )
 
         total_files += 1

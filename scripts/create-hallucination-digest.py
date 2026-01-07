@@ -8,6 +8,11 @@ from pathlib import Path
 
 import yaml
 
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from src.config import Config
+
 
 def main() -> int:  # noqa: C901
     """Generate hallucination digest grouped by file."""
@@ -17,6 +22,11 @@ def main() -> int:  # noqa: C901
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1
 
+    # Load Config class for data_dir
+    config = Config(config_path)
+    data_dir = Path(__file__).parent.parent / config.getDataDir()
+
+    # Load raw YAML to access hallucination_detection config
     with open(config_path, encoding="utf-8") as f:
         config_data = yaml.safe_load(f)
 
@@ -31,8 +41,8 @@ def main() -> int:  # noqa: C901
         )
         return 1
 
-    # Find all analysis JSON files
-    transcripts_hallucinations_dir = Path(__file__).parent.parent / config_output_dir
+    # Find all analysis JSON files (config_output_dir is relative to data_dir)
+    transcripts_hallucinations_dir = data_dir / config_output_dir
 
     if not transcripts_hallucinations_dir.exists():
         print(f"Error: Hallucination output directory not found: {transcripts_hallucinations_dir}", file=sys.stderr)
@@ -89,8 +99,8 @@ def main() -> int:  # noqa: C901
         print("No hallucinations found to digest.", file=sys.stderr)
         return 1
 
-    # Generate markdown digest
-    output_file = Path(__file__).parent.parent / "data" / "output" / "hallucination_digest.md"
+    # Generate markdown digest (using data_dir from config)
+    output_file = data_dir / "output" / "hallucination_digest.md"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     total_hallucinations = sum(len(v) for v in hallucinations_by_file.values())
