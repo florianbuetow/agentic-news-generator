@@ -56,13 +56,18 @@ extract-audio:
 
 # Transcribe audio files to text
 transcribe:
-    @echo ""
-    @printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
-    @bash scripts/transcribe_audio.sh
-    @echo ""
-    @printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
-    @bash scripts/move-transcript-metadata.sh
-    @echo ""
+    #!/usr/bin/env bash
+    set +e  # Don't exit on error
+    echo ""
+    printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
+    bash scripts/transcribe_audio.sh
+    transcribe_exit_code=$?
+    echo ""
+    printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
+    bash scripts/move-transcript-metadata.sh
+    echo ""
+    # Exit with the original transcription exit code
+    exit $transcribe_exit_code
 
 # Archive processed videos
 archive-videos:
