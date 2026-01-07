@@ -15,15 +15,12 @@ class HallucinationClassifier:
     Model coefficients are loaded from config.yaml.
     """
 
-    def __init__(self, config_path: Path | None = None) -> None:
+    def __init__(self, config_path: Path) -> None:
         """Initialize classifier from config.
 
         Args:
-            config_path: Path to config.yaml. If None, uses default location.
+            config_path: Path to config.yaml.
         """
-        if config_path is None:
-            config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
-
         # Load config
         with open(config_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
