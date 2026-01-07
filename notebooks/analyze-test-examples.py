@@ -288,9 +288,7 @@ def main() -> int:
     detector = RepetitionDetector(min_k=1, min_repetitions=5)
 
     # Prepare output file
-    output_file = (
-        Path(__file__).parent.parent / "data" / "analyze" / "hallucinations" / "test_examples_analysis.csv"
-    )
+    output_file = Path(__file__).parent.parent / "data" / "analyze" / "hallucinations" / "test_examples_analysis.csv"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Analyzing {len(TEST_EXAMPLES)} test examples...")
@@ -302,14 +300,16 @@ def main() -> int:
         writer = csv.writer(csvfile)
 
         # Write header
-        writer.writerow([
-            "repetitions",
-            "sequence_length",
-            "score",
-            "is_hallucination",
-            "text",
-            "description",
-        ])
+        writer.writerow(
+            [
+                "repetitions",
+                "sequence_length",
+                "score",
+                "is_hallucination",
+                "text",
+                "description",
+            ]
+        )
 
         # Process each example
         positive_count = 0
@@ -319,14 +319,16 @@ def main() -> int:
             k, reps, score = analyze_text(text, detector)
 
             # Write row
-            writer.writerow([
-                reps,
-                k,
-                score,
-                is_hallucination,
-                text[:200] if len(text) > 200 else text,  # Truncate long text
-                description,
-            ])
+            writer.writerow(
+                [
+                    reps,
+                    k,
+                    score,
+                    is_hallucination,
+                    text[:200] if len(text) > 200 else text,  # Truncate long text
+                    description,
+                ]
+            )
 
             if is_hallucination:
                 positive_count += 1
