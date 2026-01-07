@@ -13,7 +13,7 @@ import srt
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.util.fs_util import FSUtil
-from src.utils.repetition_detector import RepetitionDetector
+from src.processing.repetition_detector import RepetitionDetector
 
 
 def timedelta_to_srt_timestamp(td: timedelta) -> str:

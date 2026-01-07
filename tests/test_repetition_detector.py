@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.utils.repetition_detector import RepetitionDetector
+from src.processing.repetition_detector import RepetitionDetector
 
 
 class TestCountConsecutiveRepetitions:
