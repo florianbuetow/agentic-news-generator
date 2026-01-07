@@ -31,12 +31,12 @@ class ContextWindowExceededError(ValueError):
         )
 
 
-def count_tokens_from_messages(messages: list[dict[str, Any]], encoding_name: str = "o200k_base") -> int:
+def count_tokens_from_messages(messages: list[dict[str, Any]], encoding_name: str) -> int:
     """Count tokens in a list of messages using tiktoken.
 
     Args:
         messages: List of message dicts with 'role' and 'content' keys.
-        encoding_name: Tiktoken encoding to use (default: o200k_base for GPT-4o).
+        encoding_name: Tiktoken encoding to use.
 
     Returns:
         Total token count for the messages.
@@ -53,11 +53,11 @@ def count_tokens_from_messages(messages: list[dict[str, Any]], encoding_name: st
         total_tokens += 4  # Approximate overhead per message
 
         # Count tokens in role
-        role = message.get("role", "")
+        role = message["role"]
         total_tokens += len(encoding.encode(role))
 
         # Count tokens in content
-        content = message.get("content", "")
+        content = message["content"]
         total_tokens += len(encoding.encode(content))
 
     # Add overhead for response priming
@@ -70,7 +70,7 @@ def validate_token_usage(
     messages: list[dict[str, Any]],
     context_window: int,
     threshold: int,
-    encoding_name: str = "o200k_base",
+    encoding_name: str,
 ) -> int:
     """Validate that token usage is within acceptable limits.
 
@@ -78,7 +78,7 @@ def validate_token_usage(
         messages: List of message dicts to send to LLM.
         context_window: Maximum context window size in tokens.
         threshold: Percentage threshold (0-100) for acceptable usage.
-        encoding_name: Tiktoken encoding to use (default: o200k_base).
+        encoding_name: Tiktoken encoding to use.
 
     Returns:
         Total token count.
