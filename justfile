@@ -21,6 +21,7 @@ init:
     @mkdir -p reports/security
     @mkdir -p reports/pyright
     @mkdir -p reports/deptry
+    @mkdir -p .cache
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @printf "\033[0;32m✓ Development environment ready\033[0m\n"
@@ -143,6 +144,22 @@ code-semgrep:
     @printf "\033[0;32m✓ Semgrep checks passed\033[0m\n"
     @echo ""
 
+# Run AI-powered fake unit test detector
+ai-review-unit-tests:
+    @echo ""
+    @printf "\033[0;34m=== Reviewing Unit Tests with AI ===\033[0m\n"
+    @uv run python tools/fake_test_detector/detect_fake_tests.py
+    @echo ""
+
+# Run AI-powered fake unit test detector (clear cache and force re-scan)
+ai-review-unit-tests-nocache:
+    @echo ""
+    @printf "\033[0;34m=== Reviewing Unit Tests with AI (No Cache) ===\033[0m\n"
+    @rm -rf .cache/test_file_hashes.json
+    @printf "\033[0;33m✓ Cache cleared\033[0m\n"
+    @uv run python tools/fake_test_detector/detect_fake_tests.py --no-cache
+    @echo ""
+
 # Run unit tests only (fast)
 test:
     #!/usr/bin/env bash
@@ -238,4 +255,17 @@ ci-quiet:
 
     echo ""
     printf "\033[0;32m✓ All CI checks passed\033[0m\n"
+    echo ""
+
+# Run AI-based CI checks (AI-powered test validation, will grow in the future)
+# This pipeline is separate from regular CI and includes AI-assisted code quality checks
+ci-ai:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Running AI-Based CI Checks ===\033[0m\n"
+    echo ""
+    just ai-review-unit-tests-nocache
+    echo ""
+    printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
     echo ""
