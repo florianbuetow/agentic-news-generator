@@ -11,13 +11,11 @@ This script:
 import csv
 import sys
 from pathlib import Path
-from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.processing.repetition_detector import RepetitionDetector
-
 
 # Test examples extracted from tests/test_repetition_detector.py
 # Format: (text, is_hallucination, description)
@@ -272,9 +270,9 @@ def analyze_text(text: str, detector: RepetitionDetector) -> tuple[int, int, int
 
     for pattern in hallucinations:
         # pattern is a dict with keys: pattern, k, repetitions, score, start_idx, end_idx
-        k = pattern['k']
-        reps = pattern['repetitions']
-        score = pattern['score']
+        k = pattern["k"]
+        reps = pattern["repetitions"]
+        score = pattern["score"]
 
         if score > max_score:
             max_k = k
@@ -341,7 +339,7 @@ def main() -> int:
 
     print()
     print("=" * 70)
-    print(f"Analysis complete!")
+    print("Analysis complete!")
     print(f"  Total examples: {len(TEST_EXAMPLES)}")
     print(f"  Positive (hallucination): {positive_count}")
     print(f"  Negative (normal speech): {negative_count}")

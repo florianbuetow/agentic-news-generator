@@ -1,6 +1,5 @@
 """Tests for the RepetitionDetector class."""
 
-import pytest
 
 from src.processing.repetition_detector import RepetitionDetector
 

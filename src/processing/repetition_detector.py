@@ -232,7 +232,7 @@ if __name__ == "__main__":
     hallucination_text = " ".join(["you know, like,"] * 15)
     results = detector.detect_hallucinations(hallucination_text)
     print("Example 1: Massive loop (TRUE HALLUCINATION)")
-    print(f"  Text: 'you know, like,' repeated 15 times")
+    print("  Text: 'you know, like,' repeated 15 times")
     if results:
         start, end, k, rep_count = results[0]
         score = k * rep_count
@@ -241,7 +241,7 @@ if __name__ == "__main__":
         print(f"  Score: {k} × {rep_count} = {score}")
         print(f"  Result: {score} > 10 ✓ DETECTED\n")
     else:
-        print(f"  Result: NOT DETECTED (unexpected)\n")
+        print("  Result: NOT DETECTED (unexpected)\n")
 
     # Example 2: Natural stutter - should be FILTERED
     natural_stutter = "as like a, as like a, an object schema"
@@ -262,7 +262,7 @@ if __name__ == "__main__":
                 print(f"  Result: {score} < 10 ✓ FILTERED\n")
                 break
     if not results:
-        print(f"  Result: Correctly filtered (score too low)\n")
+        print("  Result: Correctly filtered (score too low)\n")
 
     # Example 3: Ambiguous 3x repetition - should be FILTERED
     ambiguous = "for this work, for this work, for this work, the xi"
