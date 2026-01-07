@@ -58,9 +58,7 @@ def detect_hallucinations_in_file(
     subtitles = list(srt.parse(srt_content))
 
     # Prepare all SRT entries
-    parts = []
-    for subtitle in subtitles:
-        parts.append((subtitle.start, subtitle.end, subtitle.content))
+    parts = [(subtitle.start, subtitle.end, subtitle.content) for subtitle in subtitles]
 
     # Initialize sliding window
     window = deque()
@@ -78,9 +76,7 @@ def detect_hallucinations_in_file(
         # Detect when window is full OR at end of file
         if i == len(parts) - 1 or words_in_window >= min_window_size:
             # DETECT: Concatenate window text and run detection
-            window_text = " ".join([
-                " ".join(words) for _, _, _, words in window
-            ])
+            window_text = " ".join([" ".join(words) for _, _, _, words in window])
 
             repetitions = detector.detect_hallucinations(window_text)
 
@@ -112,19 +108,21 @@ def detect_hallucinations_in_file(
                 # Build cleaned text for this hallucination
                 cleaned_repetition = " ".join(window_text.split()[rep_start:rep_end])
 
-                hallucinations.append({
-                    "window_index": window_idx,
-                    "window_word_count": words_in_window,
-                    "start_timestamp": timedelta_to_srt_timestamp(start_ts or window[0][0]),
-                    "end_timestamp": timedelta_to_srt_timestamp(end_ts or window[-1][1]),
-                    "original_text": " ".join(texts).strip(),
-                    "cleaned_text": cleaned_repetition,
-                    "repetition_length": rep_k,
-                    "repetition_count": rep_count,
-                    "score": rep_k * rep_count,
-                    "repetition_pattern": cleaned_repetition,
-                    "window_text": window_text,
-                })
+                hallucinations.append(
+                    {
+                        "window_index": window_idx,
+                        "window_word_count": words_in_window,
+                        "start_timestamp": timedelta_to_srt_timestamp(start_ts or window[0][0]),
+                        "end_timestamp": timedelta_to_srt_timestamp(end_ts or window[-1][1]),
+                        "original_text": " ".join(texts).strip(),
+                        "cleaned_text": cleaned_repetition,
+                        "repetition_length": rep_k,
+                        "repetition_count": rep_count,
+                        "score": rep_k * rep_count,
+                        "repetition_pattern": cleaned_repetition,
+                        "window_text": window_text,
+                    }
+                )
 
             # SHRINK: Remove entries until window is at overlap size
             while words_in_window > min_window_size * (overlap_percent / 100):
@@ -134,8 +132,7 @@ def detect_hallucinations_in_file(
             window_idx += 1
 
     # Build result
-    total_words = sum(len(detector.prepare(text).split())
-                     for _, _, text in parts)
+    total_words = sum(len(detector.prepare(text).split()) for _, _, text in parts)
 
     return {
         "source_file": str(srt_file),
@@ -171,9 +168,7 @@ def process_srt_file(
         Tuple of (success, error_message, hallucination_count).
     """
     try:
-        result = detect_hallucinations_in_file(
-            srt_file, detector, min_window_size, overlap_percent
-        )
+        result = detect_hallucinations_in_file(srt_file, detector, min_window_size, overlap_percent)
 
         # Create output directory (channel_name/transcript-analysis/)
         channel_name = srt_file.parent.name
@@ -194,9 +189,7 @@ def process_srt_file(
         return (False, f"Unexpected error: {e}", 0)
 
 
-def print_file_result(
-    filename: str, hallucination_count: int, example: dict[str, Any] | None = None
-) -> None:
+def print_file_result(filename: str, hallucination_count: int, example: dict[str, Any] | None = None) -> None:
     """Print console output for a file.
 
     Args:
@@ -217,7 +210,7 @@ def print_file_result(
             print(f"  {preview}")
 
 
-def main() -> int:
+def main() -> int:  # noqa: C901
     """Main entry point."""
     # Load configuration
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
@@ -371,24 +364,20 @@ Examples:
         print("=" * 50)
 
         # Define score ranges for grouping
-        ranges = [
-            (11, 20, "Low"),
-            (21, 50, "Medium"),
-            (51, 100, "High"),
-            (101, float("inf"), "Very High")
-        ]
+        ranges = [(11, 20, "Low"), (21, 50, "Medium"), (51, 100, "High"), (101, float("inf"), "Very High")]
 
         # Group hallucinations by score range
         for min_score, max_score, label in ranges:
             range_hallucinations = [
-                h for h in all_hallucinations
+                h
+                for h in all_hallucinations
                 if min_score <= h.get("score", h.get("repetition_length", 0) * h.get("repetition_count", 1)) < max_score
             ]
 
             if not range_hallucinations:
                 continue
 
-            print(f"\n{label} Score ({min_score}-{max_score-1 if max_score != float('inf') else '∞'}):")
+            print(f"\n{label} Score ({min_score}-{max_score - 1 if max_score != float('inf') else '∞'}):")
             print(f"  Total patterns: {len(range_hallucinations)}")
 
             # Show top 3 unique examples by score
@@ -401,7 +390,8 @@ Examples:
                     k = h.get("repetition_length", 0)
                     reps = h.get("repetition_count", 1)
                     score = h.get("score", k * reps)
-                    print(f'  • Score {score:3d} = k={k:2d} × {reps:2d} reps: "{pattern}{'...' if len(h['repetition_pattern']) > 60 else ''}"')
+                    ellipsis = "..." if len(h["repetition_pattern"]) > 60 else ""
+                    print(f'  • Score {score:3d} = k={k:2d} × {reps:2d} reps: "{pattern}{ellipsis}"')
                     examples_shown += 1
 
         print("\nUsing SVM classifier for hallucination detection")

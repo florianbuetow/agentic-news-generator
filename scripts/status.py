@@ -36,7 +36,7 @@ def get_archived_video_names_per_channel(archive_dir: Path) -> dict[str, set[str
     return dict(archived_videos)
 
 
-def get_channel_stats(base_dir: Path, archived_videos: dict[str, set[str]] | None = None) -> dict[str, dict[str, int]]:
+def get_channel_stats(base_dir: Path, archived_videos: dict[str, set[str]] | None = None) -> dict[str, dict[str, int]]:  # noqa: C901
     """Get statistics for each channel, excluding archived content.
 
     Args:
@@ -91,7 +91,7 @@ def get_channel_stats(base_dir: Path, archived_videos: dict[str, set[str]] | Non
     return dict(stats)
 
 
-def get_archived_channel_stats(archive_dir: Path, transcripts_dir: Path, archived_videos: dict[str, set[str]]) -> dict[str, dict[str, int]]:
+def get_archived_channel_stats(archive_dir: Path, transcripts_dir: Path, archived_videos: dict[str, set[str]]) -> dict[str, dict[str, int]]:  # noqa: C901
     """Get statistics for archived videos by channel.
 
     Args:

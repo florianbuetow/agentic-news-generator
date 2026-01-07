@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def main() -> int:
+def main() -> int:  # noqa: C901
     """Generate hallucination digest grouped by file."""
     # Find all analysis JSON files
     transcripts_dir = Path(__file__).parent.parent / "data" / "downloads" / "transcripts"
@@ -47,15 +47,17 @@ def main() -> int:
 
                 # Process each hallucination
                 for h in data["hallucinations_detected"]:
-                    hallucinations_by_file[file_key].append({
-                        "start_timestamp": h["start_timestamp"],
-                        "end_timestamp": h["end_timestamp"],
-                        "reps": h["repetition_count"],
-                        "k": h["repetition_length"],
-                        "window_word_count": h["window_word_count"],
-                        "pattern": h["cleaned_text"],
-                        "window": h["window_text"]
-                    })
+                    hallucinations_by_file[file_key].append(
+                        {
+                            "start_timestamp": h["start_timestamp"],
+                            "end_timestamp": h["end_timestamp"],
+                            "reps": h["repetition_count"],
+                            "k": h["repetition_length"],
+                            "window_word_count": h["window_word_count"],
+                            "pattern": h["cleaned_text"],
+                            "window": h["window_text"],
+                        }
+                    )
 
             except Exception as e:
                 print(f"Warning: Could not process {json_file}: {e}", file=sys.stderr)
