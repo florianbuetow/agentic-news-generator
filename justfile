@@ -21,8 +21,12 @@ init:
     @mkdir -p reports/security
     @mkdir -p reports/pyright
     @mkdir -p reports/deptry
+    @mkdir -p data/input/newspaper
+    @mkdir -p data/output/newspaper
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
+    @echo "Installing frontend dependencies..."
+    @cd frontend/newspaper && npm install
     @printf "\033[0;32m✓ Development environment ready\033[0m\n"
     @echo ""
 
@@ -33,12 +37,85 @@ run:
     @uv run src/main.py
     @echo ""
 
-# Destroy the virtual environment
+# Generate static newspaper website
+newspaper-generate:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Generating Newspaper Website ===\033[0m\n"
+
+    # Check if articles.js exists in data/input/newspaper/
+    if [ ! -f "data/input/newspaper/articles.js" ]; then
+        printf "\033[0;31m✗ Error: data/input/newspaper/articles.js not found\033[0m\n"
+        echo "  Please generate the articles data first"
+        exit 1
+    fi
+
+    # Copy articles.js to Nuxt data folder
+    echo "Copying articles data to frontend..."
+    cp data/input/newspaper/articles.js frontend/newspaper/data/articles.js
+
+    # Install npm dependencies if needed
+    if [ ! -d "frontend/newspaper/node_modules" ]; then
+        echo "Installing npm dependencies..."
+        cd frontend/newspaper && npm install && cd ../..
+    fi
+
+    # Generate static site
+    echo "Generating static site..."
+    cd frontend/newspaper && npm run generate && cd ../..
+
+    # Clear output directory and copy generated files
+    echo "Copying generated site to data/output/newspaper/..."
+    rm -rf data/output/newspaper/*
+    cp -r frontend/newspaper/.output/public/* data/output/newspaper/
+
+    printf "\033[0;32m✓ Newspaper website generated successfully\033[0m\n"
+    echo "  Output: data/output/newspaper/"
+    echo ""
+
+# Run newspaper development server
+newspaper-serve:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Starting Newspaper Development Server ===\033[0m\n"
+
+    # Check if articles.js exists in data/input/newspaper/
+    if [ ! -f "data/input/newspaper/articles.js" ]; then
+        printf "\033[0;31m✗ Error: data/input/newspaper/articles.js not found\033[0m\n"
+        echo "  Please generate the articles data first"
+        exit 1
+    fi
+
+    # Copy articles.js to Nuxt data folder
+    echo "Copying articles data to frontend..."
+    cp data/input/newspaper/articles.js frontend/newspaper/data/articles.js
+
+    # Install npm dependencies if needed
+    if [ ! -d "frontend/newspaper/node_modules" ]; then
+        echo "Installing npm dependencies..."
+        cd frontend/newspaper && npm install && cd ../..
+    fi
+
+    # Start development server
+    echo ""
+    printf "\033[0;32m✓ Starting development server at http://localhost:3000\033[0m\n"
+    echo ""
+    cd frontend/newspaper && npm run dev
+
+# Destroy the virtual environment and frontend artifacts
 destroy:
     @echo ""
-    @printf "\033[0;34m=== Destroying Virtual Environment ===\033[0m\n"
+    @printf "\033[0;34m=== Destroying Development Environment ===\033[0m\n"
+    @echo "Removing Python virtual environment..."
     @rm -rf .venv
-    @printf "\033[0;32m✓ Virtual environment removed\033[0m\n"
+    @echo "Removing frontend dependencies and cache..."
+    @rm -rf frontend/newspaper/node_modules
+    @rm -rf frontend/newspaper/package-lock.json
+    @rm -rf frontend/newspaper/.nuxt
+    @rm -rf frontend/newspaper/.output
+    @printf "\033[0;32m✓ Development environment destroyed\033[0m\n"
     @echo ""
 
 # Check code style and formatting (read-only)
