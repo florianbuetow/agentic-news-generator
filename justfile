@@ -208,7 +208,7 @@ code-spell:
 code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
-    @uv run pip-audit
+    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""

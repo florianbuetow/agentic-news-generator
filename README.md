@@ -508,6 +508,23 @@ __Potential Additions__
 - 🤔 Article image embedding
 - 🤔 Inline Audio or Video player with auto skip function.
 
+### Known Security Issues
+
+The following vulnerabilities are intentionally ignored in dependency audits:
+
+#### nbconvert 7.16.6 - GHSA-xm59-rqc7-hhvf
+
+- **Status**: ⚠️ IGNORED (no fix available)
+- **Type**: Windows-specific local privilege escalation via PDF conversion
+- **Risk Level**: LOW
+- **Rationale**:
+  - Dev-only dependency (Jupyter notebooks, not production code)
+  - Windows-specific vulnerability (development is on macOS)
+  - No patch available from nbconvert maintainers
+  - Risk is negligible in current usage context
+- **Review Task**: Check quarterly for upstream fix from [nbconvert releases](https://github.com/jupyter/nbconvert/releases)
+- **Next Review**: 2026-04-07
+- **Configured in**: `justfile` line 211 (`--ignore-vuln GHSA-xm59-rqc7-hhvf`)
 
 ### Video Processing Features
 
