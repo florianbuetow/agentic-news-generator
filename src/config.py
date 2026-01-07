@@ -73,6 +73,7 @@ class Config:
             KeyError: If required keys are missing from the config.
             ValueError: If channel configurations are invalid or missing required fields.
         """
+        self.config_path = Path(config_path)
         self._load(config_path)
 
         # Validate topic_segmentation section if present
@@ -213,3 +214,36 @@ class Config:
         if not hasattr(self, "_topic_segmentation"):
             raise KeyError("Missing required key 'topic_segmentation' in config file")
         return self._topic_segmentation
+
+    def getEncodingName(self) -> str:
+        """Get default tiktoken encoding for token counting."""
+        return cast(str, self._data["defaults"]["encoding_name"])
+
+    def getRepetitionMinK(self) -> int:
+        """Get default minimum phrase length for repetition detection."""
+        return cast(int, self._data["defaults"]["repetition_min_k"])
+
+    def getRepetitionMinRepetitions(self) -> int:
+        """Get default minimum consecutive repetitions for detection."""
+        return cast(int, self._data["defaults"]["repetition_min_repetitions"])
+
+    def getDetectMinK(self) -> int:
+        """Get default min_k for detect() method."""
+        return cast(int, self._data["defaults"]["detect_min_k"])
+
+    def getHallucinationClassifierModel(self) -> tuple[float, float, float]:
+        """Get SVM model coefficients for hallucination classification.
+
+        Returns:
+            Tuple of (coef_repetitions, coef_sequence_length, intercept)
+        """
+        hc = self._data["hallucination_detection"]
+        return (
+            hc["coef_repetitions"],
+            hc["coef_sequence_length"],
+            hc["intercept"],
+        )
+
+    def getConfigPath(self) -> Path:
+        """Get the path to config.yaml."""
+        return self.config_path
