@@ -209,7 +209,7 @@ def main() -> None:
         sys.exit(1)
 
     # Initialize orchestrator
-    orchestrator = TopicSegmentationOrchestrator(config=ts_config)
+    orchestrator = TopicSegmentationOrchestrator(ts_config=ts_config, config=config)
 
     # Find preprocessed transcripts directory
     transcripts_dir = Path(__file__).parent.parent / "data" / "downloads" / "transcripts-preprocessed"

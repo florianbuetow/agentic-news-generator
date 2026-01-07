@@ -5,27 +5,28 @@ from collections.abc import Callable
 from src.agents.topic_segmentation.agent import TopicSegmentationAgent
 from src.agents.topic_segmentation.critic import TopicSegmentationCritic
 from src.agents.topic_segmentation.models import AgentSegmentationResponse, SegmentationAttempt, SegmentationResult
-from src.config import TopicSegmentationConfig
+from src.config import Config, TopicSegmentationConfig
 
 
 class TopicSegmentationOrchestrator:
     """Orchestrates the multi-agent topic segmentation workflow."""
 
-    def __init__(self, config: TopicSegmentationConfig) -> None:
+    def __init__(self, ts_config: TopicSegmentationConfig, config: Config) -> None:
         """Initialize the orchestrator.
 
         Args:
-            config: Topic segmentation configuration.
+            ts_config: Topic segmentation configuration.
+            config: Full application configuration.
 
         Raises:
             KeyError: If required environment variables are missing.
         """
-        self._config = config
+        self._config = ts_config
 
         # Initialize agents
-        self._agent = TopicSegmentationAgent(llm_config=config.agent_llm)
+        self._agent = TopicSegmentationAgent(llm_config=ts_config.agent_llm, config=config)
 
-        self._critic = TopicSegmentationCritic(llm_config=config.critic_llm)
+        self._critic = TopicSegmentationCritic(llm_config=ts_config.critic_llm, config=config)
 
     def segment_transcript(
         self,
