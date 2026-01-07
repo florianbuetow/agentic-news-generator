@@ -29,11 +29,17 @@ agentic-news-generator/
 │   └── semgrep/           # Semgrep rule configurations
 ├── src/                    # Source code
 │   ├── main.py           # Main entry point
-│   └── config.py         # Configuration loading
+│   ├── config.py         # Configuration loading
+│   ├── processing/       # Processing modules
+│   │   └── repetition_detector.py  # Hallucination detection algorithm
+│   └── util/             # Utility modules
+│       └── fs_util.py    # File system utilities
 ├── scripts/                # Utility scripts
 │   ├── yt-downloader.sh   # YouTube video downloader
 │   ├── convert_to_audio.sh  # Video to audio converter
 │   ├── transcribe_audio.sh  # Audio transcription (MLX Whisper)
+│   ├── transcript-hallucination-detection.py  # Hallucination detection
+│   ├── create-hallucination-digest.py  # Digest report generator
 │   └── archive-videos.sh  # Archive processed videos
 ├── tests/                  # Test suite
 ├── prompts/                # LLM prompt templates
@@ -41,11 +47,14 @@ agentic-news-generator/
     ├── downloads/         # Downloaded and processed content
     │   ├── videos/       # Downloaded videos (by channel)
     │   ├── audio/        # Extracted WAV files (by channel)
-    │   └── transcripts/  # Transcripts in multiple formats (by channel)
+    │   ├── transcripts/  # Transcripts in multiple formats (by channel)
+    │   │   └── {channel}/transcript-analysis/  # Hallucination analysis JSON
+    │   └── metadata/     # Video metadata and silence maps (by channel)
     ├── archive/           # Archived content
     │   └── videos/       # Processed videos moved here
     ├── temp/              # Temporary processing files
     └── output/            # Generated output files
+        ├── hallucination_digest.md  # Hallucination analysis report
         ├── topics/        # Per-topic aggregated JSON files
         └── newspaper/     # Generated HTML newspaper
 ```
@@ -136,6 +145,7 @@ just help
 - `just download-videos` - Download videos from configured YouTube channels
 - `just extract-audio` - Convert downloaded videos to WAV audio files
 - `just transcribe` - Transcribe audio files using MLX Whisper (large-v3)
+- `just analyze-transcripts` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
 #### Development
@@ -164,7 +174,11 @@ just extract-audio
 # Generates: .txt, .srt, .vtt, .tsv, .json files
 just transcribe
 
-# Step 4: Archive processed videos and clean up audio files
+# Step 4: Analyze transcripts for hallucinations
+# Generates: JSON analysis + markdown digest
+just analyze-transcripts
+
+# Step 5: Archive processed videos and clean up audio files
 # Moves videos to data/archive/videos/
 # Deletes audio files from data/downloads/audio/
 just archive-videos
@@ -204,6 +218,58 @@ USE_YOUTUBE_METADATA=true               # Use video metadata in prompts (default
 ```bash
 USE_YOUTUBE_METADATA=false just transcribe
 ```
+
+### Transcript Hallucination Detection
+
+After transcription, the system analyzes all transcripts to detect and report any hallucinations that may have occurred during the transcription process. This post-processing analysis uses repetition pattern detection to identify anomalous loops and repetitive sequences.
+
+**How It Works:**
+1. **Sliding Window Analysis**: Processes transcripts using a 500-word sliding window with 25% overlap
+2. **Pattern Detection**: Uses suffix array algorithm to detect consecutive repetitions
+3. **SVM Classification**: Machine learning classifier distinguishes real hallucinations from natural speech patterns
+4. **Digest Generation**: Creates a markdown report of all detected hallucinations with timestamps
+
+**Run Hallucination Detection:**
+```bash
+just analyze-transcripts
+```
+
+This command:
+- Analyzes all `.srt` transcript files in `data/downloads/transcripts/`
+- Generates JSON analysis files in `{channel}/transcript-analysis/`
+- Creates a digest report at `data/output/hallucination_digest.md`
+
+**Configuration** (in `config/config.yaml`):
+```yaml
+hallucination_detection:
+  min_window_size: 500      # Sliding window size in words
+  overlap_percent: 25.0     # Overlap between windows (0-100)
+```
+
+**Output Example:**
+```
+Total files processed: 1072
+Files with hallucinations: 31
+Total hallucinations detected: 44
+
+Score Distribution:
+  Low Score (11-19): 3 patterns
+  Medium Score (21-49): 7 patterns
+  High Score (51-99): 9 patterns
+  Very High Score (101-∞): 22 patterns
+```
+
+**Detection Algorithm:**
+- **Repetition Score**: `k × n` where `k` = sequence length, `n` = repetition count
+- **Natural Speech Filtering**: Filters out common patterns like "you know", "I think", etc.
+- **Threshold**: Patterns with score ≥ 11 are flagged for review
+- **Window Tracking**: Records exact word count of analysis window for each detection
+
+**Benefits:**
+- **Quality Assurance**: Identify transcription issues across your entire corpus
+- **Automated Detection**: No manual review needed for 1000+ files
+- **Actionable Reports**: Timestamped hallucinations with context for easy verification
+- **Configurable**: Adjust window size and overlap based on your transcript characteristics
 
 ### Silence Detection and Removal
 
@@ -383,7 +449,16 @@ The system is configured via `config/config.yaml`. The configuration defines:
   - Each channel has a URL, name, and optional metadata
   - Channels can use structured format (`category` + `description`/`what_you_get`) or flexible format (`vibe`)
 
-See `config/config.yaml` for the current channel configuration.
+- **Hallucination Detection**: Sliding window analysis parameters
+  - `min_window_size`: Window size in words (default: 500)
+  - `overlap_percent`: Overlap between windows (default: 25.0)
+
+- **Topic Segmentation**: LLM configuration for topic analysis
+  - Agent and critic LLM settings
+  - Context window thresholds
+  - Retry limits
+
+See `config/config.yaml` for the current configuration and `config/config.yaml.template` for all available options.
 
 ## Project Status
 
@@ -394,6 +469,7 @@ This project is in active development. Current implementation status:
 - ✅ Video downloading pipeline (`scripts/yt-downloader.sh`)
 - ✅ Audio extraction pipeline (`scripts/convert_to_audio.sh`)
 - ✅ Transcription pipeline with MLX Whisper large-v3 (`scripts/transcribe_audio.sh`)
+- ✅ Transcript hallucination detection (`scripts/transcript-hallucination-detection.py`)
 - ✅ Video archiving and cleanup (`scripts/archive-videos.sh`)
 - 🚧 Topic segmentation
 - 🚧 Article generation
