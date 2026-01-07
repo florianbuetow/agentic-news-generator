@@ -2,7 +2,7 @@
   <header class="masthead">
     <div class="masthead-row">
       <div class="masthead-left">
-        <div class="motto-box">"All the News<br>That's Fit to Compute"</div>
+        <div class="motto-box">"Today's Practice<br>Tomorrow's Trends"</div>
       </div>
       <div class="masthead-center">
         <h1 class="newspaper-title">The Artificial Intelligence Times</h1>
