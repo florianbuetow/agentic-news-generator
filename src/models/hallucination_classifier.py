@@ -29,9 +29,9 @@ class HallucinationClassifier:
             config = yaml.safe_load(f)
 
         hallucination_config = config["hallucination_detection"]
-        self.coef_repetitions = hallucination_config["coef_repetitions"]
-        self.coef_sequence_length = hallucination_config["coef_sequence_length"]
-        self.intercept = hallucination_config["intercept"]
+        self.coef_repetitions: float = float(hallucination_config["coef_repetitions"])
+        self.coef_sequence_length: float = float(hallucination_config["coef_sequence_length"])
+        self.intercept: float = float(hallucination_config["intercept"])
 
     def predict(self, repetitions: float, sequence_length: float) -> bool:
         """Predict if input is a hallucination.
@@ -56,8 +56,4 @@ class HallucinationClassifier:
         Returns:
             Decision score (positive = hallucination, negative = normal).
         """
-        return (
-            self.coef_repetitions * repetitions
-            + self.coef_sequence_length * sequence_length
-            + self.intercept
-        )
+        return self.coef_repetitions * repetitions + self.coef_sequence_length * sequence_length + self.intercept

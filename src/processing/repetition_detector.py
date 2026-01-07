@@ -1,3 +1,5 @@
+"""Repetition detection for hallucination analysis in transcripts."""
+
 import re
 import unicodedata
 from pathlib import Path
@@ -6,14 +8,11 @@ from src.models.hallucination_classifier import HallucinationClassifier
 
 
 class RepetitionDetector:
+    """Detect repetitive patterns in text using suffix array algorithm and ML classification."""
+
     _WS = re.compile(r"\s+")
 
-    def __init__(
-        self,
-        min_k: int = 1,
-        min_repetitions: int = 5,
-        config_path: Path | None = None
-    ):
+    def __init__(self, min_k: int = 1, min_repetitions: int = 5, config_path: Path | None = None) -> None:
         """Initialize RepetitionDetector with ML classifier.
 
         Args:
@@ -41,6 +40,7 @@ class RepetitionDetector:
 
     def detect(self, text: str, min_k: int = 3) -> list[list[int]]:
         """Detects repetitions and returns a list of [start, end, k].
+
         If multiple k exist for the same start point, only the largest k is kept.
         """
         cleaned_text = self.prepare(text)
@@ -68,16 +68,14 @@ class RepetitionDetector:
             if lcp_len >= min_k:
                 match_indices = [suffixes[i], suffixes[j]]
                 while j + 1 < len(suffixes):
-                    if self._longest_common_prefix(tokens, suffixes[j], suffixes[j+1]) >= lcp_len:
-                        match_indices.append(suffixes[j+1])
+                    if self._longest_common_prefix(tokens, suffixes[j], suffixes[j + 1]) >= lcp_len:
+                        match_indices.append(suffixes[j + 1])
                         j += 1
                     else:
                         break
 
                 # Store every occurrence of this specific phrase
-                for start_idx in match_indices:
-                    # [start, end, k]
-                    raw_results.append([start_idx, start_idx + lcp_len, lcp_len])
+                raw_results.extend([[start_idx, start_idx + lcp_len, lcp_len] for start_idx in match_indices])
                 i = j
             else:
                 i += 1
@@ -126,17 +124,12 @@ class RepetitionDetector:
 
         # Extract the phrase and the following words
         phrase = words[start:end]
-        next_phrase = words[end:end + phrase_length]
+        next_phrase = words[end : end + phrase_length]
 
         # Check if they're identical
         return phrase == next_phrase
 
-    def _count_consecutive_repetitions(
-        self,
-        words: list[str],
-        start: int,
-        end: int
-    ) -> int:
+    def _count_consecutive_repetitions(self, words: list[str], start: int, end: int) -> int:
         """Count how many times a phrase repeats consecutively.
 
         Args:
@@ -152,7 +145,7 @@ class RepetitionDetector:
 
         current_pos = end
         while current_pos + phrase_length <= len(words):
-            next_phrase = words[current_pos:current_pos + phrase_length]
+            next_phrase = words[current_pos : current_pos + phrase_length]
             original_phrase = words[start:end]
 
             if next_phrase == original_phrase:
