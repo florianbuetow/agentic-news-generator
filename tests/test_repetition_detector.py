@@ -1,6 +1,13 @@
 """Tests for the RepetitionDetector class."""
 
+from pathlib import Path
+
+from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
+
+# Load config for tests
+CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
+CONFIG = Config(CONFIG_PATH)
 
 
 class TestCountConsecutiveRepetitions:
@@ -8,7 +15,7 @@ class TestCountConsecutiveRepetitions:
 
     def test_two_repetitions(self):
         """Test counting 2 consecutive repetitions."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "hello world hello world"
         words = detector.prepare(text).split()
 
@@ -18,7 +25,7 @@ class TestCountConsecutiveRepetitions:
 
     def test_three_repetitions(self):
         """Test counting 3 consecutive repetitions."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "abc abc abc"
         words = detector.prepare(text).split()
 
@@ -27,7 +34,7 @@ class TestCountConsecutiveRepetitions:
 
     def test_fifteen_repetitions(self):
         """Test counting 15 consecutive repetitions."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = " ".join(["like, you know,"] * 15)
         words = detector.prepare(text).split()
 
@@ -37,7 +44,7 @@ class TestCountConsecutiveRepetitions:
 
     def test_non_consecutive_returns_one(self):
         """Test that non-consecutive pattern returns 1."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "apple banana apple cherry"
         words = detector.prepare(text).split()
 
@@ -47,7 +54,7 @@ class TestCountConsecutiveRepetitions:
 
     def test_forty_repetitions_yeah(self):
         """Test massive repetition of single word (40+ times)."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Create 40 repetitions of "Yeah."
         text = " ".join(["Yeah."] * 40)
         words = detector.prepare(text).split()
@@ -61,7 +68,7 @@ class TestDetectHallucinations:
 
     def test_massive_loop_detected(self):
         """Test that massive repetition loop is detected."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         text = " ".join(["you know, like,"] * 15)
 
         results = detector.detect_hallucinations(text)
@@ -75,7 +82,7 @@ class TestDetectHallucinations:
 
     def test_natural_stutter_filtered(self):
         """Test that 2x repetition (natural stutter) is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "as like a, as like a, an object schema"
 
         results = detector.detect_hallucinations(text)
@@ -85,7 +92,7 @@ class TestDetectHallucinations:
 
     def test_ambiguous_3x_repetition_filtered(self):
         """Test that ambiguous 3x repetition is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "for this work, for this work, for this work, the xi"
 
         results = detector.detect_hallucinations(text)
@@ -95,7 +102,7 @@ class TestDetectHallucinations:
 
     def test_natural_stutter_2x_repetition(self):
         """Natural stutter with 2 repetitions should NOT be detected."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         text = "as like a, as like a, an object"
 
         results = detector.detect_hallucinations(text)
@@ -105,7 +112,7 @@ class TestDetectHallucinations:
 
     def test_phrase_15x_repetition_detected(self):
         """3-word phrase repeated 15 times should be detected as hallucination."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         text_15_reps = " ".join(["you know, like,"] * 15)
 
         results = detector.detect_hallucinations(text_15_reps)
@@ -118,7 +125,7 @@ class TestDetectHallucinations:
 
     def test_single_word_5x_not_hallucination(self):
         """Single word repeated 5 times classified as NOT hallucination by SVM."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         text = " ".join(["word"] * 5)
 
         results = detector.detect_hallucinations(text)
@@ -128,7 +135,7 @@ class TestDetectHallucinations:
 
     def test_single_word_11x_is_hallucination(self):
         """Single word repeated 11 times classified as hallucination by SVM."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         text_11 = " ".join(["word"] * 11)
 
         results_11 = detector.detect_hallucinations(text_11)
@@ -145,7 +152,7 @@ class TestDetectHallucinations:
         This is a real example of Whisper hallucination where the model
         gets stuck repeating "Yeah." about 40 times.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Actual hallucination pattern from transcript
         text = (
             "Because if there was another way to solve it, then what you would expect "
@@ -188,7 +195,7 @@ class TestDetectHallucinations:
         - k=1, reps=40, score=40 > 10 ✓
         - reps=40 >= 5 ✓
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = " ".join(["and,"] * 40)
 
         results = detector.detect_hallucinations(text)
@@ -208,7 +215,7 @@ class TestDetectHallucinations:
         This tests a hallucination pattern where the model gets stuck repeating
         a complex phrase multiple times.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Exact repetition of the core phrase 10 times
         phrase = "We have to be able to do this with the X or Y."
         text = " ".join([phrase] * 10)
@@ -233,7 +240,7 @@ class TestDetectHallucinations:
         This tests a real-world hallucination where the model gets stuck
         repeatedly thanking for support with slight variations.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = (
             "I don't know what you are saying. I would like to thank you for your "
             "support and for your notifications. I appreciate your support and your "
@@ -267,7 +274,7 @@ class TestDetectHallucinations:
         This tests a severe hallucination where the exact phrase is repeated
         many times consecutively with only brief interruptions.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = (
             "Thank you. I would like to thank you for your support. I would like to "
             "thank you for your support. I would like to thank you for your support. "
@@ -302,7 +309,7 @@ class TestDetectHallucinations:
 
     def test_short_phrase_many_reps_detected(self):
         """Test that short phrase with many repetitions is detected."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # 1 word repeated 11 times: score = 1 * 11 = 11 > 10
         text = " ".join(["word"] * 11)
 
@@ -315,7 +322,7 @@ class TestDetectHallucinations:
 
     def test_long_phrase_fewer_reps_detected(self):
         """Test that long phrase needs BOTH enough reps AND high score."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # 5 words repeated 3 times: score = 5 * 3 = 15 > 10 ✓
         # BUT reps = 3 < min_repetitions=5 ✗
         # Should NOT be detected with AND logic
@@ -340,7 +347,7 @@ class TestDetectHallucinations:
 
     def test_no_consecutive_repetition_not_detected(self):
         """Test that non-consecutive repetitions are not detected."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "apple banana apple cherry apple date"
 
         results = detector.detect_hallucinations(text)
@@ -349,19 +356,19 @@ class TestDetectHallucinations:
 
     def test_empty_text(self):
         """Test that empty text returns no results."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         results = detector.detect_hallucinations("")
         assert len(results) == 0
 
     def test_single_word(self):
         """Test that single word with no repetition returns no results."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         results = detector.detect_hallucinations("hello")
         assert len(results) == 0
 
     def test_natural_speech_i_have_to_filtered(self):
         """Test that 'I have to I have to' (natural stutter) is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "because I have to I have to generate the chunk"
 
         results = detector.detect_hallucinations(text)
@@ -371,7 +378,7 @@ class TestDetectHallucinations:
 
     def test_natural_speech_you_can_safely_filtered(self):
         """Test that 'you can safely you can safely' is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "that you can safely you can safely scale beta with N"
 
         results = detector.detect_hallucinations(text)
@@ -381,7 +388,7 @@ class TestDetectHallucinations:
 
     def test_natural_speech_i_dont_think_filtered(self):
         """Test that 'I don't think I don't think' is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "it. I don't think I don't think it's exactly like"
 
         results = detector.detect_hallucinations(text)
@@ -391,7 +398,7 @@ class TestDetectHallucinations:
 
     def test_emphatic_speech_thank_you_filtered(self):
         """Test that polite closing 'Thank you so much' repeated is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "Thank you so much. Thank you so much."
 
         results = detector.detect_hallucinations(text)
@@ -401,7 +408,7 @@ class TestDetectHallucinations:
 
     def test_emphatic_speech_who_cares_filtered(self):
         """Test that rhetorical repetition 'Who cares about you?' is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "showing up at Los Alamos? Who cares about you? Who cares about you?"
 
         results = detector.detect_hallucinations(text)
@@ -411,7 +418,7 @@ class TestDetectHallucinations:
 
     def test_emphatic_speech_sky_falling_filtered(self):
         """Test that idiom emphasis 'the sky is falling' is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "American, the sky is falling, the sky is falling, right?"
 
         results = detector.detect_hallucinations(text)
@@ -425,7 +432,7 @@ class TestDetectHallucinations:
         This is natural conversational speech with common filler patterns that
         don't constitute hallucination.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = (
             "Sver intend to serve, you know, act or behave, right, then you still "
             "need to be, you know, you need to be able to predict the consequences "
@@ -443,7 +450,7 @@ class TestDetectHallucinations:
         Natural dialogue with varied phrasing and casual language markers
         like 'I mean', 'it's weird', 'right?' should not trigger detection.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "I mean, he was like, it's weird that you don't use value functions, right?"
 
         results = detector.detect_hallucinations(text)
@@ -458,7 +465,7 @@ class TestDetectHallucinations:
         appear in close proximity but with different contexts, which should not
         be flagged as hallucination.
         """
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = (
             "ever intend to serve, you know, act or behave, right, then you still "
             "need to be, you know, you need to be able to predict the consequences "
@@ -472,7 +479,7 @@ class TestDetectHallucinations:
 
     def test_emphatic_speech_i_would_love_filtered(self):
         """Test that enthusiasm 'I would love to do that' is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "expand your search. I would love to do that. I would love to do that. Yes"
 
         results = detector.detect_hallucinations(text)
@@ -491,7 +498,7 @@ class TestDetectHallucinations:
 
     def test_natural_language_a_percent_of_filtered(self):
         """Test that technical phrase 'a percent of a percent of' is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "maybe a percent of a percent of the speed of light"
 
         results = detector.detect_hallucinations(text)
@@ -501,7 +508,7 @@ class TestDetectHallucinations:
 
     def test_this_is_like_natural_filler_filtered(self):
         """Test that 'this is like this is like' (natural filler) is filtered."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "I think this is like this is like very connected to"
 
         results = detector.detect_hallucinations(text)
@@ -511,7 +518,7 @@ class TestDetectHallucinations:
 
     def test_customer_data_pattern_high_repetitions(self):
         """Test pattern with high repetition count gets detected."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Simulate a pattern that repeats many times
         phrase = "customer data for performance monitoring"
         text = " ".join([phrase] * 10)
@@ -530,7 +537,7 @@ class TestDetectHallucinations:
 
     def test_edge_case_punctuation_variation_not_detected(self):
         """Test that punctuation variations prevent consecutive detection."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Different punctuation makes them non-identical
         text = "We're very, we're very ready for it."
 
@@ -542,7 +549,7 @@ class TestDetectHallucinations:
 
     def test_edge_case_capitalization_variation_not_detected(self):
         """Test that capitalization differences prevent consecutive detection."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "So we need to understand. so we need to understand."
 
         results = detector.detect_hallucinations(text)
@@ -552,7 +559,7 @@ class TestDetectHallucinations:
 
     def test_multiple_patterns_in_same_text(self):
         """Test detection when text contains multiple repetition patterns."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Multiple different patterns
         text = "word word word and phrase phrase phrase phrase and thing thing"
 
@@ -566,7 +573,7 @@ class TestDetectHallucinations:
 
     def test_threshold_boundary_exactly_at_threshold(self):
         """Test pattern with score exactly at threshold (not detected with AND logic)."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # Create pattern with score = exactly 10
         # k=2 × 5 reps = 10
         text = " ".join(["word pair"] * 5)
@@ -580,7 +587,7 @@ class TestDetectHallucinations:
 
     def test_threshold_boundary_one_above_threshold(self):
         """Test pattern with score just above threshold (detected)."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         # k=1 × 11 reps = 11 > 10
         text = " ".join(["word"] * 11)
 
@@ -596,7 +603,7 @@ class TestDetectBasic:
 
     def test_detect_finds_all_repetitions(self):
         """Test that detect() finds all repetitions, not just consecutive."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "apple banana cherry apple banana cherry fig apple banana cherry"
 
         results = detector.detect(text, min_k=3)
@@ -606,7 +613,7 @@ class TestDetectBasic:
 
     def test_detect_prioritizes_longer_patterns(self):
         """Test that detect() keeps longest pattern when multiple exist at same position."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "apple banana cherry date apple banana cherry fig"
 
         results = detector.detect(text, min_k=3)
@@ -626,7 +633,7 @@ class TestPrepare:
 
     def test_prepare_normalizes_whitespace_only(self):
         """Test that prepare() only normalizes whitespace."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
 
         # Should preserve punctuation and capitalization
         text = "Hello,  World!  How   are you?"
@@ -635,7 +642,7 @@ class TestPrepare:
 
     def test_prepare_preserves_punctuation(self):
         """Test that punctuation is preserved."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "We're very, we're very ready."
         prepared = detector.prepare(text)
         assert "'" in prepared
@@ -643,7 +650,7 @@ class TestPrepare:
 
     def test_prepare_preserves_case(self):
         """Test that case is preserved."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
         text = "Hello World"
         prepared = detector.prepare(text)
         assert "Hello" in prepared
@@ -656,7 +663,7 @@ class TestConstructorParameters:
 
     def test_constructor_default_parameters(self):
         """Test that default constructor parameters work correctly."""
-        detector = RepetitionDetector()
+        detector = RepetitionDetector(CONFIG.getRepetitionMinK(), CONFIG.getRepetitionMinRepetitions(), CONFIG.getConfigPath())
 
         # Defaults: min_k=1, min_repetitions=5
         assert detector.min_k == 1
@@ -664,14 +671,14 @@ class TestConstructorParameters:
 
     def test_constructor_custom_parameters(self):
         """Test that custom constructor parameters are stored."""
-        detector = RepetitionDetector(min_k=3, min_repetitions=7)
+        detector = RepetitionDetector(min_k=3, min_repetitions=7, config_path=CONFIG.getConfigPath())
 
         assert detector.min_k == 3
         assert detector.min_repetitions == 7
 
     def test_min_repetitions_filters_low_count(self):
         """Test that min_repetitions parameter filters patterns with too few repetitions."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         text = "as like a, as like a, an object"
 
         results = detector.detect_hallucinations(text)
@@ -681,7 +688,7 @@ class TestConstructorParameters:
 
     def test_min_repetitions_allows_sufficient_count(self):
         """Test that patterns meeting min_repetitions are evaluated by classifier."""
-        detector = RepetitionDetector(min_k=1, min_repetitions=3)
+        detector = RepetitionDetector(min_k=1, min_repetitions=3, config_path=CONFIG.getConfigPath())
         text = " ".join(["test pattern here"] * 4)
 
         results = detector.detect_hallucinations(text)
@@ -698,12 +705,12 @@ class TestConstructorParameters:
         text = " ".join(["word phrase pattern"] * 4)
 
         # High min_repetitions=5 filters this pattern (4 < 5)
-        detector_high = RepetitionDetector(min_k=1, min_repetitions=5)
+        detector_high = RepetitionDetector(min_k=1, min_repetitions=5, config_path=CONFIG.getConfigPath())
         results_high = detector_high.detect_hallucinations(text)
         assert len(results_high) == 0  # Filtered by min_repetitions
 
         # Lower min_repetitions=3 allows classifier to evaluate
-        detector_low = RepetitionDetector(min_k=1, min_repetitions=3)
+        detector_low = RepetitionDetector(min_k=1, min_repetitions=3, config_path=CONFIG.getConfigPath())
         results_low = detector_low.detect_hallucinations(text)
         # k=3, reps=4 - classifier determines the result
         if len(results_low) > 0:
@@ -713,8 +720,8 @@ class TestConstructorParameters:
 
     def test_constructor_min_k_parameter_filters_patterns(self):
         """Test that min_k parameter filters patterns by phrase length."""
-        detector_mink_1 = RepetitionDetector(min_k=1, min_repetitions=2)
-        detector_mink_5 = RepetitionDetector(min_k=5, min_repetitions=2)
+        detector_mink_1 = RepetitionDetector(min_k=1, min_repetitions=2, config_path=CONFIG.getConfigPath())
+        detector_mink_5 = RepetitionDetector(min_k=5, min_repetitions=2, config_path=CONFIG.getConfigPath())
 
         # Text with a 3-word pattern repeated 15 times (enough to be detected as hallucination)
         text = " ".join(["word phrase test"] * 15)
