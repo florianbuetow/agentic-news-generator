@@ -45,12 +45,12 @@ TEST_EXAMPLES: list[tuple[str, int, str]] = [
     (
         " ".join(["word"] * 11),
         1,
-        "Single word × 11 (score=11, just above threshold)",
+        "Single word × 11 (k=1, reps=11)",
     ),
     (
         " ".join(["this is a long phrase"] * 5),
         1,
-        "5-word phrase × 5 reps (score=25)",
+        "5-word phrase × 5 reps (k=5, reps=5)",
     ),
     (
         " ".join(["customer data for performance monitoring"] * 10),
@@ -111,62 +111,62 @@ TEST_EXAMPLES: list[tuple[str, int, str]] = [
     (
         "as like a, as like a, an object schema",
         0,
-        "Natural stutter: 2x repetition (score=6 < 10)",
+        "Natural stutter: 2x repetition (k=3, reps=2)",
     ),
     (
         "for this work, for this work, for this work, the xi",
         0,
-        "Ambiguous 3x repetition (score=9 < 10)",
+        "Ambiguous 3x repetition (k=3, reps=3)",
     ),
     (
         " ".join(["word"] * 5),
         0,
-        "Single word × 5 (score=5 < 10, though reps=5 >= min)",
+        "Single word × 5 (k=1, reps=5)",
     ),
     (
         " ".join(["word pair"] * 5),
         0,
-        "Threshold boundary: k=2 × 5 = 10 (not > 10)",
+        "Threshold boundary: k=2, reps=5 (SVM decision)",
     ),
     (
         " ".join(["test pattern here"] * 3),
         0,
-        "3-word phrase × 3 (score=9 < 10, reps=3 < 5)",
+        "3-word phrase × 3 (k=3, reps=3 < min_repetitions=5)",
     ),
     (
         " ".join(["word phrase pattern"] * 4),
         0,
-        "3-word phrase × 4 (score=12 > 10, but reps=4 < 5)",
+        "3-word phrase × 4 (k=3, reps=4 < min_repetitions=5)",
     ),
     (
         "because I have to I have to generate the chunk",
         0,
-        "Natural stutter: 'I have to' × 2 (score=6)",
+        "Natural stutter: 'I have to' × 2 (k=3, reps=2)",
     ),
     (
         "that you can safely you can safely scale beta with N",
         0,
-        "Natural repetition: 'you can safely' × 2 (score=6)",
+        "Natural repetition: 'you can safely' × 2 (k=3, reps=2)",
     ),
     (
         "it. I don't think I don't think it's exactly like",
         0,
-        "Natural stutter: 'I don't think' × 2 (score=6)",
+        "Natural stutter: 'I don't think' × 2 (k=3, reps=2)",
     ),
     (
         "Thank you so much. Thank you so much.",
         0,
-        "Polite closing: 'Thank you so much' × 2 (score=8)",
+        "Polite closing: 'Thank you so much' × 2 (k=4, reps=2)",
     ),
     (
         "showing up at Los Alamos? Who cares about you? Who cares about you?",
         0,
-        "Rhetorical repetition: 'Who cares about you?' × 2 (score=8)",
+        "Rhetorical repetition: 'Who cares about you?' × 2 (k=4, reps=2)",
     ),
     (
         "American, the sky is falling, the sky is falling, right?",
         0,
-        "Idiom emphasis: 'the sky is falling' × 2 (score=8)",
+        "Idiom emphasis: 'the sky is falling' × 2 (k=4, reps=2)",
     ),
     (
         (
@@ -194,17 +194,17 @@ TEST_EXAMPLES: list[tuple[str, int, str]] = [
     (
         "expand your search. I would love to do that. I would love to do that. Yes",
         0,
-        "Enthusiasm: 'I would love to do that' × 2 (borderline score=12)",
+        "Enthusiasm: 'I would love to do that' × 2 (k=6, reps=2 borderline)",
     ),
     (
         "maybe a percent of a percent of the speed of light",
         0,
-        "Technical phrase: 'a percent of' × 2 (score=6)",
+        "Technical phrase: 'a percent of' × 2 (k=3, reps=2)",
     ),
     (
         "I think this is like this is like very connected to",
         0,
-        "Natural filler: 'this is like' × 2 (score=6)",
+        "Natural filler: 'this is like' × 2 (k=3, reps=2)",
     ),
     (
         "We're very, we're very ready for it.",
@@ -219,7 +219,7 @@ TEST_EXAMPLES: list[tuple[str, int, str]] = [
     (
         "word word word and phrase phrase phrase phrase and thing thing",
         0,
-        "Multiple low-score patterns (3, 4, 2 all < 10)",
+        "Multiple low-rep patterns (reps=3, 4, 2 all < min_repetitions=5)",
     ),
     (
         "apple banana apple cherry",
@@ -253,31 +253,30 @@ def analyze_text(text: str, detector: RepetitionDetector) -> tuple[int, int, int
 
     Returns:
         Tuple of (max_k, max_reps, max_score).
+        Score is calculated as k × reps for analysis purposes only.
         If no patterns found, returns (0, 0, 0).
     """
     if not text.strip():
         return (0, 0, 0)
 
-    # Use the public detect_hallucinations method which returns patterns with scores
+    # detect_hallucinations returns list of [start, end, k, rep_count]
     hallucinations = detector.detect_hallucinations(text)
 
     if not hallucinations:
         return (0, 0, 0)
 
-    # Find the pattern with the highest score
+    # Find the pattern with the highest score (k × reps)
     max_k = 0
     max_reps = 0
     max_score = 0
 
-    for pattern in hallucinations:
-        # pattern is a dict with keys: pattern, k, repetitions, score, start_idx, end_idx
-        k = pattern["k"]
-        reps = pattern["repetitions"]
-        score = pattern["score"]
+    for _start, _end, k, rep_count in hallucinations:
+        # Calculate score for analysis/comparison purposes
+        score = k * rep_count
 
         if score > max_score:
             max_k = k
-            max_reps = reps
+            max_reps = rep_count
             max_score = score
 
     return (max_k, max_reps, max_score)
@@ -288,7 +287,7 @@ def main() -> int:
     # Initialize detector with default parameters
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
-    detector = RepetitionDetector(min_k=1, min_repetitions=5, config_path=config.getConfigPath())
+    detector = RepetitionDetector(min_k=1, min_repetitions=5, config=config)
     # Prepare output file
     output_file = Path(__file__).parent.parent / "data" / "analyze" / "hallucinations" / "test_examples_analysis.csv"
     output_file.parent.mkdir(parents=True, exist_ok=True)
