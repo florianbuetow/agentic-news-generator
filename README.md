@@ -43,6 +43,14 @@ agentic-news-generator/
 │   └── archive-videos.sh  # Archive processed videos
 ├── tests/                  # Test suite
 ├── prompts/                # LLM prompt templates
+├── frontend/               # Frontend applications
+│   └── newspaper/         # Nuxt-based newspaper generator
+│       ├── nuxt.config.ts # Nuxt configuration
+│       ├── package.json   # Node.js dependencies
+│       ├── components/    # Vue components (Masthead, ArticleCard, etc.)
+│       ├── data/          # Content data (articles.js)
+│       ├── pages/         # Nuxt pages
+│       └── assets/        # Styles and static assets
 └── data/                   # Data files
     ├── downloads/         # Downloaded and processed content
     │   ├── videos/       # Downloaded videos (by channel)
@@ -52,11 +60,14 @@ agentic-news-generator/
     │   └── metadata/     # Video metadata and silence maps (by channel)
     ├── archive/           # Archived content
     │   └── videos/       # Processed videos moved here
+    ├── input/             # Input data files
+    │   └── newspaper/     # Newspaper input data
+    │       └── articles.js # Generated articles data for Nuxt
     ├── temp/              # Temporary processing files
     └── output/            # Generated output files
         ├── hallucination_digest.md  # Hallucination analysis report
         ├── topics/        # Per-topic aggregated JSON files
-        └── newspaper/     # Generated HTML newspaper
+        └── newspaper/     # Generated HTML newspaper (static site output)
 ```
 
 ## Prerequisites
@@ -68,6 +79,7 @@ agentic-news-generator/
 - [FFmpeg](https://ffmpeg.org/) for audio extraction (`brew install ffmpeg`)
 - [jq](https://jqlang.github.io/jq/) for JSON processing (`brew install jq`)
 - Chrome browser (for YouTube cookie authentication with yt-dlp)
+- Node.js 18+ and npm (for the Nuxt newspaper frontend)
 
 ## Setup
 
@@ -151,6 +163,8 @@ just help
 #### Development
 - `just init` - Initialize development environment
 - `just run` - Run the main application
+- `just newspaper-generate` - Generate static newspaper website from articles data
+- `just newspaper-serve` - Run newspaper development server at http://localhost:3000
 - `just test` - Run unit tests
 - `just test-coverage` - Run tests with coverage report
 - `just code-format` - Auto-fix code style and formatting
@@ -485,6 +499,120 @@ This approach ensures:
 
 See `config/config.yaml` for the current configuration and `config/config.yaml.template` for all available options.
 
+## HTML Newspaper Frontend
+
+The project includes a Nuxt-based newspaper generator that creates a static HTML site styled like a 1950s New York Times newspaper.
+
+### Frontend Structure
+
+```
+frontend/newspaper/
+├── nuxt.config.ts          # Nuxt config with static generation
+├── package.json            # Node.js dependencies
+├── app.vue                 # App entry point
+├── assets/css/
+│   └── newspaper.css       # All newspaper styles
+├── components/
+│   ├── Masthead.vue        # Newspaper header
+│   ├── HeroSection.vue     # Featured article with image
+│   ├── ArticleCard.vue     # Reusable article card (normal/large)
+│   ├── SidebarArticle.vue  # Compact sidebar article
+│   ├── BriefItem.vue       # Single news brief
+│   └── BriefsSection.vue   # Briefs grid section
+├── data/
+│   └── articles.js         # All content data in one place
+├── layouts/
+│   └── default.vue         # Default page layout
+└── pages/
+    └── index.vue           # Homepage
+```
+
+### Frontend Setup
+
+Navigate to the frontend directory and install dependencies:
+
+```bash
+cd frontend/newspaper
+npm install
+```
+
+### Frontend Development
+
+Start the development server on `http://localhost:3000`:
+
+```bash
+npm run dev
+```
+
+### Generate Static Newspaper
+
+Generate a static version of the newspaper site:
+
+```bash
+npm run generate
+```
+
+The static files will be output to `.output/public/`. This folder can be deployed to any static hosting service (Netlify, Vercel, GitHub Pages, etc.).
+
+### Preview Production Build
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+### Updating Newspaper Content
+
+Edit `frontend/newspaper/data/articles.js` to update newspaper content. The data structure includes:
+
+- `heroArticle` - Main featured article with image, headline, byline, and paragraphs
+- `featuredArticles[]` - Grid of top stories (with optional images)
+- `secondaryMain` - Secondary featured article
+- `sidebarArticles[][]` - Sidebar article lists
+- `briefsColumns[]` - News briefs organized by section (National, International, Business, Arts & Culture)
+
+### Key Features
+
+- **Authentic newspaper design** with gothic typography and classic layout
+- **Fully responsive** - works on desktop, tablet, and mobile
+- **Modular components** - all components are reusable with props
+- **Data-driven content** - all articles defined in one central file
+- **Static site generation** - deploy the generated site anywhere
+- **Zero runtime dependencies** - fully static HTML/CSS/JS output
+
+### Automated Newspaper Generation
+
+Use the `just newspaper-generate` command to automatically build the static newspaper website:
+
+```bash
+just newspaper-generate
+```
+
+This command will:
+1. Check if `data/input/newspaper/articles.js` exists (generated by your Python pipeline)
+2. Copy the articles data to the Nuxt frontend
+3. Install npm dependencies (if not already installed)
+4. Run `npm run generate` to build the static site
+5. Copy the generated files from `frontend/newspaper/.output/public/` to `data/output/newspaper/`
+
+The final static website will be available at `data/output/newspaper/` and can be deployed to any static hosting service.
+
+### Development Server
+
+For development and testing, use the `just newspaper-serve` command to run the Nuxt development server:
+
+```bash
+just newspaper-serve
+```
+
+This will:
+1. Copy the articles data to the frontend
+2. Install npm dependencies (if needed)
+3. Start the development server at `http://localhost:3000`
+
+The development server includes hot-reloading, so changes to the frontend code will be reflected immediately in the browser.
+
 ## Project Status
 
 This project is in active development. Current implementation status:
@@ -496,10 +624,11 @@ This project is in active development. Current implementation status:
 - ✅ Transcription pipeline with MLX Whisper large-v3 (`scripts/transcribe_audio.sh`)
 - ✅ Transcript hallucination detection (`scripts/transcript-hallucination-detection.py`)
 - ✅ Video archiving and cleanup (`scripts/archive-videos.sh`)
+- ✅ HTML newspaper frontend (Nuxt-based, `frontend/newspaper/`)
 - 🚧 Topic segmentation
 - 🚧 Article generation
-- 🚧 HTML newspaper generation
-- 🚧 Topic ordering based on relevancy ("interests").
+- 🚧 Python-to-frontend data pipeline (transform topic data to articles.js format)
+- 🚧 Topic ordering based on relevancy ("interests")
 
 __Known Issues / TODO__
 
@@ -513,7 +642,7 @@ __Potential Additions__
 - 🤔 Source linking (video timestamps)
 - 🤔 Video image extraction
 - 🤔 Article image embedding
-- 🤔 Inline Audio or Video player with auto skip function.
+- 🤔 Inline Audio or Video player with auto skip function
 
 ### Known Security Issues
 

@@ -212,10 +212,28 @@ __marimo__/
 
 # Project-specific configuration files
 config/config.yaml
+
+# Claude Code - exclude settings.local.json in all subdirectories
 **/settings.local.json
 
 # Documentation files
 docs/
+
+# Frontend / Nuxt.js
+frontend/newspaper/node_modules/
+frontend/newspaper/.nuxt/
+frontend/newspaper/.output/
+frontend/newspaper/.nitro/
+frontend/newspaper/.cache
+frontend/newspaper/.data
+frontend/newspaper/dist
+frontend/newspaper/logs/
+frontend/newspaper/package-lock.json
+frontend/newspaper/.fleet
+frontend/newspaper/.env.*
+!frontend/newspaper/.env.example
+frontend/newspaper/content/articles/
+>>>>>>> main
 
 # Data files
 data/

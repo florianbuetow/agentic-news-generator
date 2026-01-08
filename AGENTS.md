@@ -12,6 +12,8 @@
   - **NO legacy format support, NO fallback logic, NO "handle both old and new" code**
   - When changing a format or structure, the old format becomes immediately unsupported
   - If old data exists, it must be regenerated or migrated - never supported in-place
+- **NEVER delete any files without explicitly asking the user first**
+- **ALWAYS verify .gitignore before running destructive commands that might delete files**
 
 ## Git Commit Guidelines
 - **NEVER include AI attribution in commit messages**

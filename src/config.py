@@ -7,6 +7,48 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 
+class ParagraphConfig(BaseModel):
+    """Configuration for paragraph extraction."""
+
+    hero_count: int = Field(..., gt=0, description="Paragraphs for hero article")
+    secondary_count: int = Field(..., gt=0, description="Paragraphs for secondary article")
+    featured_count: int = Field(..., gt=0, description="Paragraphs for featured articles")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ImageConfig(BaseModel):
+    """Configuration for image extraction."""
+
+    extract_first: bool = Field(..., description="Extract first image from markdown")
+    fallback_url: str | None = Field(None, description="Fallback URL if no image")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class LinkConfig(BaseModel):
+    """Configuration for link generation."""
+
+    base_path: str = Field(..., description="Base path for article links")
+    slug_from_filename: bool = Field(..., description="Generate slug from filename")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleCompilerConfig(BaseModel):
+    """Configuration for article compilation."""
+
+    input_dir: str = Field(..., description="Input directory for markdown articles")
+    output_file: str = Field(..., description="Output path for articles.js")
+    min_articles: int = Field(..., gt=0, description="Minimum articles required")
+    date_format: str = Field(..., description="Date format in YAML frontmatter")
+    paragraphs: ParagraphConfig
+    images: ImageConfig
+    links: LinkConfig
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class ChannelConfig(BaseModel):
     """Pydantic model for validating channel configurations.
 
@@ -395,3 +437,16 @@ class Config:
             Path object pointing to the data/archive/videos directory.
         """
         return Path(self._paths.data_archive_videos_dir)
+
+    def get_article_compiler_config(self) -> ArticleCompilerConfig:
+        """Get article compiler configuration.
+
+        Returns:
+            ArticleCompilerConfig instance.
+
+        Raises:
+            KeyError: If article_compiler section is missing from config.
+        """
+        if "article_compiler" not in self._data:
+            raise KeyError("Missing required key 'article_compiler' in config file")
+        return ArticleCompilerConfig.model_validate(self._data["article_compiler"])

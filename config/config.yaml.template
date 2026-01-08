@@ -29,8 +29,7 @@ channels:
 
   - name: Example Channel Three
     url: https://www.youtube.com/@ExampleChannel3
-    category: example_category_three
-    description: "alternative format using vibe field instead of category/what_you_get"
+    vibe: "alternative format using vibe field instead of category/what_you_get"
     download-limiter: 0  # Skip this channel entirely
 
 # Hallucination Detection Configuration
@@ -80,3 +79,23 @@ defaults:
   repetition_min_k: 1  # Minimum phrase length for detection
   repetition_min_repetitions: 5  # Minimum consecutive repetitions
   detect_min_k: 3  # Default min_k for detect() method
+
+# Article Compiler Configuration
+article_compiler:
+  input_dir: "data/input/newspaper/articles"
+  output_file: "data/input/newspaper/articles.js"
+  min_articles: 21
+  date_format: "%Y-%m-%d"
+
+  paragraphs:
+    hero_count: 2
+    secondary_count: 2
+    featured_count: 1
+
+  images:
+    extract_first: true
+    fallback_url: null
+
+  links:
+    base_path: "/articles/"
+    slug_from_filename: true

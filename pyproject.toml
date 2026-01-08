@@ -4,16 +4,18 @@ version = "0.1.0"
 description = "An AI-powered news generator that creates news articles using autonomous agents"
 requires-python = ">=3.12"
 dependencies = [
-    "pydantic>=2.0.0",
-    "pyyaml>=6.0",
     "litellm>=1.0.0",
+    "markdown-it-py>=3.0.0",
+    "matplotlib>=3.7.0",
+    "mlx-whisper>=0.4.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "pydantic>=2.0.0",
+    "python-frontmatter>=1.0.0",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.3.0",
     "srt>=3.5.0",
     "tiktoken>=0.12.0",
-    "mlx-whisper>=0.4.0",
-    "scikit-learn>=1.3.0",
-    "pandas>=2.0.0",
-    "matplotlib>=3.7.0",
-    "numpy>=1.24.0",
 ]
 
 [build-system]
@@ -48,6 +50,11 @@ dev = [
     "pip-audit>=2.7.0",
     "semgrep>=1.144.0",
 
+    # AI Test Detector
+    "autogen-ext[openai]>=0.7.5",
+    "autogen-agentchat>=0.7.5",
+    "requests>=2.25.0",
+
     # Git Hooks
     "pre-commit>=3.6.0",
 
@@ -59,7 +66,7 @@ dev = [
 line-length = 140
 indent-width = 4
 target-version = "py312"
-exclude = [".git", ".ruff_cache", ".venv", ".vscode", "reports"]
+exclude = [".git", ".ruff_cache", ".venv", ".vscode", "reports", "tools/fake_test_detector"]
 
 [tool.ruff.lint]
 # Core errors & warnings, Google-style docs, types, bugbear, quotes, imports, naming
@@ -138,6 +145,11 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 check_untyped_defs = false
 
+# Third-party libraries without type stubs
+[[tool.mypy.overrides]]
+module = ["frontmatter"]
+ignore_missing_imports = true
+
 [tool.coverage.run]
 source = ["src"]
 omit = [
@@ -188,6 +200,7 @@ extend_exclude = [
     "data",
     "reports",
     "notes",
+    "tools/fake_test_detector",
 ]
 
 # Ignore Jupyter notebooks (not part of production code)
