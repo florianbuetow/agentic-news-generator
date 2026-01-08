@@ -232,6 +232,7 @@ frontend/newspaper/package-lock.json
 frontend/newspaper/.fleet
 frontend/newspaper/.env.*
 !frontend/newspaper/.env.example
+frontend/newspaper/content/articles/
 
 # Data files
 data/
