@@ -68,6 +68,7 @@ class PathsConfig(BaseModel):
     data_downloads_transcripts_hallucinations_dir: str = Field(
         ..., description="Transcript hallucinations analysis directory path", min_length=1
     )
+    data_downloads_transcripts_cleaned_dir: str = Field(..., description="Cleaned transcripts directory path", min_length=1)
     data_downloads_audio_dir: str = Field(..., description="Audio files directory path", min_length=1)
     data_downloads_metadata_dir: str = Field(..., description="Metadata files directory path", min_length=1)
     data_output_dir: str = Field(..., description="Output directory path", min_length=1)
@@ -330,6 +331,14 @@ class Config:
             Path object pointing to the data/downloads/transcripts-hallucinations directory.
         """
         return Path(self._paths.data_downloads_transcripts_hallucinations_dir)
+
+    def getDataDownloadsTranscriptsCleanedDir(self) -> Path:
+        """Get the data downloads cleaned transcripts directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/transcripts_cleaned directory.
+        """
+        return Path(self._paths.data_downloads_transcripts_cleaned_dir)
 
     def getDataDownloadsAudioDir(self) -> Path:
         """Get the data downloads audio directory path.
