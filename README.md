@@ -501,6 +501,13 @@ This project is in active development. Current implementation status:
 - 🚧 HTML newspaper generation
 - 🚧 Topic ordering based on relevancy ("interests").
 
+__Known Issues / TODO__
+
+- 🐛 Fix hallucination detection during hallucination removal
+  - The removal script extracts text using timestamps from the detection JSON, but the timestamps only point to where the hallucination is located (specific subtitle entries), not the full sliding window that was analyzed during detection
+  - This causes the suffix array algorithm to find different pattern lengths (e.g., 13-word vs 14-word patterns) when run on smaller text windows
+  - Solution: Use the `window_text` field from the JSON directly for validation instead of reconstructing from timestamps
+
 __Potential Additions__
 
 - 🤔 Source linking (video timestamps)
