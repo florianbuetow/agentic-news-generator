@@ -4,6 +4,8 @@
 - **Never assume any default values anywhere**
 - Always be explicit about values, paths, and configurations
 - If a value is not provided, handle it explicitly (raise error, use null, or prompt for input)
+- **NEVER delete any files without explicitly asking the user first**
+- **ALWAYS verify .gitignore before running destructive commands that might delete files**
 
 ## Git Commit Guidelines
 - **NEVER include AI attribution in commit messages**
