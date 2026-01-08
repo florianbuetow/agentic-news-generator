@@ -84,14 +84,12 @@ useHead({
 
 <style scoped>
 .article-page {
-  max-width: 800px;
-  margin: 0 auto;
   padding: 40px 20px;
   font-family: 'Libre Baskerville', serif;
 }
 
 .article-container {
-  background: white;
+  /* Inherits background from main content */
 }
 
 .article-header {
