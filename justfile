@@ -58,10 +58,9 @@ newspaper-generate:
         exit 1
     fi
 
-    # Copy markdown articles to Nuxt content folder
-    echo "Copying markdown articles to frontend..."
-    mkdir -p frontend/newspaper/content/articles
-    cp data/input/newspaper/articles/*.md frontend/newspaper/content/articles/
+    # Preprocess markdown articles (extract YAML frontmatter only)
+    echo "Preprocessing markdown articles..."
+    uv run scripts/preprocess_articles.py
 
     # Install npm dependencies if needed
     if [ ! -d "frontend/newspaper/node_modules" ]; then
@@ -104,10 +103,9 @@ newspaper-serve:
         exit 1
     fi
 
-    # Copy markdown articles to Nuxt content folder
-    echo "Copying markdown articles to frontend..."
-    mkdir -p frontend/newspaper/content/articles
-    cp data/input/newspaper/articles/*.md frontend/newspaper/content/articles/
+    # Preprocess markdown articles (extract YAML frontmatter only)
+    echo "Preprocessing markdown articles..."
+    uv run scripts/preprocess_articles.py
 
     # Install npm dependencies if needed
     if [ ! -d "frontend/newspaper/node_modules" ]; then
