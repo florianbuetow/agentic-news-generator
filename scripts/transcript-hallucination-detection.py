@@ -121,7 +121,6 @@ def detect_hallucinations_in_file(
                         "cleaned_text": cleaned_repetition,
                         "repetition_length": rep_k,
                         "repetition_count": rep_count,
-                        "score": rep_k * rep_count,
                         "repetition_pattern": cleaned_repetition,
                         "window_text": window_text,
                     }
@@ -294,14 +293,14 @@ Examples:
         print("Error: overlap-percent must be in [0, 100)", file=sys.stderr)
         return 1
 
-    # Find all SRT files (using data_dir from config)
-    transcripts_dir = data_dir / "downloads" / "transcripts"
+    # Find all SRT files (using paths from config)
+    transcripts_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsDir()
     if not transcripts_dir.exists():
         print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
         return 1
 
-    # Hallucination detection output directory from config (config_output_dir is relative to data_dir)
-    transcripts_hallucinations_dir = data_dir / config_output_dir
+    # Hallucination detection output directory from config
+    transcripts_hallucinations_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsHallucinationsDir()
 
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
 
@@ -318,7 +317,7 @@ Examples:
     detector = RepetitionDetector(
         min_k=config.getRepetitionMinK(),
         min_repetitions=config.getRepetitionMinRepetitions(),
-        config_path=config.getConfigPath(),
+        config=config,
     )
 
     # Process each file
@@ -326,7 +325,6 @@ Examples:
     files_with_hallucinations = 0
     total_hallucinations = 0
     failed_files = []
-    all_hallucinations = []  # Collect all for score distribution
 
     for srt_file in srt_files:
         # Display relative path for cleaner output
@@ -355,7 +353,7 @@ Examples:
                 analysis_dir = transcripts_hallucinations_dir / channel_name
                 output_file = analysis_dir / f"{srt_file.stem}.json"
 
-                # Read back the JSON to get an example and collect all hallucinations
+                # Read back the JSON to get an example if hallucinations were found
                 try:
                     import json
 
@@ -363,8 +361,6 @@ Examples:
                         result_data = json.load(f)
                         if result_data["hallucinations_detected"]:
                             example = result_data["hallucinations_detected"][0]
-                            # Collect all hallucinations for score distribution
-                            all_hallucinations.extend(result_data["hallucinations_detected"])
                 except Exception:
                     pass  # If we can't load the example, just skip it
 
@@ -387,46 +383,6 @@ Examples:
         print(f"\nFailed files ({len(failed_files)}):")
         for filename, error in failed_files:
             print(f"  - {filename}: {error}")
-
-    # Print score distribution if we have hallucinations
-    if all_hallucinations:
-        print("\n" + "=" * 50)
-        print("Score Distribution (for analysis)")
-        print("=" * 50)
-
-        # Define score ranges for grouping
-        ranges = [(11, 20, "Low"), (21, 50, "Medium"), (51, 100, "High"), (101, float("inf"), "Very High")]
-
-        # Group hallucinations by score range
-        for min_score, max_score, label in ranges:
-            range_hallucinations = [
-                h
-                for h in all_hallucinations
-                if min_score <= h.get("score", h.get("repetition_length", 0) * h.get("repetition_count", 1)) < max_score
-            ]
-
-            if not range_hallucinations:
-                continue
-
-            print(f"\n{label} Score ({min_score}-{max_score - 1 if max_score != float('inf') else '∞'}):")
-            print(f"  Total patterns: {len(range_hallucinations)}")
-
-            # Show top 3 unique examples by score
-            seen_patterns = set()
-            examples_shown = 0
-            for h in sorted(range_hallucinations, key=lambda x: x.get("score", 0), reverse=True):
-                pattern = h["repetition_pattern"][:60]
-                if pattern not in seen_patterns and examples_shown < 3:
-                    seen_patterns.add(pattern)
-                    k = h.get("repetition_length", 0)
-                    reps = h.get("repetition_count", 1)
-                    score = h.get("score", k * reps)
-                    ellipsis = "..." if len(h["repetition_pattern"]) > 60 else ""
-                    print(f'  • Score {score:3d} = k={k:2d} × {reps:2d} reps: "{pattern}{ellipsis}"')
-                    examples_shown += 1
-
-        print("\nUsing SVM classifier for hallucination detection")
-        print("Patterns are classified based on repetition count and sequence length.")
 
     return 1 if failed_files else 0
 

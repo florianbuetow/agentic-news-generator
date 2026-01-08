@@ -1,34 +1,26 @@
 """Hallucination classifier for detecting transcript hallucinations.
 
-Loads SVM model configuration from config.yaml and provides classification
+Loads SVM model configuration from Config object and provides classification
 without requiring ML library dependencies at inference time.
 """
 
-from pathlib import Path
-
-import yaml
+from src.config import Config
 
 
 class HallucinationClassifier:
     """SVM-based hallucination classifier using trained model coefficients.
 
-    Model coefficients are loaded from config.yaml.
+    Model coefficients are loaded from Config object.
     """
 
-    def __init__(self, config_path: Path) -> None:
+    def __init__(self, config: Config) -> None:
         """Initialize classifier from config.
 
         Args:
-            config_path: Path to config.yaml.
+            config: Config object with hallucination detection settings.
         """
-        # Load config
-        with open(config_path, encoding="utf-8") as f:
-            config = yaml.safe_load(f)
-
-        hallucination_config = config["hallucination_detection"]
-        self.coef_repetitions: float = float(hallucination_config["coef_repetitions"])
-        self.coef_sequence_length: float = float(hallucination_config["coef_sequence_length"])
-        self.intercept: float = float(hallucination_config["intercept"])
+        # Load model coefficients from Config
+        self.coef_repetitions, self.coef_sequence_length, self.intercept = config.getHallucinationClassifierModel()
 
     def predict(self, repetitions: float, sequence_length: float) -> bool:
         """Predict if input is a hallucination.

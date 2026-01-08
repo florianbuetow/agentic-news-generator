@@ -6,8 +6,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-import yaml
-
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -22,27 +20,11 @@ def main() -> int:  # noqa: C901
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1
 
-    # Load Config class for data_dir
+    # Load Config class
     config = Config(config_path)
-    data_dir = Path(__file__).parent.parent / config.getDataDir()
 
-    # Load raw YAML to access hallucination_detection config
-    with open(config_path, encoding="utf-8") as f:
-        config_data = yaml.safe_load(f)
-
-    # Get hallucination detection output directory
-    hallucination_config = config_data.get("hallucination_detection", {})
-    config_output_dir = hallucination_config.get("output_dir")
-
-    if config_output_dir is None:
-        print(
-            "Error: hallucination_detection.output_dir must be configured in config.yaml",
-            file=sys.stderr,
-        )
-        return 1
-
-    # Find all analysis JSON files (config_output_dir is relative to data_dir)
-    transcripts_hallucinations_dir = data_dir / config_output_dir
+    # Get hallucination detection output directory from Config
+    transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
 
     if not transcripts_hallucinations_dir.exists():
         print(f"Error: Hallucination output directory not found: {transcripts_hallucinations_dir}", file=sys.stderr)
@@ -99,8 +81,8 @@ def main() -> int:  # noqa: C901
         print("No hallucinations found to digest.", file=sys.stderr)
         return 1
 
-    # Generate markdown digest (using data_dir from config)
-    output_file = data_dir / "output" / "hallucination_digest.md"
+    # Generate markdown digest
+    output_file = config.getDataOutputDir() / "hallucination_digest.md"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     total_hallucinations = sum(len(v) for v in hallucinations_by_file.values())
