@@ -18,6 +18,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_downloads_videos_dir": "./data/downloads/videos/",
         "data_downloads_transcripts_dir": "./data/downloads/transcripts",
         "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
+        "data_downloads_transcripts_cleaned_dir": "./data/downloads/transcripts_cleaned",
         "data_downloads_audio_dir": "./data/downloads/audio",
         "data_downloads_metadata_dir": "./data/downloads/metadata",
         "data_output_dir": "./data/output/",
