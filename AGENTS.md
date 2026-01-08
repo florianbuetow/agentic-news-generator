@@ -4,10 +4,14 @@
 - **Never assume any default values anywhere**
 - Always be explicit about values, paths, and configurations
 - If a value is not provided, handle it explicitly (raise error, use null, or prompt for input)
-- **Never maintain backwards compatibility when changing code**
+- **NEVER MAINTAIN BACKWARDS COMPATIBILITY WHEN CHANGING CODE**
+  - **ABSOLUTELY NO backwards compatibility - EVER**
   - Backwards compatibility accumulates technical debt
   - Make breaking changes cleanly rather than adding compatibility layers
   - Delete unused code completely instead of keeping it for compatibility
+  - **NO legacy format support, NO fallback logic, NO "handle both old and new" code**
+  - When changing a format or structure, the old format becomes immediately unsupported
+  - If old data exists, it must be regenerated or migrated - never supported in-place
 
 ## Git Commit Guidelines
 - **NEVER include AI attribution in commit messages**

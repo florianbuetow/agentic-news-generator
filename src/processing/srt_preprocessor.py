@@ -122,10 +122,16 @@ def main() -> None:
     """Main function to preprocess all SRT files."""
     import sys
 
-    # Define paths
+    from src.config import Config
+
+    # Load configuration
     project_root = Path(__file__).parent.parent.parent
-    transcripts_dir = project_root / "data" / "downloads" / "transcripts"
-    output_dir = project_root / "data" / "downloads" / "transcripts-preprocessed"
+    config_path = project_root / "config" / "config.yaml"
+    config = Config(config_path)
+
+    # Get paths from Config
+    transcripts_dir = config.getDataDownloadsTranscriptsDir()
+    output_dir = config.getDataDownloadsTranscriptsDir().parent / "transcripts-preprocessed"
 
     if not transcripts_dir.exists():
         print(f"Transcripts directory not found: {transcripts_dir}")

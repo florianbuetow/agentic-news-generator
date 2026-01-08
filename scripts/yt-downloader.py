@@ -80,7 +80,7 @@ def main() -> None:
 
         # Sanitize channel name for directory use
         sanitized_name = sanitize_channel_name(channel.name)
-        output_dir = project_root / "data" / "downloads" / "videos" / sanitized_name
+        output_dir = config.getDataDownloadsVideosDir() / sanitized_name
 
         print(f"Processing channel: {channel.name} ({channel.url})")
         print(f"  Output directory: {output_dir}")

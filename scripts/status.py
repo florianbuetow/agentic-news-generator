@@ -5,6 +5,11 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from src.config import Config
+
 
 def count_files_by_extension(directory: Path, extensions: set[str]) -> int:
     """Count files with specific extensions in a directory."""
@@ -149,11 +154,15 @@ def get_archived_channel_stats(archive_dir: Path, transcripts_dir: Path, archive
 
 def main() -> int:
     """Main entry point."""
-    # Get the downloads directory
+    # Load configuration
     project_root = Path(__file__).parent.parent
-    downloads_dir = project_root / "data" / "downloads"
-    archive_dir = project_root / "data" / "archive"
-    transcripts_dir = downloads_dir / "transcripts"
+    config_path = project_root / "config" / "config.yaml"
+    config = Config(config_path)
+
+    # Get directories from Config
+    downloads_dir = config.getDataDownloadsDir()
+    archive_dir = config.getDataArchiveDir()
+    transcripts_dir = config.getDataDownloadsTranscriptsDir()
 
     if not downloads_dir.exists():
         print(f"Error: Downloads directory not found: {downloads_dir}")
