@@ -217,7 +217,6 @@ config/config.yaml
 **/settings.local.json
 
 # Documentation files
-docs/
 
 # Frontend / Nuxt.js
 frontend/newspaper/node_modules/
