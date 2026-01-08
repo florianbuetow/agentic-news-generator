@@ -50,7 +50,10 @@
             :src="secondaryMain.image"
             :alt="secondaryMain.headline"
           >
-          <h3 class="secondary-main-headline">{{ secondaryMain.headline }}</h3>
+          <NuxtLink v-if="secondaryMain.link" :to="secondaryMain.link" class="headline-link">
+            <h3 class="secondary-main-headline">{{ secondaryMain.headline }}</h3>
+          </NuxtLink>
+          <h3 v-else class="secondary-main-headline">{{ secondaryMain.headline }}</h3>
           <p class="article-card-byline">By {{ secondaryMain.byline }}</p>
           <div class="secondary-main-text">
             <p v-for="(paragraph, index) in secondaryMain.paragraphs" :key="index">

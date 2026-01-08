@@ -5,7 +5,9 @@
         <div class="motto-box">"Today's Practice<br>Tomorrow's Trends"</div>
       </div>
       <div class="masthead-center">
-        <h1 class="newspaper-title">The Artificial Intelligence Times</h1>
+        <NuxtLink to="/" class="title-link">
+          <h1 class="newspaper-title">The Artificial Intelligence Times</h1>
+        </NuxtLink>
       </div>
       <div class="masthead-right">
         <div class="edition-box">Late Edition</div>

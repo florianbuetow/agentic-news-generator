@@ -8,7 +8,10 @@
     >
     <div>
       <div v-if="section" class="article-card-section">{{ section }}</div>
-      <h3 class="article-card-headline">{{ headline }}</h3>
+      <NuxtLink v-if="link" :to="link" class="headline-link">
+        <h3 class="article-card-headline">{{ headline }}</h3>
+      </NuxtLink>
+      <h3 v-else class="article-card-headline">{{ headline }}</h3>
       <p v-if="subhead" class="article-card-subhead">{{ subhead }}</p>
       <p v-if="byline" class="article-card-byline">By {{ byline }}</p>
       <p class="article-card-text">{{ text }}</p>

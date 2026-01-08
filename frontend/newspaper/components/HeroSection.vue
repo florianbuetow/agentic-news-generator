@@ -7,7 +7,10 @@
       </div>
     </div>
     <div class="hero-content">
-      <h2 class="hero-headline">{{ headline }}</h2>
+      <NuxtLink v-if="link" :to="link" class="headline-link">
+        <h2 class="hero-headline">{{ headline }}</h2>
+      </NuxtLink>
+      <h2 v-else class="hero-headline">{{ headline }}</h2>
       <p v-if="subhead" class="hero-subhead">{{ subhead }}</p>
       <p v-if="byline" class="hero-byline">By {{ byline }}</p>
       <div class="hero-text">
