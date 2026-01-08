@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Preprocess markdown articles by extracting only YAML frontmatter.
 
-This script reads markdown files from data/input/newspaper/articles/ and
+This script reads markdown files from {data_input_dir}/newspaper/articles/ and
 creates processed versions in frontend/newspaper/content/articles/ containing
 only the YAML frontmatter (up to and including the second '---' delimiter).
 All markdown content after the frontmatter is removed.
@@ -10,6 +10,10 @@ All markdown content after the frontmatter is removed.
 import logging
 import sys
 from pathlib import Path
+
+# Add src to path to import Config
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+from config import Config
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -87,9 +91,13 @@ def preprocess_article(input_path: Path, output_path: Path) -> None:
 
 def main() -> None:
     """Main entry point for article preprocessing."""
-    # Define paths
+    # Load config to get data directory paths (single source of truth)
     project_root = Path(__file__).parent.parent
-    input_dir = project_root / "data" / "input" / "newspaper" / "articles"
+    config_path = project_root / "config" / "config.yaml"
+    config = Config(config_path=str(config_path))
+
+    # Define paths from config
+    input_dir = config.getDataInputDir() / "newspaper" / "articles"
     output_dir = project_root / "frontend" / "newspaper" / "content" / "articles"
 
     # Validate input directory

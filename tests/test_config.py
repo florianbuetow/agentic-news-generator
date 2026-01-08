@@ -11,6 +11,25 @@ from pydantic import ValidationError
 from src.config import ChannelConfig, Config
 
 
+def get_valid_paths_config() -> dict[str, str]:
+    """Return a valid paths configuration dictionary for tests."""
+    return {
+        "data_dir": "./data/",
+        "data_downloads_dir": "./data/downloads",
+        "data_downloads_videos_dir": "./data/downloads/videos/",
+        "data_downloads_transcripts_dir": "./data/downloads/transcripts",
+        "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
+        "data_downloads_transcripts_cleaned_dir": "./data/downloads/transcripts_cleaned",
+        "data_downloads_audio_dir": "./data/downloads/audio",
+        "data_downloads_metadata_dir": "./data/downloads/metadata",
+        "data_output_dir": "./data/output/",
+        "data_input_dir": "./data/input/",
+        "data_temp_dir": "./data/temp",
+        "data_archive_dir": "./data/archive",
+        "data_archive_videos_dir": "./data/archive/videos",
+    }
+
+
 class TestChannelConfig:
     """Test cases for the ChannelConfig Pydantic model."""
 
@@ -21,26 +40,28 @@ class TestChannelConfig:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
+            "download-limiter": 20,
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.url == "https://www.youtube.com/@test"
         assert channel.name == "Test Channel"
         assert channel.category == "test_category"
         assert channel.description == "Test content"
+        assert channel.download_limiter == 20
 
     def test_missing_required_field(self) -> None:
         """Test that missing required fields raise ValidationError."""
         channel_data = {
             "url": "https://www.youtube.com/@test",
             "name": "Test Channel",
-            # Missing category, description
+            # Missing category, description, download_limiter
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 2  # category, description
+        assert len(errors) == 3  # category, description, download-limiter
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"category", "description"}
+        assert error_fields == {"category", "description", "download-limiter"}
 
     def test_extra_fields_forbidden(self) -> None:
         """Test that extra fields are forbidden due to extra='forbid'."""
@@ -49,6 +70,7 @@ class TestChannelConfig:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
+            "download-limiter": 20,
             "extra_field": "should not be allowed",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -63,6 +85,7 @@ class TestChannelConfig:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
+            "download-limiter": 20,
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
@@ -75,14 +98,14 @@ class TestChannelConfig:
             "url": "https://www.youtube.com/@test",
             "name": "Test Channel",
             "category": "test_category",
-            # Missing description
+            # Missing description, download_limiter
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 1
-        assert errors[0]["loc"][0] == "description"
-        assert "required" in errors[0]["msg"].lower()
+        assert len(errors) == 2
+        error_fields = {error["loc"][0] for error in errors}
+        assert error_fields == {"description", "download-limiter"}
 
     def test_empty_strings_allowed(self) -> None:
         """Test that empty strings are allowed (validation passes but may not be practical)."""
@@ -91,11 +114,13 @@ class TestChannelConfig:
             "name": "",
             "category": "",
             "description": "",
+            "download-limiter": 0,
         }
         # Empty strings are valid str types, so validation passes
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.url == ""
         assert channel.name == ""
+        assert channel.download_limiter == 0
 
 
 class TestConfig:
@@ -104,20 +129,23 @@ class TestConfig:
     def test_load_valid_config(self) -> None:
         """Test loading a valid configuration file."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
                     "name": "Test Channel 1",
                     "category": "category1",
                     "description": "Content 1",
+                    "download-limiter": 20,
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
                     "category": "category2",
                     "description": "Content 2",
+                    "download-limiter": 20,
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -167,7 +195,7 @@ class TestConfig:
 
     def test_channels_not_list(self) -> None:
         """Test that channels not being a list raises ValueError."""
-        config_data = {"channels": "not a list"}
+        config_data = {"paths": get_valid_paths_config(), "channels": "not a list"}
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
             temp_path = Path(f.name)
@@ -181,7 +209,7 @@ class TestConfig:
 
     def test_empty_channels_list(self) -> None:
         """Test that an empty channels list is valid."""
-        config_data: dict[str, list[dict[str, Any]]] = {"channels": []}
+        config_data: dict[str, Any] = {"paths": get_valid_paths_config(), "channels": []}
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
             temp_path = Path(f.name)
@@ -196,13 +224,14 @@ class TestConfig:
     def test_channel_missing_required_field(self) -> None:
         """Test that channel missing required fields raises ValueError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
-                    # Missing category, description
+                    # Missing category, description, download_limiter
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -219,12 +248,13 @@ class TestConfig:
     def test_channel_missing_name_field(self) -> None:
         """Test that channel missing name field uses index in error message."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
-                    # Missing name, category, description
+                    # Missing name, category, description, download_limiter
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -240,18 +270,19 @@ class TestConfig:
     def test_multiple_validation_errors(self) -> None:
         """Test that multiple channel validation errors are all reported."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
                     "name": "Test Channel 1",
-                    # Missing category, description
+                    # Missing category, description, download_limiter
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
-                    # Missing category, description
+                    # Missing category, description, download_limiter
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -271,20 +302,23 @@ class TestConfig:
     def test_get_channel_valid_index(self) -> None:
         """Test getting a channel by valid index."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
                     "name": "Test Channel 1",
                     "category": "category1",
                     "description": "Content 1",
+                    "download-limiter": 20,
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
                     "category": "category2",
                     "description": "Content 2",
+                    "download-limiter": 20,
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -302,14 +336,16 @@ class TestConfig:
     def test_get_channel_negative_index(self) -> None:
         """Test that negative index raises IndexError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -326,14 +362,16 @@ class TestConfig:
     def test_get_channel_index_too_large(self) -> None:
         """Test that index too large raises IndexError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -351,20 +389,23 @@ class TestConfig:
     def test_get_channel_by_name_valid(self) -> None:
         """Test getting a channel by valid name."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test1",
                     "name": "Test Channel 1",
                     "category": "category1",
                     "description": "Content 1",
+                    "download-limiter": 20,
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
                     "name": "Test Channel 2",
                     "category": "category2",
                     "description": "Content 2",
+                    "download-limiter": 20,
                 },
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -382,14 +423,16 @@ class TestConfig:
     def test_get_channel_by_name_not_found(self) -> None:
         """Test that non-existent channel name raises KeyError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -406,14 +449,16 @@ class TestConfig:
     def test_get_channel_by_name_case_sensitive(self) -> None:
         """Test that channel name lookup is case-sensitive."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -429,14 +474,16 @@ class TestConfig:
     def test_channel_with_wrong_type(self) -> None:
         """Test that channel with wrong field type raises ValueError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": 123,  # Should be string
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -452,15 +499,17 @@ class TestConfig:
     def test_channel_with_extra_field(self) -> None:
         """Test that channel with extra field raises ValueError."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                     "extra_field": "not allowed",
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -476,14 +525,16 @@ class TestConfig:
     def test_config_path_as_string(self) -> None:
         """Test that config_path can be provided as a string."""
         config_data = {
+            "paths": get_valid_paths_config(),
             "channels": [
                 {
                     "url": "https://www.youtube.com/@test",
                     "name": "Test Channel",
                     "category": "category",
                     "description": "Content",
+                    "download-limiter": 20,
                 }
-            ]
+            ],
         }
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(config_data, f)
@@ -508,3 +559,115 @@ class TestConfig:
             assert "Missing required key 'channels'" in str(exc_info.value)
         finally:
             temp_path.unlink()
+
+
+class TestChannelConfigDownloadLimiter:
+    """Test cases for the download_limiter field."""
+
+    def test_download_limiter_zero(self) -> None:
+        """Test that download_limiter=0 is valid (skip downloads)."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 0,
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == 0
+
+    def test_download_limiter_unlimited(self) -> None:
+        """Test that download_limiter=-1 is valid (unlimited)."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": -1,
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == -1
+
+    def test_download_limiter_positive(self) -> None:
+        """Test that positive download_limiter values are valid."""
+        test_values = [1, 5, 10, 20, 50, 100, 99999]
+        for value in test_values:
+            channel_data = {
+                "url": "https://www.youtube.com/@test",
+                "name": "Test Channel",
+                "category": "test_category",
+                "description": "Test content",
+                "download-limiter": value,
+            }
+            channel = ChannelConfig.model_validate(channel_data)
+            assert channel.download_limiter == value
+
+    def test_download_limiter_missing(self) -> None:
+        """Test that missing download_limiter raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            # Missing download_limiter
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert len(errors) == 1
+        assert errors[0]["loc"][0] == "download-limiter"
+        assert "required" in errors[0]["msg"].lower()
+
+    def test_download_limiter_wrong_type_string(self) -> None:
+        """Test that non-numeric string download_limiter raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": "unlimited",  # Should be int, not string
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert any(error["loc"][0] == "download-limiter" for error in errors)
+
+    def test_download_limiter_wrong_type_float(self) -> None:
+        """Test that float download_limiter raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20.5,  # Should be int, not float
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert any(error["loc"][0] == "download-limiter" for error in errors)
+
+    def test_download_limiter_negative_other_than_minus_one(self) -> None:
+        """Test that negative download_limiter values other than -1 are valid (no restriction)."""
+        # Note: The spec only defines behavior for 0, -1, and >0
+        # But technically any integer is valid from a type perspective
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": -5,
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == -5
+
+    def test_download_limiter_with_hyphen_alias(self) -> None:
+        """Test that download-limiter (with hyphen) is accepted via alias."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,  # Using hyphen as in actual YAML
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.download_limiter == 20
