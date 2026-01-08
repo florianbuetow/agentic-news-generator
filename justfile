@@ -20,14 +20,8 @@ help:
 init:
     @echo ""
     @printf "\033[0;34m=== Initializing Development Environment ===\033[0m\n"
-    @mkdir -p reports/coverage
-    @mkdir -p reports/security
-    @mkdir -p reports/pyright
-    @mkdir -p reports/deptry
-    @mkdir -p data/downloads/metadata
-    @mkdir -p data/input/newspaper
-    @mkdir -p data/output/newspaper
-    @mkdir -p .cache
+    @echo "Creating directories from config.yaml..."
+    @bash scripts/init-directories.sh
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @echo "Installing frontend dependencies..."
