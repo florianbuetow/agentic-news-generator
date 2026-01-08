@@ -14,3 +14,13 @@ reports/
 # Cache directories
 .cache/
 
+# Prompt templates (legitimate module-level constants for import)
+src/agents/topic_segmentation/agent_prompts.py
+src/agents/topic_segmentation/critic_prompts.py
+
+# Example test directories
+tools/*/example_text/
+
+# Fake test detector tool
+tools/fake_test_detector/
+

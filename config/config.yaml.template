@@ -1,18 +1,86 @@
+# Project directories
+paths:
+  data_dir: ./data/
+  data_downloads_dir: ./data/downloads
+  data_downloads_videos_dir: ./data/downloads/videos/
+  data_downloads_transcripts_dir: ./data/downloads/transcripts
+  data_downloads_transcripts_hallucinations_dir: ./data/downloads/transcripts-hallucinations
+  data_downloads_transcripts_cleaned_dir: ./data/downloads/transcripts_cleaned
+  data_downloads_audio_dir: ./data/downloads/audio
+  data_downloads_metadata_dir: ./data/downloads/metadata
+  data_output_dir: ./data/output/
+  data_input_dir: ./data/input/
+  data_temp_dir: ./data/temp
+  data_archive_dir: ./data/archive
+  data_archive_videos_dir: ./data/archive/videos
+
 channels:
   - url: https://www.youtube.com/@ExampleChannel1
     name: Example Channel One
     category: example_category
-    what_you_get: "Description of what content this channel provides."
+    description: "Description of what content this channel provides."
+    download-limiter: 20  # 0=skip downloads, -1=unlimited (99999), >0=max videos to download
 
   - url: https://www.youtube.com/@ExampleChannel2
     name: Example Channel Two
     category: another_example_category
-    what_you_get: "Another description of channel content and value proposition."
+    description: "Another description of channel content and value proposition."
+    download-limiter: -1  # Unlimited downloads
 
   - name: Example Channel Three
     url: https://www.youtube.com/@ExampleChannel3
     vibe: "alternative format using vibe field instead of category/what_you_get"
+    download-limiter: 0  # Skip this channel entirely
 
+# Hallucination Detection Configuration
+hallucination_detection:
+  min_window_size: 500  # Minimum sliding window size in words
+  overlap_percent: 25.0  # Overlap percentage between windows (0-100)
+
+  # Output directory for hallucination detection results (relative to data_dir)
+  output_dir: downloads/transcripts-hallucinations
+
+  # SVM model coefficients (auto-generated from training)
+  coef_repetitions: 0.8888460000
+  coef_sequence_length: 0.6665380000
+  intercept: -6.7770510000
+
+# Topic Segmentation Agent Configuration
+topic_segmentation:
+  # Segmentation Agent LLM - using LM Studio
+  agent_llm:
+    model: your-model-name
+    api_base: http://127.0.0.1:1234/v1
+    api_key_env: LMSTUDIO_API_KEY
+    context_window: 262144
+    max_tokens: 32000
+    temperature: 0.7
+    context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
+
+  # Critic Agent LLM - using same LM Studio instance
+  critic_llm:
+    model: your-model-name
+    api_base: http://127.0.0.1:1234/v1
+    api_key_env: LMSTUDIO_API_KEY
+    context_window: 262144
+    max_tokens: 32000
+    temperature: 0.3
+    context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
+
+  # Retry configuration
+  retry_limit: 1
+
+# Default parameter values
+defaults:
+  # Token validation defaults
+  encoding_name: "o200k_base"  # Tiktoken encoding for token counting
+
+  # Repetition detection defaults
+  repetition_min_k: 1  # Minimum phrase length for detection
+  repetition_min_repetitions: 5  # Minimum consecutive repetitions
+  detect_min_k: 3  # Default min_k for detect() method
+
+# Article Compiler Configuration
 article_compiler:
   input_dir: "data/input/newspaper/articles"
   output_file: "data/input/newspaper/articles.js"

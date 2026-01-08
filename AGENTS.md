@@ -4,6 +4,14 @@
 - **Never assume any default values anywhere**
 - Always be explicit about values, paths, and configurations
 - If a value is not provided, handle it explicitly (raise error, use null, or prompt for input)
+- **NEVER MAINTAIN BACKWARDS COMPATIBILITY WHEN CHANGING CODE**
+  - **ABSOLUTELY NO backwards compatibility - EVER**
+  - Backwards compatibility accumulates technical debt
+  - Make breaking changes cleanly rather than adding compatibility layers
+  - Delete unused code completely instead of keeping it for compatibility
+  - **NO legacy format support, NO fallback logic, NO "handle both old and new" code**
+  - When changing a format or structure, the old format becomes immediately unsupported
+  - If old data exists, it must be regenerated or migrated - never supported in-place
 - **NEVER delete any files without explicitly asking the user first**
 - **ALWAYS verify .gitignore before running destructive commands that might delete files**
 
@@ -39,12 +47,16 @@
 - Prompt templates go in `prompts/`
 - **Input data**: `data/input/`
 - **Output data**: `data/output/`
+- **Temporary debug scripts**: `debug/`
+  - Create all temporary test and debugging scripts in `debug/` subfolder
+  - This makes it easy to identify and clean up scripts that are no longer needed
+  - Debug scripts should not be committed to version control
 - **Never create Python files in the project root directory**
   - Wrong: `./test.py`, `./helper.py`
-  - Correct: `./src/helper.py`, `./scripts/test.py`
+  - Correct: `./src/helper.py`, `./scripts/test.py`, `./debug/test_something.py`
 
 ## News Generation
-- Use Claude API via the Anthropic SDK for news generation
+- Use OpenAI compatible API (LM Studio) for news generation
 - Store prompt templates in `prompts/` directory
 - Input topics/sources should be stored in `data/input/`
 - Generated articles should be saved to `data/output/`

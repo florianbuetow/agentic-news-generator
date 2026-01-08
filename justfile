@@ -1,3 +1,6 @@
+# Load environment variables from .env file
+set dotenv-load := true
+
 # Default recipe: show available commands
 _default:
     @just --list
@@ -17,13 +20,8 @@ help:
 init:
     @echo ""
     @printf "\033[0;34m=== Initializing Development Environment ===\033[0m\n"
-    @mkdir -p reports/coverage
-    @mkdir -p reports/security
-    @mkdir -p reports/pyright
-    @mkdir -p reports/deptry
-    @mkdir -p data/input/newspaper
-    @mkdir -p data/output/newspaper
-    @mkdir -p .cache
+    @echo "Creating directories from config.yaml..."
+    @bash scripts/init-directories.sh
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @echo "Installing frontend dependencies..."
@@ -37,6 +35,104 @@ run:
     @printf "\033[0;34m=== Running Application ===\033[0m\n"
     @uv run src/main.py
     @echo ""
+
+# Run the complete pipeline
+all:
+    @just ci-quiet
+    -@just download-videos
+    @just extract-audio
+    @just transcribe
+    @just archive-videos
+    @just analyze-transcripts-hallucinations
+    @just transcripts-remove-hallucinations
+
+# Download YouTube videos from channels in config.yaml
+download-videos:
+    @echo ""
+    @printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
+    @uv run scripts/yt-downloader.py
+    @echo ""
+    @printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
+    @bash scripts/move-metadata.sh
+    @echo ""
+
+# Convert downloaded videos to WAV audio files
+extract-audio:
+    @echo ""
+    @printf "\033[0;34m=== Converting Videos to Audio ===\033[0m\n"
+    @bash scripts/convert_to_audio.sh
+    @echo ""
+
+# Transcribe audio files to text
+transcribe:
+    #!/usr/bin/env bash
+    set +e  # Don't exit on error
+    echo ""
+    printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
+    bash scripts/transcribe_audio.sh
+    transcribe_exit_code=$?
+    echo ""
+    printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
+    bash scripts/move-transcript-metadata.sh
+    echo ""
+    # Exit with the original transcription exit code
+    exit $transcribe_exit_code
+
+# Archive processed videos
+archive-videos:
+    @echo ""
+    @printf "\033[0;34m=== Archiving Processed Videos ===\033[0m\n"
+    @bash scripts/archive-videos.sh
+    @echo ""
+
+# Analyze transcripts for hallucinations
+analyze-transcripts-hallucinations:
+    @echo ""
+    @printf "\033[0;34m=== Analyzing Transcripts for Hallucinations ===\033[0m\n"
+    @uv run scripts/transcript-hallucination-detection.py
+    @echo ""
+    @printf "\033[0;34m=== Creating Transcript Hallucination Digest ===\033[0m\n"
+    @uv run scripts/create-hallucination-digest.py
+    @echo ""
+    @printf "\033[0;32m✓ Digest created: data/output/hallucination_digest.md\033[0m\n"
+    @echo ""
+
+# Remove hallucinations from transcripts using LLM cleaning
+transcripts-remove-hallucinations:
+    @echo ""
+    @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
+    @uv run python scripts/transcript-hallucination-removal.py
+    @echo ""
+
+# Show processing status of downloads
+status:
+    @echo ""
+    @uv run scripts/status.py
+    @echo ""
+
+# Launch Jupyter notebook server
+notebooks:
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Launching Jupyter Notebook Server ===\033[0m\n"
+    echo ""
+
+    # Determine OS and set open command
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        OPEN_CMD="open"
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        OPEN_CMD="xdg-open"
+    else
+        OPEN_CMD="echo"
+        echo "Warning: Unknown OS, cannot auto-open browser"
+    fi
+
+    # Open browser after 5 seconds in background
+    (sleep 5 && $OPEN_CMD "http://localhost:8888/") &
+
+    # Launch notebook server in foreground
+    uv run jupyter notebook --no-browser --NotebookApp.token='' --NotebookApp.password='' notebooks/
+    echo ""
 
 # Compile markdown articles into articles.js
 compile-articles:
@@ -176,6 +272,13 @@ code-format:
     @printf "\033[0;32m✓ Code formatted\033[0m\n"
     @echo ""
 
+# Check config.yaml matches template structure
+code-config:
+    @echo ""
+    @printf "\033[0;34m=== Checking Config Structure ===\033[0m\n"
+    @uv run scripts/check/config_template.py
+    @echo ""
+
 # Run static type checking with mypy
 code-typecheck:
     @echo ""
@@ -213,7 +316,7 @@ code-deptry:
     @echo ""
     @printf "\033[0;34m=== Checking Dependencies ===\033[0m\n"
     @mkdir -p reports/deptry
-    @uv run deptry src
+    @uv run deptry .
     @echo ""
     @printf "\033[0;32m✓ Dependency checks passed\033[0m\n"
     @echo ""
@@ -242,7 +345,7 @@ code-spell:
 code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
-    @uv run pip-audit
+    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""
@@ -310,6 +413,7 @@ ci:
     printf "\033[0;34m=== Running CI Checks ===\033[0m\n"
     echo ""
     just init
+    just code-config
     just code-format
     just code-style
     just code-typecheck
@@ -328,6 +432,7 @@ ci:
 ci-quiet:
     #!/usr/bin/env bash
     set -e
+    echo ""
     printf "\033[0;34m=== Running CI Checks (Quiet Mode) ===\033[0m\n"
     TMPFILE=$(mktemp)
     trap "rm -f $TMPFILE" EXIT

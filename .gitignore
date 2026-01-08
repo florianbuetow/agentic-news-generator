@@ -197,12 +197,6 @@ reports/
 # PyPI configuration file
 .pypirc
 
-# Cursor
-#  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
-#  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
-#  refer to https://docs.cursor.com/context/ignore-files
-.cursorignore
-.cursorindexingignore
 
 # Marimo
 marimo/_static/
@@ -216,8 +210,13 @@ __marimo__/
 # Copier answers file
 .copier-answers.yml
 
+# Project-specific configuration files
+config/config.yaml
+
 # Claude Code - exclude settings.local.json in all subdirectories
 **/settings.local.json
+
+# Documentation files
 
 # Frontend / Nuxt.js
 frontend/newspaper/node_modules/
@@ -233,9 +232,10 @@ frontend/newspaper/.fleet
 frontend/newspaper/.env.*
 !frontend/newspaper/.env.example
 frontend/newspaper/content/articles/
+>>>>>>> main
 
 # Data files
 data/
 
-# Config files (use config.yaml.template to create your own)
-config/config.yaml
+# Debug scripts (temporary)
+debug/
