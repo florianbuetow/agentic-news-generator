@@ -11,8 +11,29 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Data directories
-DATA_DIR="$PROJECT_ROOT/data"
+# Read data directory path from config.yaml (single source of truth)
+CONFIG_FILE="$PROJECT_ROOT/config/config.yaml"
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "🚨 ERROR: config.yaml not found at $CONFIG_FILE" >&2
+    exit 1
+fi
+
+# Extract data_dir from config.yaml using Python (available via uv)
+DATA_DIR_RELATIVE=$(cd "$PROJECT_ROOT" && uv run python -c "
+import yaml
+import sys
+with open('config/config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+    print(config['paths']['data_dir'])
+" 2>/dev/null)
+
+if [ -z "$DATA_DIR_RELATIVE" ]; then
+    echo "🚨 ERROR: Failed to read paths.data_dir from config.yaml" >&2
+    exit 1
+fi
+
+# Convert relative path to absolute path
+DATA_DIR="$(cd "$PROJECT_ROOT" && cd "$DATA_DIR_RELATIVE" && pwd)"
 DOWNLOADS_DIR="$DATA_DIR/downloads"
 VIDEOS_DIR="$DOWNLOADS_DIR/videos"
 AUDIO_DIR="$DOWNLOADS_DIR/audio"
