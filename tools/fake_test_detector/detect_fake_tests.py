@@ -15,7 +15,6 @@ Usage:
 import argparse
 import ast
 import asyncio
-from datetime import datetime
 import glob
 import hashlib
 import json
@@ -23,9 +22,9 @@ import logging
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 
 import requests
-
 from autogen_core.models import UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
@@ -94,9 +93,9 @@ class TestFileHashCache:
         """
         if os.path.exists(self.cache_file):
             try:
-                with open(self.cache_file, "r", encoding="utf-8") as f:
+                with open(self.cache_file, encoding="utf-8") as f:
                     return json.load(f)
-            except (json.JSONDecodeError, IOError) as e:
+            except (OSError, json.JSONDecodeError) as e:
                 logger.warning(f"Failed to load cache file: {e}. Starting with empty cache.")
                 return {}
         return {}
@@ -367,7 +366,7 @@ class MarkdownReportWriter:
             if fake_results:
                 _ = f.write(f"- **Detection Rate:** {len(fake_results) / len(test_cases) * 100:.1f}%\n\n")
             else:
-                _ = f.write(f"- **Detection Rate:** 0.0%\n\n")
+                _ = f.write("- **Detection Rate:** 0.0%\n\n")
 
             # Fake tests details
             if fake_results:
@@ -555,7 +554,7 @@ Is this a fake/fraudulent test? Respond with JSON only."""
             json_str = re.sub(r',\s*""\s*}', r', "reason": "" }', json_str)
 
             # Remove trailing commas before } or ]
-            json_str = re.sub(r',(\s*[}\]])', r'\1', json_str)
+            json_str = re.sub(r",(\s*[}\]])", r"\1", json_str)
 
             # Debug log if we fixed something
             if json_str != json_str_before:
@@ -670,8 +669,8 @@ Is this a fake/fraudulent test? Respond with JSON only."""
                 print("-" * 80)
                 print(f"❌ FAKE TEST DETECTED @ {test_case.file_path}:{test_case.function_name}:{test_case.line_number}")
                 print(f"   Reason: {result.reason} (confidence: {result.confidence:.2f})")
-                print(f"   Code:")
-                for line in test_case.code.split('\n'):
+                print("   Code:")
+                for line in test_case.code.split("\n"):
                     print(f"     {line}")
                 print("-" * 80)
                 previous_was_fake = True
