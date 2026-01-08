@@ -1,6 +1,9 @@
+![News Generator](./docs/news_generator.png)
+
 # Agentic News Generator
 
 An AI-powered YouTube news aggregator that crawls AI-focused YouTube channels, transcribes video content, segments transcripts by topic, and generates a weekly newspaper-style HTML digest using autonomous AI agents.
+
 
 ## Overview
 
