@@ -114,7 +114,7 @@ class ArticleCompiler:
 
     def _to_sidebar(self, a: MarkdownArticle) -> dict[str, Any]:
         """Convert to sidebar article format."""
-        result = {"headline": a.title, "text": a.frontmatter.summary}
+        result = {"headline": a.title, "text": a.frontmatter.summary, "link": self._link(a.slug)}
         if len(a.byline) < 30:
             result["byline"] = a.byline
         return result
@@ -126,7 +126,10 @@ class ArticleCompiler:
 
         for i in range(4):
             start_idx = i * 2
-            items = [{"headline": a.title, "text": a.frontmatter.summary} for a in articles[start_idx : start_idx + 2]]
+            items = [
+                {"headline": a.title, "text": a.frontmatter.summary, "link": self._link(a.slug)}
+                for a in articles[start_idx : start_idx + 2]
+            ]
             columns.append({"section": sections[i], "items": items})
 
         return columns

@@ -94,6 +94,7 @@ class SidebarArticle(BaseModel):
     headline: str
     byline: str | None = None
     text: str
+    link: str
 
     model_config = ConfigDict(frozen=False)
 
@@ -103,6 +104,7 @@ class BriefItem(BaseModel):
 
     headline: str
     text: str
+    link: str
 
     model_config = ConfigDict(frozen=False)
 

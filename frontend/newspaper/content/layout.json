@@ -1,0 +1,41 @@
+{
+  "hero": "breakthrough-model-achieves-new-benchmark-in-scientific-reasoning",
+  "featured": [
+    "senate-opens-sweeping-inquiry-into-ai-safety-standards",
+    "china-unveils-50-billion-ai-development-plan",
+    "ai-system-identifies-new-antibiotic-candidates",
+    "european-regulators-propose-strict-new-ai-rules",
+    "universities-overhaul-curricula-to-meet-surging-ai-demand"
+  ],
+  "secondary": "labor-unions-call-for-ai-worker-protections",
+  "sidebar": [
+    [
+      "tech-giants-report-record-quarterly-earnings",
+      "startups-race-to-build-specialized-ai-chips",
+      "schools-grapple-with-ai-in-classrooms"
+    ],
+    [
+      "global-ai-summit-set-for-march-in-geneva",
+      "wall-street-debates-ai-valuations",
+      "supreme-court-to-hear-ai-copyright-case"
+    ]
+  ],
+  "briefs": [
+    [
+      "pentagon-boosts-ai-budget-by-40-percent",
+      "moma-exhibits-ai-generated-art"
+    ],
+    [
+      "hollywood-writers-reach-ai-deal",
+      "openai-names-new-board-members"
+    ],
+    [
+      "japan-and-us-partner-on-robotics-research-lab",
+      "britain-plans-ai-safety-institute"
+    ],
+    [
+      "nvidia-stock-hits-new-record-high",
+      "microsoft-expands-azure-ai-services"
+    ]
+  ]
+}

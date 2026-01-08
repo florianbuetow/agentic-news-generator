@@ -1,85 +1,83 @@
 <template>
   <div class="article-page">
-    <div class="article-container">
+    <div v-if="error" class="article-container">
       <div class="article-header">
-        <div class="section-label">{{ article?.section || 'News' }}</div>
-        <h1 class="article-headline">{{ article?.headline || 'Article Not Found' }}</h1>
-        <div v-if="article?.subhead" class="article-subhead">{{ article.subhead }}</div>
-        <div v-if="article?.byline" class="article-byline">By {{ article.byline }}</div>
-        <div v-if="article?.dateline" class="article-dateline">{{ article.dateline }}</div>
+        <h1 class="article-headline">Article Not Found</h1>
+      </div>
+      <div class="article-body">
+        <p>
+          This article could not be found. Please return to the <NuxtLink to="/">homepage</NuxtLink>.
+        </p>
+      </div>
+    </div>
+    <div v-else-if="article" class="article-container">
+      <div class="article-header">
+        <div class="section-label">{{ article.tags?.[0] || 'News' }}</div>
+        <h1 class="article-headline">{{ article.title }}</h1>
+        <div v-if="article.subtitle" class="article-subhead">{{ article.subtitle }}</div>
+        <div v-if="article.author" class="article-byline">By {{ article.author }}</div>
+        <div v-if="article.date" class="article-dateline">{{ formatDate(article.date) }}</div>
       </div>
 
-      <div v-if="article?.image" class="article-image">
-        <img :src="article.image" :alt="article.headline" />
-        <div v-if="article?.caption" class="caption">
-          <span v-if="article?.captionLabel" class="caption-label">{{ article.captionLabel }}</span>
-          {{ article.caption }}
+      <div v-if="articleImage" class="article-image">
+        <img :src="articleImage" :alt="article.title" />
+        <div v-if="article.summary" class="caption">
+          <span class="caption-label">{{ article.tags?.[0]?.toUpperCase() }}:</span>
+          {{ article.summary }}
         </div>
       </div>
 
       <div class="article-body">
-        <p v-for="(paragraph, index) in article?.paragraphs || []" :key="index">
-          {{ paragraph }}
-        </p>
-        <p v-if="article?.text && !article?.paragraphs">
-          {{ article.text }}
-        </p>
-        <p v-if="!article">
-          This article could not be found. Please return to the <NuxtLink to="/">homepage</NuxtLink>.
-        </p>
+        <ContentRenderer :value="article" />
       </div>
 
       <div class="article-footer">
         <NuxtLink to="/" class="back-link">← Back to Homepage</NuxtLink>
       </div>
     </div>
+    <div v-else class="article-container">
+      <p>Loading...</p>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { heroArticle, featuredArticles, secondaryMain, sidebarArticles } from '~/data/articles.js'
-
 const route = useRoute()
 const slug = route.params.slug
 
-// Find the article by matching the slug from the link
-const findArticle = () => {
-  // Check hero article
-  if (heroArticle.link === `/articles/${slug}`) {
-    return heroArticle
-  }
+// Query the article by slug
+const { data: article, error } = await useAsyncData(`article-${slug}`, () =>
+  queryCollection('articles').where('slug', '=', slug).first()
+)
 
-  // Check featured articles
-  for (const article of featuredArticles) {
-    if (article.link === `/articles/${slug}`) {
-      return article
-    }
-  }
+// Extract image from article
+const articleImage = computed(() => {
+  if (!article.value) return null
 
-  // Check secondary main
-  if (secondaryMain.link === `/articles/${slug}`) {
-    return secondaryMain
-  }
+  // Try frontmatter first
+  if (article.value.image) return article.value.image
 
-  // Check sidebar articles
-  for (const column of sidebarArticles) {
-    for (const article of column) {
-      if (article.link === `/articles/${slug}`) {
-        return article
-      }
-    }
-  }
+  // Extract from markdown body
+  const imgRegex = /!\[.*?\]\((https?:\/\/[^\)]+)\)/
+  const match = article.value.body?.raw?.match?.(imgRegex)
+  return match ? match[1] : null
+})
 
-  return null
+// Format date helper
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
 }
-
-const article = findArticle()
 
 // Set page metadata
 useHead({
-  title: article ? `${article.headline} - The Artificial Intelligence Times` : 'Article Not Found - The Artificial Intelligence Times',
+  title: article.value ? `${article.value.title} - The Artificial Intelligence Times` : 'Article Not Found - The Artificial Intelligence Times',
   meta: [
-    { name: 'description', content: article?.text || article?.subhead || '' }
+    { name: 'description', content: article.value?.summary || article.value?.subtitle || '' }
   ]
 })
 </script>
@@ -170,17 +168,88 @@ useHead({
   line-height: 1.8;
 }
 
-.article-body p {
+/* Style the rendered markdown content */
+.article-body :deep(p) {
   margin-bottom: 20px;
   text-align: justify;
 }
 
-.article-body p:first-letter {
+.article-body :deep(p:first-of-type:first-letter) {
   font-size: 3em;
   line-height: 0.8;
   float: left;
   margin: 5px 8px 0 0;
   font-weight: 700;
+}
+
+.article-body :deep(h2),
+.article-body :deep(h3) {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  margin: 30px 0 15px 0;
+}
+
+.article-body :deep(h2) {
+  font-size: 28px;
+}
+
+.article-body :deep(h3) {
+  font-size: 22px;
+}
+
+.article-body :deep(blockquote) {
+  border-left: 4px solid #000;
+  padding-left: 20px;
+  margin: 20px 0;
+  font-style: italic;
+  color: #333;
+}
+
+.article-body :deep(ul),
+.article-body :deep(ol) {
+  margin: 20px 0;
+  padding-left: 40px;
+}
+
+.article-body :deep(li) {
+  margin-bottom: 10px;
+}
+
+.article-body :deep(code) {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+}
+
+.article-body :deep(pre) {
+  background: #f5f5f5;
+  padding: 20px;
+  border-radius: 5px;
+  overflow-x: auto;
+  margin: 20px 0;
+}
+
+.article-body :deep(pre code) {
+  background: none;
+  padding: 0;
+}
+
+.article-body :deep(a) {
+  color: #000;
+  text-decoration: underline;
+}
+
+.article-body :deep(a:hover) {
+  color: #333;
+}
+
+.article-body :deep(img) {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 20px auto;
 }
 
 .article-footer {

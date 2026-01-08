@@ -1,10 +1,17 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  devtools: { enabled: true },
-  
+  devtools: { enabled: false },
+
+  modules: ['@nuxt/content'],
+
   ssr: true,
+
+  experimental: {
+    payloadExtraction: false
+  },
   
   app: {
+    baseURL: '/',
     head: {
       title: 'The Artificial Intelligence Times',
       meta: [
@@ -29,7 +36,30 @@ export default defineNuxtConfig({
   nitro: {
     prerender: {
       crawlLinks: true,
-      routes: ['/']
+      routes: [
+        '/',
+        '/articles/breakthrough-model-achieves-new-benchmark-in-scientific-reasoning',
+        '/articles/senate-opens-sweeping-inquiry-into-ai-safety-standards',
+        '/articles/china-unveils-50-billion-ai-development-plan',
+        '/articles/ai-system-identifies-new-antibiotic-candidates',
+        '/articles/european-regulators-propose-strict-new-ai-rules',
+        '/articles/universities-overhaul-curricula-to-meet-surging-ai-demand',
+        '/articles/labor-unions-call-for-ai-worker-protections',
+        '/articles/tech-giants-report-record-quarterly-earnings',
+        '/articles/startups-race-to-build-specialized-ai-chips',
+        '/articles/schools-grapple-with-ai-in-classrooms',
+        '/articles/global-ai-summit-set-for-march-in-geneva',
+        '/articles/wall-street-debates-ai-valuations',
+        '/articles/supreme-court-to-hear-ai-copyright-case',
+        '/articles/pentagon-boosts-ai-budget-by-40-percent',
+        '/articles/moma-exhibits-ai-generated-art',
+        '/articles/hollywood-writers-reach-ai-deal',
+        '/articles/openai-names-new-board-members',
+        '/articles/japan-and-us-partner-on-robotics-research-lab',
+        '/articles/britain-plans-ai-safety-institute',
+        '/articles/nvidia-stock-hits-new-record-high',
+        '/articles/microsoft-expands-azure-ai-services'
+      ]
     }
   },
 

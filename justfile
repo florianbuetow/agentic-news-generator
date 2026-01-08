@@ -51,16 +51,17 @@ newspaper-generate:
     echo ""
     printf "\033[0;34m=== Generating Newspaper Website ===\033[0m\n"
 
-    # Check if articles.js exists in data/input/newspaper/
-    if [ ! -f "data/input/newspaper/articles.js" ]; then
-        printf "\033[0;31m✗ Error: data/input/newspaper/articles.js not found\033[0m\n"
-        echo "  Please generate the articles data first"
+    # Check if markdown articles exist
+    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
+        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
+        echo "  Please generate the articles first"
         exit 1
     fi
 
-    # Copy articles.js to Nuxt data folder
-    echo "Copying articles data to frontend..."
-    cp data/input/newspaper/articles.js frontend/newspaper/data/articles.js
+    # Copy markdown articles to Nuxt content folder
+    echo "Copying markdown articles to frontend..."
+    mkdir -p frontend/newspaper/content/articles
+    cp data/input/newspaper/articles/*.md frontend/newspaper/content/articles/
 
     # Install npm dependencies if needed
     if [ ! -d "frontend/newspaper/node_modules" ]; then
@@ -88,16 +89,25 @@ newspaper-serve:
     echo ""
     printf "\033[0;34m=== Starting Newspaper Development Server ===\033[0m\n"
 
-    # Check if articles.js exists in data/input/newspaper/
-    if [ ! -f "data/input/newspaper/articles.js" ]; then
-        printf "\033[0;31m✗ Error: data/input/newspaper/articles.js not found\033[0m\n"
-        echo "  Please generate the articles data first"
+    # Check if markdown articles exist
+    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
+        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
+        echo "  Please generate the articles first"
         exit 1
     fi
 
-    # Copy articles.js to Nuxt data folder
-    echo "Copying articles data to frontend..."
-    cp data/input/newspaper/articles.js frontend/newspaper/data/articles.js
+    # Check if port 3000 is available
+    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        printf "\033[0;31m✗ Error: Port 3000 is already in use\033[0m\n"
+        echo "  Please stop the service using port 3000 and try again"
+        echo "  You can find the process with: lsof -i :3000"
+        exit 1
+    fi
+
+    # Copy markdown articles to Nuxt content folder
+    echo "Copying markdown articles to frontend..."
+    mkdir -p frontend/newspaper/content/articles
+    cp data/input/newspaper/articles/*.md frontend/newspaper/content/articles/
 
     # Install npm dependencies if needed
     if [ ! -d "frontend/newspaper/node_modules" ]; then
@@ -105,11 +115,31 @@ newspaper-serve:
         cd frontend/newspaper && npm install && cd ../..
     fi
 
-    # Start development server
+    # Start development server in background
     echo ""
     printf "\033[0;32m✓ Starting development server at http://localhost:3000\033[0m\n"
     echo ""
-    cd frontend/newspaper && npm run dev
+    cd frontend/newspaper && npm run dev &
+    DEV_PID=$!
+
+    # Wait for server to start, then open browser
+    sleep 3
+    open http://localhost:3000
+
+    # Wait for dev server to exit (allows Ctrl+C)
+    wait $DEV_PID
+
+# Clean up generated newspaper files
+newspaper-destroy:
+    @echo ""
+    @printf "\033[0;34m=== Cleaning Up Generated Newspaper Files ===\033[0m\n"
+    @echo "Removing generated newspaper output..."
+    @rm -rf data/output/newspaper/*
+    @echo "Removing frontend build artifacts..."
+    @rm -rf frontend/newspaper/.output
+    @rm -rf frontend/newspaper/.nuxt
+    @printf "\033[0;32m✓ Newspaper files cleaned up\033[0m\n"
+    @echo ""
 
 # Destroy the virtual environment and frontend artifacts
 destroy:

@@ -7,11 +7,12 @@
         class="brief-column"
       >
         <div class="brief-section-label">{{ column.section }}</div>
-        <BriefItem 
-          v-for="(brief, briefIndex) in column.items" 
+        <BriefItem
+          v-for="(brief, briefIndex) in column.items"
           :key="briefIndex"
           :headline="brief.headline"
           :text="brief.text"
+          :link="brief.link"
         />
       </div>
     </div>
