@@ -37,6 +37,16 @@ run:
     @uv run src/main.py
     @echo ""
 
+# Run the complete pipeline
+all:
+    @just ci-quiet
+    -@just download-videos
+    @just extract-audio
+    @just transcribe
+    @just archive-videos
+    @just analyze-transcripts-hallucinations
+    @just transcripts-remove-hallucinations
+
 # Download YouTube videos from channels in config.yaml
 download-videos:
     @echo ""
@@ -86,6 +96,13 @@ analyze-transcripts-hallucinations:
     @uv run scripts/create-hallucination-digest.py
     @echo ""
     @printf "\033[0;32m✓ Digest created: data/output/hallucination_digest.md\033[0m\n"
+    @echo ""
+
+# Remove hallucinations from transcripts using LLM cleaning
+transcripts-remove-hallucinations:
+    @echo ""
+    @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
+    @uv run python scripts/transcript-hallucination-removal.py
     @echo ""
 
 # Show processing status of downloads
