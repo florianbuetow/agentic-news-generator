@@ -21,9 +21,13 @@ init:
     @mkdir -p reports/security
     @mkdir -p reports/pyright
     @mkdir -p reports/deptry
+    @mkdir -p data/input/newspaper
+    @mkdir -p data/output/newspaper
     @mkdir -p .cache
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
+    @echo "Installing frontend dependencies..."
+    @cd frontend/newspaper && npm install
     @printf "\033[0;32m✓ Development environment ready\033[0m\n"
     @echo ""
 
@@ -34,12 +38,120 @@ run:
     @uv run src/main.py
     @echo ""
 
-# Destroy the virtual environment
+# Compile markdown articles into articles.js
+compile-articles:
+    @echo ""
+    @printf "\033[0;34m=== Compiling Articles ===\033[0m\n"
+    @uv run scripts/compile_articles.py
+    @echo ""
+
+# Generate static newspaper website
+newspaper-generate:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Generating Newspaper Website ===\033[0m\n"
+
+    # Check if markdown articles exist
+    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
+        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
+        echo "  Please generate the articles first"
+        exit 1
+    fi
+
+    # Preprocess markdown articles (extract YAML frontmatter only)
+    echo "Preprocessing markdown articles..."
+    uv run scripts/preprocess_articles.py
+
+    # Install npm dependencies if needed
+    if [ ! -d "frontend/newspaper/node_modules" ]; then
+        echo "Installing npm dependencies..."
+        cd frontend/newspaper && npm install && cd ../..
+    fi
+
+    # Generate static site
+    echo "Generating static site..."
+    cd frontend/newspaper && npm run generate && cd ../..
+
+    # Clear output directory and copy generated files
+    echo "Copying generated site to data/output/newspaper/..."
+    rm -rf data/output/newspaper/*
+    cp -r frontend/newspaper/.output/public/* data/output/newspaper/
+
+    printf "\033[0;32m✓ Newspaper website generated successfully\033[0m\n"
+    echo "  Output: data/output/newspaper/"
+    echo ""
+
+# Run newspaper development server
+newspaper-serve:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Starting Newspaper Development Server ===\033[0m\n"
+
+    # Check if markdown articles exist
+    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
+        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
+        echo "  Please generate the articles first"
+        exit 1
+    fi
+
+    # Check if port 3000 is available
+    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        printf "\033[0;31m✗ Error: Port 3000 is already in use\033[0m\n"
+        echo "  Please stop the service using port 3000 and try again"
+        echo "  You can find the process with: lsof -i :3000"
+        exit 1
+    fi
+
+    # Preprocess markdown articles (extract YAML frontmatter only)
+    echo "Preprocessing markdown articles..."
+    uv run scripts/preprocess_articles.py
+
+    # Install npm dependencies if needed
+    if [ ! -d "frontend/newspaper/node_modules" ]; then
+        echo "Installing npm dependencies..."
+        cd frontend/newspaper && npm install && cd ../..
+    fi
+
+    # Start development server in background
+    echo ""
+    printf "\033[0;32m✓ Starting development server at http://localhost:3000\033[0m\n"
+    echo ""
+    cd frontend/newspaper && npm run dev &
+    DEV_PID=$!
+
+    # Wait for server to start, then open browser
+    sleep 3
+    open http://localhost:3000
+
+    # Wait for dev server to exit (allows Ctrl+C)
+    wait $DEV_PID
+
+# Clean up generated newspaper files
+newspaper-destroy:
+    @echo ""
+    @printf "\033[0;34m=== Cleaning Up Generated Newspaper Files ===\033[0m\n"
+    @echo "Removing generated newspaper output..."
+    @rm -rf data/output/newspaper/*
+    @echo "Removing frontend build artifacts..."
+    @rm -rf frontend/newspaper/.output
+    @rm -rf frontend/newspaper/.nuxt
+    @printf "\033[0;32m✓ Newspaper files cleaned up\033[0m\n"
+    @echo ""
+
+# Destroy the virtual environment and frontend artifacts
 destroy:
     @echo ""
-    @printf "\033[0;34m=== Destroying Virtual Environment ===\033[0m\n"
+    @printf "\033[0;34m=== Destroying Development Environment ===\033[0m\n"
+    @echo "Removing Python virtual environment..."
     @rm -rf .venv
-    @printf "\033[0;32m✓ Virtual environment removed\033[0m\n"
+    @echo "Removing frontend dependencies and cache..."
+    @rm -rf frontend/newspaper/node_modules
+    @rm -rf frontend/newspaper/package-lock.json
+    @rm -rf frontend/newspaper/.nuxt
+    @rm -rf frontend/newspaper/.output
+    @printf "\033[0;32m✓ Development environment destroyed\033[0m\n"
     @echo ""
 
 # Check code style and formatting (read-only)

@@ -215,3 +215,27 @@ __marimo__/
 
 # Copier answers file
 .copier-answers.yml
+
+# Claude Code - exclude settings.local.json in all subdirectories
+**/settings.local.json
+
+# Frontend / Nuxt.js
+frontend/newspaper/node_modules/
+frontend/newspaper/.nuxt/
+frontend/newspaper/.output/
+frontend/newspaper/.nitro/
+frontend/newspaper/.cache
+frontend/newspaper/.data
+frontend/newspaper/dist
+frontend/newspaper/logs/
+frontend/newspaper/package-lock.json
+frontend/newspaper/.fleet
+frontend/newspaper/.env.*
+!frontend/newspaper/.env.example
+frontend/newspaper/content/articles/
+
+# Data files
+data/
+
+# Config files (use config.yaml.template to create your own)
+config/config.yaml
