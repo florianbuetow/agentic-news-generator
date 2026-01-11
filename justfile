@@ -104,10 +104,24 @@ transcripts-remove-hallucinations:
     @uv run python scripts/transcript-hallucination-removal.py
     @echo ""
 
+# Generate articles from topic transcripts
+generate-articles:
+    @echo ""
+    @printf "\033[0;34m=== Generating Articles from Topics ===\033[0m\n"
+    @uv run scripts/generate-articles.py
+    @echo ""
+
 # Show processing status of downloads
 status:
     @echo ""
     @uv run scripts/status.py
+    @echo ""
+
+# List all available models from configured API endpoints
+list-models:
+    @echo ""
+    @printf "\033[0;34m=== Listing Available Models ===\033[0m\n"
+    @bash scripts/list-models.sh
     @echo ""
 
 # Launch Jupyter notebook server
