@@ -24,4 +24,5 @@ def completion(
     max_tokens: int,
     timeout: int | None = None,
     stream: bool | None = None,
+    response_format: dict[str, object] | None = None,
 ) -> ModelResponse: ...
