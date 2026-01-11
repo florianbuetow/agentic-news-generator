@@ -19,6 +19,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_downloads_transcripts_dir": "./data/downloads/transcripts",
         "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
         "data_downloads_transcripts_cleaned_dir": "./data/downloads/transcripts_cleaned",
+        "data_transcripts_topics_dir": "./data/downloads/transcripts-topics",
         "data_downloads_audio_dir": "./data/downloads/audio",
         "data_downloads_metadata_dir": "./data/downloads/metadata",
         "data_output_dir": "./data/output/",
@@ -26,6 +27,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_temp_dir": "./data/temp",
         "data_archive_dir": "./data/archive",
         "data_archive_videos_dir": "./data/archive/videos",
+        "data_logs_dir": "./logs",
     }
 
 
@@ -39,6 +41,18 @@ class TestPathsConfig:
         assert paths.data_dir == "./data/"
         assert paths.data_downloads_dir == "./data/downloads"
         assert paths.data_archive_videos_dir == "./data/archive/videos"
+
+    def test_data_logs_dir_field_exists(self) -> None:
+        """Test that data_logs_dir field is present and valid."""
+        paths_data = get_valid_paths_config()
+        paths = PathsConfig.model_validate(paths_data)
+        assert paths.data_logs_dir == "./logs"
+
+    def test_data_transcripts_topics_dir_field_exists(self) -> None:
+        """Test that data_transcripts_topics_dir field is present and valid."""
+        paths_data = get_valid_paths_config()
+        paths = PathsConfig.model_validate(paths_data)
+        assert paths.data_transcripts_topics_dir == "./data/downloads/transcripts-topics"
 
     def test_missing_required_path(self) -> None:
         """Test that missing required paths raise ValidationError."""
@@ -161,6 +175,7 @@ class TestConfigPaths:
             assert isinstance(config.getDataDownloadsVideosDir(), Path)
             assert isinstance(config.getDataDownloadsTranscriptsDir(), Path)
             assert isinstance(config.getDataDownloadsTranscriptsHallucinationsDir(), Path)
+            assert isinstance(config.getDataTranscriptsTopicsDir(), Path)
             assert isinstance(config.getDataDownloadsAudioDir(), Path)
             assert isinstance(config.getDataDownloadsMetadataDir(), Path)
             assert isinstance(config.getDataOutputDir(), Path)
@@ -168,6 +183,7 @@ class TestConfigPaths:
             assert isinstance(config.getDataTempDir(), Path)
             assert isinstance(config.getDataArchiveDir(), Path)
             assert isinstance(config.getDataArchiveVideosDir(), Path)
+            assert isinstance(config.getDataLogsDir(), Path)
         finally:
             temp_path.unlink()
 
@@ -189,6 +205,7 @@ class TestConfigPaths:
             assert config.getDataDownloadsVideosDir() == Path("./data/downloads/videos/")
             assert config.getDataDownloadsTranscriptsDir() == Path("./data/downloads/transcripts")
             assert config.getDataDownloadsTranscriptsHallucinationsDir() == Path("./data/downloads/transcripts-hallucinations")
+            assert config.getDataTranscriptsTopicsDir() == Path("./data/downloads/transcripts-topics")
             assert config.getDataDownloadsAudioDir() == Path("./data/downloads/audio")
             assert config.getDataDownloadsMetadataDir() == Path("./data/downloads/metadata")
             assert config.getDataOutputDir() == Path("./data/output/")
@@ -196,6 +213,7 @@ class TestConfigPaths:
             assert config.getDataTempDir() == Path("./data/temp")
             assert config.getDataArchiveDir() == Path("./data/archive")
             assert config.getDataArchiveVideosDir() == Path("./data/archive/videos")
+            assert config.getDataLogsDir() == Path("./logs")
         finally:
             temp_path.unlink()
 
@@ -214,5 +232,41 @@ class TestConfigPaths:
         try:
             config = Config(temp_path)
             assert str(config.getDataDir()) == "/absolute/path/to/data"
+        finally:
+            temp_path.unlink()
+
+    def test_get_data_logs_dir(self) -> None:
+        """Test getDataLogsDir returns correct Path."""
+        config_data: dict[str, Any] = {
+            "paths": get_valid_paths_config(),
+            "channels": [],
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            logs_dir = config.getDataLogsDir()
+            assert isinstance(logs_dir, Path)
+            assert logs_dir == Path("./logs")
+        finally:
+            temp_path.unlink()
+
+    def test_get_data_transcripts_topics_dir(self) -> None:
+        """Test getDataTranscriptsTopicsDir returns correct Path."""
+        config_data: dict[str, Any] = {
+            "paths": get_valid_paths_config(),
+            "channels": [],
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            topics_dir = config.getDataTranscriptsTopicsDir()
+            assert isinstance(topics_dir, Path)
+            assert topics_dir == Path("./data/downloads/transcripts-topics")
         finally:
             temp_path.unlink()

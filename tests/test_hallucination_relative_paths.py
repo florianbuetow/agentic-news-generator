@@ -238,6 +238,7 @@ paths:
   data_downloads_transcripts_dir: {data_dir / "downloads" / "transcripts"}
   data_downloads_transcripts_hallucinations_dir: {data_dir / "downloads" / "transcripts-hallucinations"}
   data_downloads_transcripts_cleaned_dir: {data_dir / "downloads" / "transcripts_cleaned"}
+  data_transcripts_topics_dir: {data_dir / "downloads" / "transcripts-topics"}
   data_downloads_audio_dir: {data_dir / "downloads" / "audio"}
   data_downloads_metadata_dir: {data_dir / "downloads" / "metadata"}
   data_output_dir: {data_dir / "output"}
@@ -245,6 +246,7 @@ paths:
   data_temp_dir: {data_dir / "temp"}
   data_archive_dir: {data_dir / "archive"}
   data_archive_videos_dir: {data_dir / "archive" / "videos"}
+  data_logs_dir: {data_dir / "logs"}
 
 channels: []
 

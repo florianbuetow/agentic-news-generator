@@ -111,6 +111,7 @@ class PathsConfig(BaseModel):
         ..., description="Transcript hallucinations analysis directory path", min_length=1
     )
     data_downloads_transcripts_cleaned_dir: str = Field(..., description="Cleaned transcripts directory path", min_length=1)
+    data_transcripts_topics_dir: str = Field(..., description="Transcripts split by topics directory path", min_length=1)
     data_downloads_audio_dir: str = Field(..., description="Audio files directory path", min_length=1)
     data_downloads_metadata_dir: str = Field(..., description="Metadata files directory path", min_length=1)
     data_output_dir: str = Field(..., description="Output directory path", min_length=1)
@@ -118,6 +119,7 @@ class PathsConfig(BaseModel):
     data_temp_dir: str = Field(..., description="Temporary files directory path", min_length=1)
     data_archive_dir: str = Field(..., description="Archive directory path", min_length=1)
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
+    data_logs_dir: str = Field(..., description="Logs directory path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -382,6 +384,14 @@ class Config:
         """
         return Path(self._paths.data_downloads_transcripts_cleaned_dir)
 
+    def getDataTranscriptsTopicsDir(self) -> Path:
+        """Get the transcripts split by topics directory path.
+
+        Returns:
+            Path object pointing to the data/downloads/transcripts-topics directory.
+        """
+        return Path(self._paths.data_transcripts_topics_dir)
+
     def getDataDownloadsAudioDir(self) -> Path:
         """Get the data downloads audio directory path.
 
@@ -437,6 +447,14 @@ class Config:
             Path object pointing to the data/archive/videos directory.
         """
         return Path(self._paths.data_archive_videos_dir)
+
+    def getDataLogsDir(self) -> Path:
+        """Get the logs directory path.
+
+        Returns:
+            Path object pointing to the logs directory.
+        """
+        return Path(self._paths.data_logs_dir)
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.

@@ -239,3 +239,6 @@ data/
 
 # Debug scripts (temporary)
 debug/
+
+# Logs directory
+logs/
