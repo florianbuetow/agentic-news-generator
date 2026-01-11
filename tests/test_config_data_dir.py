@@ -28,6 +28,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_dir": "./data/archive",
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./logs",
+        "data_output_articles_dir": "./data/output/articles",
     }
 
 

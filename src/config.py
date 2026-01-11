@@ -76,7 +76,7 @@ class LLMConfig(BaseModel):
         description="litellm model string (e.g., 'openai/gpt-4', 'anthropic/claude-3-5-sonnet', 'openai/local-model' for LM Studio)",
     )
     api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
-    api_key_env: str = Field(..., description="Environment variable name for API key")
+    api_key: str = Field(..., description="API key for the LLM service")
     context_window: int = Field(..., description="Model context window size in tokens")
     max_tokens: int = Field(..., description="Maximum tokens for response/completion")
     temperature: float = Field(..., description="Sampling temperature (0.0-1.0)")
@@ -96,6 +96,18 @@ class TopicSegmentationConfig(BaseModel):
     agent_llm: LLMConfig = Field(..., description="LLM config for segmentation agent")
     critic_llm: LLMConfig = Field(..., description="LLM config for critic agent")
     retry_limit: int = Field(..., description="Maximum retry attempts")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationConfig(BaseModel):
+    """Configuration for article generation agent system."""
+
+    writer_llm: LLMConfig = Field(..., description="LLM config for article writer")
+    max_retries: int = Field(..., description="Maximum retry attempts for malformed JSON", ge=0, le=10)
+    allowed_styles: list[str] = Field(..., description="List of allowed article writing styles", min_length=1)
+    default_style_mode: str = Field(..., description="Default writing style if not specified in topic file")
+    default_target_length_words: str = Field(..., description="Default target word count if not specified in topic file")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -120,6 +132,7 @@ class PathsConfig(BaseModel):
     data_archive_dir: str = Field(..., description="Archive directory path", min_length=1)
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
     data_logs_dir: str = Field(..., description="Logs directory path", min_length=1)
+    data_output_articles_dir: str = Field(..., description="Generated articles directory path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -148,6 +161,10 @@ class Config:
         # Validate topic_segmentation section if present
         if "topic_segmentation" in self._data:
             self._topic_segmentation = self._validate_topic_segmentation()
+
+        # Validate article_generation section if present
+        if "article_generation" in self._data:
+            self._article_generation = self._validate_article_generation()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -271,6 +288,21 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Topic segmentation configuration validation failed: {error_messages}") from e
 
+    def _validate_article_generation(self) -> ArticleGenerationConfig:
+        """Validate article generation configuration.
+
+        Returns:
+            Validated ArticleGenerationConfig instance.
+
+        Raises:
+            ValueError: If article generation configuration is invalid.
+        """
+        try:
+            return ArticleGenerationConfig.model_validate(self._data["article_generation"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Article generation configuration validation failed: {error_messages}") from e
+
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -302,6 +334,32 @@ class Config:
         if not hasattr(self, "_topic_segmentation"):
             raise KeyError("Missing required key 'topic_segmentation' in config file")
         return self._topic_segmentation
+
+    def get_article_generation_config(self) -> ArticleGenerationConfig:
+        """Get article generation configuration.
+
+        Returns:
+            ArticleGenerationConfig instance.
+
+        Raises:
+            KeyError: If article_generation section is not configured.
+        """
+        if not hasattr(self, "_article_generation"):
+            raise KeyError("Missing required key 'article_generation' in config file")
+        return self._article_generation
+
+    def get_allowed_article_styles(self) -> list[str]:
+        """Get list of allowed article writing styles.
+
+        Returns:
+            List of allowed style strings (e.g., ["NATURE_NEWS", "SCIAM_MAGAZINE"]).
+
+        Raises:
+            KeyError: If article_generation section is not configured.
+        """
+        if not hasattr(self, "_article_generation"):
+            raise KeyError("Missing required key 'article_generation' in config file")
+        return self._article_generation.allowed_styles
 
     def getEncodingName(self) -> str:
         """Get default tiktoken encoding for token counting."""
@@ -455,6 +513,14 @@ class Config:
             Path object pointing to the logs directory.
         """
         return Path(self._paths.data_logs_dir)
+
+    def getDataOutputArticlesDir(self) -> Path:
+        """Get the generated articles directory path.
+
+        Returns:
+            Path object pointing to the data/output/articles directory.
+        """
+        return Path(self._paths.data_output_articles_dir)
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.

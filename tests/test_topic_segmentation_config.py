@@ -28,6 +28,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_dir": "./data/archive",
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./logs",
+        "data_output_articles_dir": "./data/output/articles",
     }
 
 
@@ -39,7 +40,7 @@ class TestLLMConfig:
         config = LLMConfig(
             model="qwen3-30b-a3b-thinking-2507-mlx@8bit",
             api_base="http://127.0.0.1:1234/v1",
-            api_key_env="LMSTUDIO_API_KEY",
+            api_key="LMSTUDIO_API_KEY",
             context_window=262144,
             max_tokens=32000,
             temperature=0.7,
@@ -47,7 +48,7 @@ class TestLLMConfig:
         )
         assert config.model == "qwen3-30b-a3b-thinking-2507-mlx@8bit"
         assert config.api_base == "http://127.0.0.1:1234/v1"
-        assert config.api_key_env == "LMSTUDIO_API_KEY"
+        assert config.api_key == "LMSTUDIO_API_KEY"
         assert config.context_window == 262144
         assert config.max_tokens == 32000
         assert config.temperature == 0.7
@@ -58,7 +59,7 @@ class TestLLMConfig:
         config = LLMConfig(
             model="anthropic/claude-3-5-sonnet-20241022",
             api_base=None,
-            api_key_env="ANTHROPIC_API_KEY",
+            api_key="ANTHROPIC_API_KEY",
             context_window=200000,
             max_tokens=4096,
             temperature=0.5,
@@ -66,7 +67,7 @@ class TestLLMConfig:
         )
         assert config.model == "anthropic/claude-3-5-sonnet-20241022"
         assert config.api_base is None
-        assert config.api_key_env == "ANTHROPIC_API_KEY"
+        assert config.api_key == "ANTHROPIC_API_KEY"
         assert config.context_window_threshold == 85
 
     def test_missing_model_field(self) -> None:
@@ -75,7 +76,7 @@ class TestLLMConfig:
             LLMConfig.model_validate(
                 {
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -97,7 +98,7 @@ class TestLLMConfig:
                 }
             )
         errors = exc_info.value.errors()
-        assert any(err["loc"] == ("api_key_env",) and err["type"] == "missing" for err in errors)
+        assert any(err["loc"] == ("api_key",) and err["type"] == "missing" for err in errors)
 
     def test_missing_context_window_field(self) -> None:
         """Test LLM config with missing context_window field."""
@@ -106,7 +107,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "max_tokens": 2048,
                     "temperature": 0.7,
                 }
@@ -121,7 +122,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "temperature": 0.7,
                 }
@@ -136,7 +137,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                 }
@@ -150,7 +151,7 @@ class TestLLMConfig:
             LLMConfig.model_validate(
                 {
                     "model": "test-model",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -166,7 +167,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": "not_an_int",
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -182,7 +183,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": "not_an_int",
                     "temperature": 0.7,
@@ -198,7 +199,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": "not_a_float",
@@ -214,7 +215,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -229,7 +230,7 @@ class TestLLMConfig:
         config = LLMConfig(
             model="test-model",
             api_base="http://localhost:1234/v1",
-            api_key_env="API_KEY",
+            api_key="API_KEY",
             context_window=100000,
             max_tokens=2048,
             temperature=0.7,
@@ -245,7 +246,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -261,7 +262,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -278,7 +279,7 @@ class TestLLMConfig:
                 {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
                     "temperature": 0.7,
@@ -294,7 +295,7 @@ class TestLLMConfig:
         config_0 = LLMConfig(
             model="test-model",
             api_base="http://localhost:1234/v1",
-            api_key_env="API_KEY",
+            api_key="API_KEY",
             context_window=100000,
             max_tokens=2048,
             temperature=0.7,
@@ -306,7 +307,7 @@ class TestLLMConfig:
         config_100 = LLMConfig(
             model="test-model",
             api_base="http://localhost:1234/v1",
-            api_key_env="API_KEY",
+            api_key="API_KEY",
             context_window=100000,
             max_tokens=2048,
             temperature=0.7,
@@ -323,7 +324,7 @@ class TestTopicSegmentationConfig:
         agent_llm = LLMConfig(
             model="test-agent-model",
             api_base="http://localhost:1234/v1",
-            api_key_env="AGENT_KEY",
+            api_key="AGENT_KEY",
             context_window=262144,
             max_tokens=32000,
             temperature=0.7,
@@ -332,7 +333,7 @@ class TestTopicSegmentationConfig:
         critic_llm = LLMConfig(
             model="test-critic-model",
             api_base="http://localhost:1235/v1",
-            api_key_env="CRITIC_KEY",
+            api_key="CRITIC_KEY",
             context_window=262144,
             max_tokens=32000,
             temperature=0.3,
@@ -352,7 +353,7 @@ class TestTopicSegmentationConfig:
         critic_llm_dict = {
             "model": "test-critic-model",
             "api_base": "http://localhost:1235/v1",
-            "api_key_env": "CRITIC_KEY",
+            "api_key": "CRITIC_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
@@ -368,7 +369,7 @@ class TestTopicSegmentationConfig:
         agent_llm_dict = {
             "model": "test-agent-model",
             "api_base": "http://localhost:1234/v1",
-            "api_key_env": "AGENT_KEY",
+            "api_key": "AGENT_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
@@ -384,7 +385,7 @@ class TestTopicSegmentationConfig:
         agent_llm_dict = {
             "model": "test-agent-model",
             "api_base": "http://localhost:1234/v1",
-            "api_key_env": "AGENT_KEY",
+            "api_key": "AGENT_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
@@ -393,7 +394,7 @@ class TestTopicSegmentationConfig:
         critic_llm_dict = {
             "model": "test-critic-model",
             "api_base": "http://localhost:1235/v1",
-            "api_key_env": "CRITIC_KEY",
+            "api_key": "CRITIC_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
@@ -409,7 +410,7 @@ class TestTopicSegmentationConfig:
         agent_llm_dict = {
             "model": "test-agent-model",
             "api_base": "http://localhost:1234/v1",
-            "api_key_env": "AGENT_KEY",
+            "api_key": "AGENT_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
@@ -418,7 +419,7 @@ class TestTopicSegmentationConfig:
         critic_llm_dict = {
             "model": "test-critic-model",
             "api_base": "http://localhost:1235/v1",
-            "api_key_env": "CRITIC_KEY",
+            "api_key": "CRITIC_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
@@ -436,7 +437,7 @@ class TestTopicSegmentationConfig:
         agent_llm_dict = {
             "model": "test-agent-model",
             "api_base": "http://localhost:1234/v1",
-            "api_key_env": "AGENT_KEY",
+            "api_key": "AGENT_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.7,
@@ -445,7 +446,7 @@ class TestTopicSegmentationConfig:
         critic_llm_dict = {
             "model": "test-critic-model",
             "api_base": "http://localhost:1235/v1",
-            "api_key_env": "CRITIC_KEY",
+            "api_key": "CRITIC_KEY",
             "context_window": 262144,
             "max_tokens": 32000,
             "temperature": 0.3,
@@ -468,7 +469,7 @@ class TestTopicSegmentationConfig:
         agent_llm = LLMConfig(
             model="test-agent-model",
             api_base="http://localhost:1234/v1",
-            api_key_env="AGENT_KEY",
+            api_key="AGENT_KEY",
             context_window=262144,
             max_tokens=32000,
             temperature=0.7,
@@ -477,7 +478,7 @@ class TestTopicSegmentationConfig:
         critic_llm = LLMConfig(
             model="test-critic-model",
             api_base="http://localhost:1235/v1",
-            api_key_env="CRITIC_KEY",
+            api_key="CRITIC_KEY",
             context_window=262144,
             max_tokens=32000,
             temperature=0.3,
@@ -512,7 +513,7 @@ class TestConfigWithTopicSegmentation:
                 "agent_llm": {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.7,
@@ -521,7 +522,7 @@ class TestConfigWithTopicSegmentation:
                 "critic_llm": {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.3,
@@ -624,7 +625,7 @@ class TestConfigWithTopicSegmentation:
                 "agent_llm": {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.7,
@@ -633,7 +634,7 @@ class TestConfigWithTopicSegmentation:
                 "critic_llm": {
                     "model": "test-model",
                     "api_base": "http://localhost:1234/v1",
-                    "api_key_env": "API_KEY",
+                    "api_key": "API_KEY",
                     "context_window": 262144,
                     "max_tokens": 32000,
                     "temperature": 0.3,

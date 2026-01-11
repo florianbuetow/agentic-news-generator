@@ -1,7 +1,6 @@
 """Topic segmentation agent using litellm."""
 
 import json
-import os
 
 from litellm import completion
 from pydantic import ValidationError
@@ -30,13 +29,7 @@ class TopicSegmentationAgent:
         self._system_prompt = SYSTEM_PROMPT
         self._user_prompt_template = USER_PROMPT_TEMPLATE
         self._retry_prompt_template = RETRY_PROMPT_TEMPLATE
-
-        # Get API key from environment
-        api_key = os.environ.get(llm_config.api_key_env)
-        if api_key is None:
-            raise KeyError(f"Environment variable '{llm_config.api_key_env}' not found")
-
-        self._api_key = api_key
+        self._api_key = llm_config.api_key
 
     def segment(
         self,
