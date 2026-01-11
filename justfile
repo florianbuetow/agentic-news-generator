@@ -148,12 +148,8 @@ newspaper-generate:
     echo ""
     printf "\033[0;34m=== Generating Newspaper Website ===\033[0m\n"
 
-    # Check if markdown articles exist
-    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
-        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
-        echo "  Please generate the articles first"
-        exit 1
-    fi
+    # Validate articles directory using config
+    uv run scripts/validate_articles_dir.py
 
     # Preprocess markdown articles (extract YAML frontmatter only)
     echo "Preprocessing markdown articles..."
@@ -185,18 +181,14 @@ newspaper-serve:
     echo ""
     printf "\033[0;34m=== Starting Newspaper Development Server ===\033[0m\n"
 
-    # Check if markdown articles exist
-    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
-        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
-        echo "  Please generate the articles first"
-        exit 1
-    fi
+    # Validate articles directory using config
+    uv run scripts/validate_articles_dir.py
 
-    # Check if port 3000 is available
-    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-        printf "\033[0;31m✗ Error: Port 3000 is already in use\033[0m\n"
-        echo "  Please stop the service using port 3000 and try again"
-        echo "  You can find the process with: lsof -i :3000"
+    # Check if port 12000 is available
+    if lsof -Pi :12000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        printf "\033[0;31m✗ Error: Port 12000 is already in use\033[0m\n"
+        echo "  Please stop the service using port 12000 and try again"
+        echo "  You can find the process with: lsof -i :12000"
         exit 1
     fi
 
@@ -212,14 +204,14 @@ newspaper-serve:
 
     # Start development server in background
     echo ""
-    printf "\033[0;32m✓ Starting development server at http://localhost:3000\033[0m\n"
+    printf "\033[0;32m✓ Starting development server at http://localhost:12000\033[0m\n"
     echo ""
     cd frontend/newspaper && npm run dev &
     DEV_PID=$!
 
     # Wait for server to start, then open browser
     sleep 3
-    open http://localhost:3000
+    open http://localhost:12000
 
     # Wait for dev server to exit (allows Ctrl+C)
     wait $DEV_PID
