@@ -466,6 +466,53 @@ ci-quiet:
     printf "\033[0;32m✓ All CI checks passed\033[0m\n"
     echo ""
 
+# Run the complete pipeline quietly (only show errors and warnings)
+all-quiet:
+    #!/usr/bin/env bash
+    set +e  # Don't exit on error for download-videos
+    echo ""
+    printf "\033[0;34m=== Running Complete Pipeline (Quiet Mode) ===\033[0m\n"
+    TMPFILE=$(mktemp)
+    trap "rm -f $TMPFILE" EXIT
+
+    printf "🚀 Starting ci-quiet...\n"
+    just ci-quiet || exit 1
+    printf "✅ Completed ci-quiet\n"
+
+    printf "🚀 Starting download-videos...\n"
+    if just download-videos > $TMPFILE 2>&1; then
+        printf "✅ Completed download-videos\n"
+    else
+        printf "\033[0;33m⚠ Download-videos failed (continuing...)\033[0m\n"
+        cat $TMPFILE
+    fi
+
+    set -e  # Exit on error for remaining steps
+
+    printf "🚀 Starting extract-audio...\n"
+    just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed extract-audio\n"
+
+    printf "🚀 Starting transcribe...\n"
+    just transcribe > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcribe failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed transcribe\n"
+
+    printf "🚀 Starting archive-videos...\n"
+    just archive-videos > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Archive-videos failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed archive-videos\n"
+
+    printf "🚀 Starting analyze-transcripts-hallucinations...\n"
+    just analyze-transcripts-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Analyze-transcripts-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed analyze-transcripts-hallucinations\n"
+
+    printf "🚀 Starting transcripts-remove-hallucinations...\n"
+    just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed transcripts-remove-hallucinations\n"
+
+    echo ""
+    printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"
+    echo ""
+
 # Run AI-based CI checks (AI-powered test validation, will grow in the future)
 # This pipeline is separate from regular CI and includes AI-assisted code quality checks
 ci-ai:
