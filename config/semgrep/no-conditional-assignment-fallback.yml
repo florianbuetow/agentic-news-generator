@@ -1,0 +1,155 @@
+# IMPORTANT: These rules prevent circumventing the no-default-values principle.
+#
+# Assigning fallback/default values through conditional statements (if var is None: var = "default")
+# is a CODE QUALITY VIOLATION because it:
+#
+# 1. Makes debugging significantly more difficult by hiding the root cause of missing data
+# 2. Allows invalid/incomplete data to propagate silently through the system
+# 3. Creates situations where bugs only manifest far from their actual source
+# 4. Violates the core project principle: "Never assume any default values anywhere"
+#
+# When a required value is missing, the code MUST fail immediately and explicitly at the point
+# where the missing value is detected, not mask the problem with a fallback value.
+#
+# Using conditional assignment to set defaults is functionally equivalent to:
+#   - dict.get(key, "default")
+#   - var = expr or "default"
+#   - parameter=default in function signatures
+#
+# All of these patterns hide configuration errors and make the system harder to debug.
+
+rules:
+  - id: xrag.no-conditional-none-assignment
+    languages: [python]
+    message: >
+      Conditional assignment of fallback value hides missing data.
+      Use explicit validation and raise an error when the value is expected but missing.
+
+      IMPORTANT: This pattern is a code quality violation because it makes debugging more difficult
+      by hiding the root cause of missing data. When a required value is missing, the code must fail
+      immediately and explicitly at the point where the problem is detected.
+
+      Example violations:
+        # WRONG - assigns "Unknown" fallback
+        var = source.get("key")
+        if var is None:
+            var = "Unknown"
+
+        # CORRECT - raise error for missing required value
+        var = source.get("key")
+        if var is None:
+            raise ValueError("Required field 'key' is missing")
+    severity: ERROR
+    pattern: |
+      $VAR = $EXPR
+      if $VAR is None:
+          $VAR = $DEFAULT
+    paths:
+      include:
+        - src/
+      exclude:
+        - tests/
+
+  - id: xrag.no-conditional-not-assignment
+    languages: [python]
+    message: >
+      Conditional assignment with 'if not' hides missing/falsy data.
+      Use explicit validation and raise an error when the value is expected but missing.
+
+      IMPORTANT: This pattern is a code quality violation because it makes debugging more difficult
+      by hiding the root cause of missing data. When a required value is missing, the code must fail
+      immediately and explicitly at the point where the problem is detected.
+
+      Example violations:
+        # WRONG - assigns fallback for any falsy value
+        var = source.get("key")
+        if not var:
+            var = "default"
+
+        # CORRECT - raise error for missing required value
+        var = source.get("key")
+        if var is None:
+            raise ValueError("Required field 'key' is missing")
+    severity: ERROR
+    pattern: |
+      $VAR = $EXPR
+      if not $VAR:
+          $VAR = $DEFAULT
+    paths:
+      include:
+        - src/
+      exclude:
+        - tests/
+
+  - id: xrag.no-conditional-equality-assignment
+    languages: [python]
+    message: >
+      Conditional assignment for equality check hides expected values.
+      Use explicit validation and raise an error when the value is unexpected.
+
+      IMPORTANT: This pattern is a code quality violation because it makes debugging more difficult
+      by hiding the root cause of unexpected values. When a value doesn't meet expectations, the code
+      must fail immediately and explicitly at the point where the problem is detected.
+
+      Example violations:
+        # WRONG - assigns fallback when var equals specific value
+        var = calculate_something()
+        if var == 0:
+            var = 1
+
+        # CORRECT - raise error for unexpected value
+        var = calculate_something()
+        if var == 0:
+            raise ValueError("Unexpected zero value from calculation")
+    severity: ERROR
+    pattern: |
+      $VAR = $EXPR
+      if $VAR == $VALUE:
+          $VAR = $DEFAULT
+    paths:
+      include:
+        - src/
+      exclude:
+        - tests/
+
+  - id: xrag.no-inline-conditional-none-assignment
+    languages: [python]
+    message: >
+      Inline conditional assignment of fallback value hides missing data.
+      Use explicit validation and raise an error when the value is expected but missing.
+
+      IMPORTANT: This pattern is a code quality violation because it makes debugging more difficult
+      by hiding the root cause of missing data. When a required value is missing, the code must fail
+      immediately and explicitly at the point where the problem is detected.
+
+      Example violations:
+        # WRONG - inline None check with fallback
+        if var is None: var = "Unknown"
+
+        # CORRECT - raise error for missing required value
+        if var is None:
+            raise ValueError("Required value is missing")
+    severity: ERROR
+    pattern: "if $VAR is None: $VAR = $DEFAULT"
+    paths:
+      include:
+        - src/
+      exclude:
+        - tests/
+
+  - id: xrag.no-inline-conditional-not-assignment
+    languages: [python]
+    message: >
+      Inline conditional assignment with 'if not' hides missing/falsy data.
+      Use explicit validation and raise an error when the value is expected but missing.
+
+      IMPORTANT: This pattern is a code quality violation because it makes debugging more difficult
+      by hiding the root cause of missing data. When a required value is missing, the code must fail
+      immediately and explicitly at the point where the problem is detected.
+    severity: ERROR
+    pattern: "if not $VAR: $VAR = $DEFAULT"
+    paths:
+      include:
+        - src/
+      exclude:
+        - tests/
