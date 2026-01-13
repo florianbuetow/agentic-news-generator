@@ -41,6 +41,7 @@ class TestChannelConfig:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "languages": ["en"],
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.url == "https://www.youtube.com/@test"
@@ -48,20 +49,21 @@ class TestChannelConfig:
         assert channel.category == "test_category"
         assert channel.description == "Test content"
         assert channel.download_limiter == 20
+        assert channel.languages == ["en"]
 
     def test_missing_required_field(self) -> None:
         """Test that missing required fields raise ValidationError."""
         channel_data = {
             "url": "https://www.youtube.com/@test",
             "name": "Test Channel",
-            # Missing category, description, download_limiter
+            # Missing category, description, download_limiter, languages
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 3  # category, description, download-limiter
+        assert len(errors) == 4  # category, description, download-limiter, languages
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"category", "description", "download-limiter"}
+        assert error_fields == {"category", "description", "download-limiter", "languages"}
 
     def test_extra_fields_forbidden(self) -> None:
         """Test that extra fields are forbidden due to extra='forbid'."""
@@ -71,6 +73,7 @@ class TestChannelConfig:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "languages": ["en"],
             "extra_field": "should not be allowed",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -86,6 +89,7 @@ class TestChannelConfig:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "languages": ["en"],
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
@@ -98,14 +102,14 @@ class TestChannelConfig:
             "url": "https://www.youtube.com/@test",
             "name": "Test Channel",
             "category": "test_category",
-            # Missing description, download_limiter
+            # Missing description, download_limiter, languages
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 2
+        assert len(errors) == 3
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"description", "download-limiter"}
+        assert error_fields == {"description", "download-limiter", "languages"}
 
     def test_empty_strings_allowed(self) -> None:
         """Test that empty strings are allowed (validation passes but may not be practical)."""
@@ -115,12 +119,14 @@ class TestChannelConfig:
             "category": "",
             "description": "",
             "download-limiter": 0,
+            "languages": ["en"],
         }
         # Empty strings are valid str types, so validation passes
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.url == ""
         assert channel.name == ""
         assert channel.download_limiter == 0
+        assert channel.languages == ["en"]
 
 
 class TestConfig:
@@ -137,6 +143,7 @@ class TestConfig:
                     "category": "category1",
                     "description": "Content 1",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
@@ -144,6 +151,7 @@ class TestConfig:
                     "category": "category2",
                     "description": "Content 2",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 },
             ],
         }
@@ -310,6 +318,7 @@ class TestConfig:
                     "category": "category1",
                     "description": "Content 1",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
@@ -317,6 +326,7 @@ class TestConfig:
                     "category": "category2",
                     "description": "Content 2",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 },
             ],
         }
@@ -344,6 +354,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 }
             ],
         }
@@ -370,6 +381,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 }
             ],
         }
@@ -397,6 +409,7 @@ class TestConfig:
                     "category": "category1",
                     "description": "Content 1",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 },
                 {
                     "url": "https://www.youtube.com/@test2",
@@ -404,6 +417,7 @@ class TestConfig:
                     "category": "category2",
                     "description": "Content 2",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 },
             ],
         }
@@ -431,6 +445,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 }
             ],
         }
@@ -457,6 +472,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 }
             ],
         }
@@ -482,6 +498,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 }
             ],
         }
@@ -507,6 +524,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                     "extra_field": "not allowed",
                 }
             ],
@@ -533,6 +551,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "languages": ["en"],
                 }
             ],
         }
@@ -572,6 +591,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 0,
+            "languages": ["en"],
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.download_limiter == 0
@@ -584,6 +604,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": -1,
+            "languages": ["en"],
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.download_limiter == -1
@@ -598,6 +619,7 @@ class TestChannelConfigDownloadLimiter:
                 "category": "test_category",
                 "description": "Test content",
                 "download-limiter": value,
+                "languages": ["en"],
             }
             channel = ChannelConfig.model_validate(channel_data)
             assert channel.download_limiter == value
@@ -609,14 +631,14 @@ class TestChannelConfigDownloadLimiter:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
-            # Missing download_limiter
+            # Missing download_limiter and languages
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 1
-        assert errors[0]["loc"][0] == "download-limiter"
-        assert "required" in errors[0]["msg"].lower()
+        assert len(errors) == 2
+        error_fields = {error["loc"][0] for error in errors}
+        assert error_fields == {"download-limiter", "languages"}
 
     def test_download_limiter_wrong_type_string(self) -> None:
         """Test that non-numeric string download_limiter raises ValidationError."""
@@ -626,6 +648,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": "unlimited",  # Should be int, not string
+            "languages": ["en"],
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
@@ -640,6 +663,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20.5,  # Should be int, not float
+            "languages": ["en"],
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
@@ -656,6 +680,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": -5,
+            "languages": ["en"],
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.download_limiter == -5
@@ -668,6 +693,177 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,  # Using hyphen as in actual YAML
+            "languages": ["en"],
         }
         channel = ChannelConfig.model_validate(channel_data)
         assert channel.download_limiter == 20
+
+
+class TestChannelConfigLanguages:
+    """Test cases for the languages field validation."""
+
+    def test_languages_with_single_valid_code(self) -> None:
+        """Test that single valid language code is accepted."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            "languages": ["en"],
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.languages == ["en"]
+
+    def test_languages_with_multiple_valid_codes(self) -> None:
+        """Test that multiple valid language codes are accepted."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            "languages": ["en", "ja", "es"],
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.languages == ["en", "ja", "es"]
+
+    def test_languages_with_unknown_code(self) -> None:
+        """Test that '??' (unknown) language code is accepted."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            "languages": ["??"],
+        }
+        channel = ChannelConfig.model_validate(channel_data)
+        assert channel.languages == ["??"]
+
+    def test_languages_rejects_invalid_code(self) -> None:
+        """Test that invalid language code raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            "languages": ["xyz"],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        error = str(exc_info.value)
+        assert "Invalid language code(s): ['xyz']" in error
+        assert "Supported codes:" in error
+
+    def test_languages_rejects_mixed_valid_invalid(self) -> None:
+        """Test that mix of valid and invalid codes raises ValidationError."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            "languages": ["en", "invalid", "ja"],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        error = str(exc_info.value)
+        assert "Invalid language code(s): ['invalid']" in error
+
+    def test_languages_field_required(self) -> None:
+        """Test that languages field is required."""
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            # Missing languages
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        assert any(error["loc"][0] == "languages" for error in errors)
+
+    def test_languages_rejects_empty_list(self) -> None:
+        """Test that empty languages list raises ValidationError."""
+        empty_languages: list[str] = []
+        channel_data = {
+            "url": "https://www.youtube.com/@test",
+            "name": "Test Channel",
+            "category": "test_category",
+            "description": "Test content",
+            "download-limiter": 20,
+            "languages": empty_languages,
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            ChannelConfig.model_validate(channel_data)
+        errors = exc_info.value.errors()
+        # Should fail min_length=1 constraint
+        assert any(error["loc"][0] == "languages" for error in errors)
+
+    def test_config_get_channel_includes_languages(self) -> None:
+        """Test that Config.get_channel() returns channel with languages field."""
+        config_data = {
+            "paths": get_valid_paths_config(),
+            "channels": [
+                {
+                    "url": "https://www.youtube.com/@test",
+                    "name": "Test Channel",
+                    "category": "test_category",
+                    "description": "Test content",
+                    "download-limiter": 20,
+                    "languages": ["en", "es"],
+                }
+            ],
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            channel = config.get_channel(0)
+            assert channel.languages == ["en", "es"]
+        finally:
+            temp_path.unlink()
+
+    def test_config_get_channels_all_have_languages(self) -> None:
+        """Test that Config.get_channels() returns all channels with languages."""
+        config_data = {
+            "paths": get_valid_paths_config(),
+            "channels": [
+                {
+                    "url": "https://www.youtube.com/@test1",
+                    "name": "Test Channel 1",
+                    "category": "test_category",
+                    "description": "Test content",
+                    "download-limiter": 20,
+                    "languages": ["en"],
+                },
+                {
+                    "url": "https://www.youtube.com/@test2",
+                    "name": "Test Channel 2",
+                    "category": "test_category",
+                    "description": "Test content",
+                    "download-limiter": 20,
+                    "languages": ["ja", "en"],
+                },
+            ],
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            channels = config.get_channels()
+            assert len(channels) == 2
+            assert all(hasattr(ch, "languages") for ch in channels)
+            assert all(len(ch.languages) > 0 for ch in channels)
+            assert channels[0].languages == ["en"]
+            assert channels[1].languages == ["ja", "en"]
+        finally:
+            temp_path.unlink()
