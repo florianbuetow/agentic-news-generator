@@ -421,6 +421,45 @@ topic_segmentation:
 - Compatible with existing error handling (ValueError → SegmentationResult with success=False)
 - Comprehensive test coverage with 44 tests for validation logic
 
+## Troubleshooting
+
+### Browser Cookie Authentication
+
+The video downloader uses `yt-dlp` with browser cookies for authentication with YouTube. The browser selection is controlled by the `BROWSER` environment variable.
+
+**Default Configuration:**
+- **Location**: `scripts/config.sh:96`
+- **Default value**: `chrome`
+
+**Changing the Browser:**
+
+If you need to use a different browser (Firefox, Safari, Edge, etc.), you can override the default in two ways:
+
+1. **Per-command override:**
+   ```bash
+   BROWSER=firefox just download-videos
+   ```
+
+2. **Session-wide override:**
+   ```bash
+   export BROWSER=firefox
+   just download-videos
+   ```
+
+**Supported Browsers:**
+- `chrome` (default)
+- `firefox`
+- `safari`
+- `edge`
+- `brave`
+- `opera`
+- Any browser supported by yt-dlp's `--cookies-from-browser` option
+
+**Common Issues:**
+- If video downloads fail with authentication errors, ensure the specified browser is installed and you're logged into YouTube in that browser
+- If using a browser profile, cookies must be accessible from the default profile
+- On macOS, you may need to grant Terminal access to the browser's data in System Preferences → Security & Privacy
+
 ## Development
 
 ### Development Guidelines
