@@ -49,6 +49,7 @@ class TestArticleGenerationConfig:
         config = ArticleGenerationConfig(
             writer_llm=writer_llm,
             max_retries=3,
+            timeout_seconds=30,
             allowed_styles=["NATURE_NEWS", "SCIAM_MAGAZINE"],
             default_style_mode="SCIAM_MAGAZINE",
             default_target_length_words="900-1200",
@@ -253,6 +254,7 @@ class TestArticleGenerationConfig:
         config_0 = ArticleGenerationConfig(
             writer_llm=writer_llm,
             max_retries=0,
+            timeout_seconds=30,
             allowed_styles=["NATURE_NEWS"],
             default_style_mode="NATURE_NEWS",
             default_target_length_words="900-1200",
@@ -263,6 +265,7 @@ class TestArticleGenerationConfig:
         config_10 = ArticleGenerationConfig(
             writer_llm=writer_llm,
             max_retries=10,
+            timeout_seconds=30,
             allowed_styles=["NATURE_NEWS"],
             default_style_mode="NATURE_NEWS",
             default_target_length_words="900-1200",
@@ -356,6 +359,7 @@ class TestArticleGenerationConfig:
         config = ArticleGenerationConfig(
             writer_llm=writer_llm,
             max_retries=3,
+            timeout_seconds=30,
             allowed_styles=["NATURE_NEWS"],
             default_style_mode="NATURE_NEWS",
             default_target_length_words="900-1200",
@@ -391,6 +395,7 @@ class TestConfigWithArticleGeneration:
                     "context_window_threshold": 90,
                 },
                 "max_retries": 3,
+                "timeout_seconds": 600,
                 "allowed_styles": ["NATURE_NEWS", "SCIAM_MAGAZINE"],
                 "default_style_mode": "SCIAM_MAGAZINE",
                 "default_target_length_words": "900-1200",
@@ -540,6 +545,7 @@ class TestConfigWithArticleGeneration:
                     "context_window_threshold": 90,
                 },
                 "max_retries": 3,
+                "timeout_seconds": 30,
                 "allowed_styles": ["NATURE_NEWS", "SCIAM_MAGAZINE", "CUSTOM_STYLE"],
                 "default_style_mode": "NATURE_NEWS",
                 "default_target_length_words": "900-1200",

@@ -5,7 +5,6 @@ from datetime import UTC, datetime
 from typing import Literal, cast
 
 from litellm import completion
-from pydantic import ValidationError
 
 from src.agents.article_generation import agent_prompts
 from src.agents.article_generation.models import ArticleGenerationResult, ArticleMetadata, ArticleResponse
@@ -44,30 +43,33 @@ class ArticleWriterAgent:
 
         Returns:
             ArticleMetadata instance.
+
+        Raises:
+            ValueError: If required metadata fields are missing.
         """
         topic_slug_value = source_metadata.get("topic_slug")
         if topic_slug_value is None:
-            topic_slug_value = "unknown"
+            raise ValueError("Required metadata field 'topic_slug' is missing")
 
         topic_title_value = source_metadata.get("topic_title")
         if topic_title_value is None:
-            topic_title_value = "Unknown Topic"
+            raise ValueError("Required metadata field 'topic_title' is missing")
 
         channel_name_value = source_metadata.get("channel_name")
         if channel_name_value is None:
-            channel_name_value = "Unknown"
+            raise ValueError("Required metadata field 'channel_name' is missing")
 
         video_id_value = source_metadata.get("video_id")
         if video_id_value is None:
-            video_id_value = "Unknown"
+            raise ValueError("Required metadata field 'video_id' is missing")
 
         video_title_value = source_metadata.get("video_title")
         if video_title_value is None:
-            video_title_value = "Unknown"
+            raise ValueError("Required metadata field 'video_title' is missing")
 
         source_file_value = source_metadata.get("source_file")
         if source_file_value is None:
-            source_file_value = "Unknown"
+            raise ValueError("Required metadata field 'source_file' is missing")
 
         return ArticleMetadata(
             topic_slug=topic_slug_value,
@@ -118,19 +120,30 @@ class ArticleWriterAgent:
             )
 
             # Extract metadata values
-            channel_name = source_metadata.get("channel_name", "Unknown")
-            video_title = source_metadata.get("video_title", "Unknown")
-            video_id = source_metadata.get("video_id", "Unknown")
-            publish_date = source_metadata.get("publish_date", "Unknown")
+            channel_name_value = source_metadata.get("channel_name")
+            if channel_name_value is None:
+                raise ValueError("Required metadata field 'channel_name' is missing")
+
+            video_title_value = source_metadata.get("video_title")
+            if video_title_value is None:
+                raise ValueError("Required metadata field 'video_title' is missing")
+
+            video_id_value = source_metadata.get("video_id")
+            if video_id_value is None:
+                raise ValueError("Required metadata field 'video_id' is missing")
+
+            publish_date_value = source_metadata.get("publish_date")
+            if publish_date_value is None:
+                raise ValueError("Required metadata field 'publish_date' is missing")
 
             user_prompt = self._USER_PROMPT_TEMPLATE.format(
                 style_mode=style_mode,
                 target_length_words=target_length_words,
                 source_text=source_text,
-                channel_name=channel_name,
-                video_title=video_title,
-                video_id=video_id,
-                publish_date=publish_date,
+                channel_name=channel_name_value,
+                video_title=video_title_value,
+                video_id=video_id_value,
+                publish_date=publish_date_value,
             )
 
             # Validate token usage before calling LLM
@@ -160,7 +173,7 @@ class ArticleWriterAgent:
                 messages=messages,
                 temperature=self._llm_config.temperature,
                 max_tokens=self._llm_config.max_tokens,
-                timeout=600,
+                timeout=self._config.get_article_timeout_seconds(),
                 stream=False,
             )
 
@@ -175,10 +188,7 @@ class ArticleWriterAgent:
             response_text = response_text.strip()
             if (response_text.startswith("```json") or response_text.startswith("```")) and response_text.endswith("```"):
                 # Remove opening fence
-                if response_text.startswith("```json"):
-                    response_text = response_text[7:]
-                else:
-                    response_text = response_text[3:]
+                response_text = response_text[7:] if response_text.startswith("```json") else response_text[3:]
                 # Remove closing fence
                 response_text = response_text[:-3].strip()
                 print("        [Agent] Stripped markdown code fences from response")

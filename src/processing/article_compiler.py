@@ -49,10 +49,10 @@ class ArticleCompiler:
         else:
             raise ValueError(f"No image found for hero article: {a.filename}")
 
-        # Get paragraphs with fallback
+        # Get paragraphs
         paragraphs = a.paragraphs[: self.config.paragraphs.hero_count]
         if not paragraphs:
-            paragraphs = [a.frontmatter.summary]
+            raise ValueError(f"No paragraphs found for hero article: {a.filename}")
 
         return HeroArticle(
             image=image,
@@ -98,10 +98,10 @@ class ArticleCompiler:
         else:
             raise ValueError(f"No image found for secondary article: {a.filename}")
 
-        # Get paragraphs with fallback
+        # Get paragraphs
         paragraphs = a.paragraphs[: self.config.paragraphs.secondary_count]
         if not paragraphs:
-            paragraphs = [a.frontmatter.summary]
+            raise ValueError(f"No paragraphs found for secondary article: {a.filename}")
 
         return SecondaryMain(
             image=image,

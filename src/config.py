@@ -105,6 +105,7 @@ class ArticleGenerationConfig(BaseModel):
 
     writer_llm: LLMConfig = Field(..., description="LLM config for article writer")
     max_retries: int = Field(..., description="Maximum retry attempts for malformed JSON", ge=0, le=10)
+    timeout_seconds: int = Field(..., description="API timeout in seconds", gt=0)
     allowed_styles: list[str] = Field(..., description="List of allowed article writing styles", min_length=1)
     default_style_mode: str = Field(..., description="Default writing style if not specified in topic file")
     default_target_length_words: str = Field(..., description="Default target word count if not specified in topic file")
@@ -360,6 +361,19 @@ class Config:
         if not hasattr(self, "_article_generation"):
             raise KeyError("Missing required key 'article_generation' in config file")
         return self._article_generation.allowed_styles
+
+    def get_article_timeout_seconds(self) -> int:
+        """Get API timeout for article generation in seconds.
+
+        Returns:
+            Timeout in seconds.
+
+        Raises:
+            KeyError: If article_generation section is not configured.
+        """
+        if not hasattr(self, "_article_generation"):
+            raise KeyError("Missing required key 'article_generation' in config file")
+        return self._article_generation.timeout_seconds
 
     def getEncodingName(self) -> str:
         """Get default tiktoken encoding for token counting."""

@@ -88,6 +88,9 @@ article_generation:
   # Retry configuration for malformed JSON (handled by LiteLLM)
   max_retries: 3
 
+  # API timeout in seconds
+  timeout_seconds: 30
+
   # Allowed article writing styles
   allowed_styles:
     - "NATURE_NEWS"
