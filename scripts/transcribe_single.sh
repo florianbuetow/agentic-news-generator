@@ -99,4 +99,10 @@ else
         --word-timestamps True
 fi
 
+# Check if transcription succeeded
+if [ $? -eq 0 ]; then
+    echo "      ⏸️  Waiting for 5 seconds..."
+    sleep 5
+fi
+
 exit $?
