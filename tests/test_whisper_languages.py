@@ -16,25 +16,15 @@ class TestWhisperLanguages:
         languages = WhisperLanguages.get_supported_languages()
         assert "en" in languages
 
-    def test_get_supported_languages_includes_unknown(self) -> None:
-        """Test that '??' (unknown) is in supported languages."""
-        languages = WhisperLanguages.get_supported_languages()
-        assert "??" in languages
-
     def test_get_supported_languages_count(self) -> None:
-        """Test that exactly 101 languages are supported (100 Whisper + '??')."""
+        """Test that exactly 100 Whisper languages are supported."""
         languages = WhisperLanguages.get_supported_languages()
-        assert len(languages) == 101
+        assert len(languages) == 100
 
     def test_get_supported_languages_english_name(self) -> None:
         """Test that 'en' maps to 'english'."""
         languages = WhisperLanguages.get_supported_languages()
         assert languages["en"] == "english"
-
-    def test_get_supported_languages_unknown_name(self) -> None:
-        """Test that '??' maps to 'unknown'."""
-        languages = WhisperLanguages.get_supported_languages()
-        assert languages["??"] == "unknown"
 
     def test_get_supported_languages_keys_are_lowercase(self) -> None:
         """Test that all language keys are lowercase strings."""

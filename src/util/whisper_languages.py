@@ -11,11 +11,10 @@ class WhisperLanguages:
         Returns:
             Dictionary mapping language codes (e.g., 'en', 'ja') to
             English language names (e.g., 'english', 'japanese').
-            Includes special '??' code mapping to 'unknown'.
 
         Note:
             Imports from mlx_whisper.tokenizer.LANGUAGES (verified available).
-            Contains 100 Whisper-supported languages plus '??' for unknown.
+            Contains 100 Whisper-supported languages.
 
         Examples:
             >>> langs = WhisperLanguages.get_supported_languages()
@@ -23,15 +22,7 @@ class WhisperLanguages:
             'english'
             >>> langs['ja']
             'japanese'
-            >>> langs['??']
-            'unknown'
-            >>> len(langs)
-            101
         """
         from mlx_whisper.tokenizer import LANGUAGES
 
-        # Create new dict with Whisper languages + our special '??' code
-        supported_languages = dict(LANGUAGES)  # Copy to avoid modifying original
-        supported_languages["??"] = "unknown"
-
-        return supported_languages
+        return dict(LANGUAGES)
