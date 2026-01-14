@@ -4,11 +4,12 @@ version = "0.1.0"
 description = "An AI-powered news generator that creates news articles using autonomous agents"
 requires-python = ">=3.12"
 dependencies = [
+    "fasttext>=0.9.0",
     "litellm>=1.0.0",
     "markdown-it-py>=3.0.0",
     "matplotlib>=3.7.0",
     "mlx-whisper>=0.4.0",
-    "numpy>=1.24.0",
+    "numpy>=1.24.0,<2.0.0",
     "pandas>=2.0.0",
     "pydantic>=2.0.0",
     "python-frontmatter>=1.0.0",
