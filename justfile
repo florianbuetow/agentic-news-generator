@@ -22,6 +22,8 @@ init:
     @printf "\033[0;34m=== Initializing Development Environment ===\033[0m\n"
     @echo "Creating directories from config.yaml..."
     @bash scripts/init-directories.sh
+    @echo "Downloading FastText language detection models..."
+    @bash scripts/download-fasttext-models.sh
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @echo "Installing frontend dependencies..."
