@@ -64,39 +64,37 @@ class ChannelConfig(BaseModel):
         alias="download-limiter",
         description="Max videos to download: 0=skip, -1=unlimited, >0=exact limit",
     )
-    languages: list[str] = Field(
+    language: str = Field(
         ...,
-        min_length=1,
-        description="List of ISO language codes for channel content (e.g., ['en'], ['ja', 'en']). Use ['??'] if unknown.",
+        description="ISO language code for channel content (e.g., 'en', 'de', 'ja').",
     )
 
-    @field_validator("languages")
+    @field_validator("language")
     @classmethod
-    def validate_languages(cls, languages: list[str]) -> list[str]:
-        """Validate that all language codes are supported by Whisper.
+    def validate_language(cls, language: str) -> str:
+        """Validate that the language code is supported by Whisper.
 
         Args:
-            languages: List of language codes to validate.
+            language: Language code to validate.
 
         Returns:
-            The validated list of language codes.
+            The validated language code.
 
         Raises:
-            ValueError: If any language code is not supported by Whisper.
+            ValueError: If the language code is not supported by Whisper.
         """
         from src.util.whisper_languages import WhisperLanguages
 
         supported = WhisperLanguages.get_supported_languages()
-        invalid = [lang for lang in languages if lang not in supported]
 
-        if invalid:
+        if language not in supported:
             raise ValueError(
-                f"Invalid language code(s): {invalid}. "
-                f"Must be one of Whisper's supported languages or '??'. "
-                f"Supported codes: {sorted(supported.keys())}"
+                f"Invalid language code: '{language}'. "
+                f"Must be one of Whisper's supported languages. "
+                f"Supported codes: {', '.join(sorted(supported.keys()))}"
             )
 
-        return languages
+        return language
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
