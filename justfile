@@ -588,3 +588,22 @@ ci-ai:
     echo ""
     printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
     echo ""
+
+# Run AI-based CI checks silently (only show output on errors)
+ci-ai-quiet:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Running AI-Based CI Checks (Quiet Mode) ===\033[0m\n"
+    TMPFILE=$(mktemp)
+    trap "rm -f $TMPFILE" EXIT
+
+    just ai-review-unit-tests-nocache > $TMPFILE 2>&1 || { printf "\033[0;31m✗ AI-review-unit-tests failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ AI-review-unit-tests passed\033[0m\n"
+
+    just ai-review-shell-scripts-nocache > $TMPFILE 2>&1 || { printf "\033[0;31m✗ AI-review-shell-scripts failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ AI-review-shell-scripts passed\033[0m\n"
+
+    echo ""
+    printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
+    echo ""

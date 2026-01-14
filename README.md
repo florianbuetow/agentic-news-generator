@@ -586,6 +586,51 @@ Run all checks:
 just ci
 ```
 
+### AI-Powered Code Quality Checks
+
+The project includes AI-powered code quality tools that analyze code using local LLMs:
+
+#### Unit Test Quality Detection
+Detects fake/trivial unit tests that don't provide real test coverage:
+
+```bash
+just ai-review-unit-tests          # With caching
+just ai-review-unit-tests-nocache  # Force re-scan all files
+```
+
+- **Cache**: `.cache/unit_test_hashes.json`
+- **Report**: `reports/fake_test_report.md`
+- **Model**: Local LLM via LM Studio
+
+#### Shell Script Environment Variable Detection
+Detects shell scripts that rely on environment variables not passed as CLI arguments or read from files:
+
+```bash
+just ai-review-shell-scripts          # With caching
+just ai-review-shell-scripts-nocache  # Force re-scan all files
+```
+
+- **Cache**: `.cache/shell_script_hashes.json`
+- **Report**: `reports/shell_env_var_violations.md`
+- **Model**: Local LLM via LM Studio
+- **Target**: All `.sh` files in `scripts/` directory
+
+**Violation Rules:**
+- Scripts **FAIL** if they use environment variables that are NOT:
+  1. Passed as command line arguments to the script, OR
+  2. Read from a configuration file by the script (e.g., `source config.sh`)
+- Standard system env vars (`HOME`, `PATH`, `USER`) are acceptable
+- Detects violating variables and provides actionable recommendations
+
+#### Run All AI Checks
+
+Run all AI-based CI checks together:
+
+```bash
+just ci-ai          # Verbose output
+just ci-ai-quiet    # Quiet mode (only errors)
+```
+
 ## Configuration
 
 The system is configured via `config/config.yaml`. The configuration defines:
