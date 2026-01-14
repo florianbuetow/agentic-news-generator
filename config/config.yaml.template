@@ -15,22 +15,29 @@ paths:
   data_archive_videos_dir: ./data/archive/videos
 
 channels:
+  # Example 1: English channel
   - url: https://www.youtube.com/@ExampleChannel1
     name: Example Channel One
     category: example_category
     description: "Description of what content this channel provides."
     download-limiter: 20  # 0=skip downloads, -1=unlimited (99999), >0=max videos to download
+    language: "en"  # Source language: English (transcribed in English)
 
+  # Example 2: German channel (will be translated to English)
   - url: https://www.youtube.com/@ExampleChannel2
     name: Example Channel Two
     category: another_example_category
     description: "Another description of channel content and value proposition."
     download-limiter: -1  # Unlimited downloads
+    language: "de"  # Source language: German (translated to English)
 
+  # Example 3: Japanese channel (will be translated to English)
   - name: Example Channel Three
     url: https://www.youtube.com/@ExampleChannel3
-    vibe: "alternative format using vibe field instead of category/what_you_get"
+    category: japanese_tech_channel
+    description: "Japanese-language channel about technology."
     download-limiter: 0  # Skip this channel entirely
+    language: "ja"  # Source language: Japanese (translated to English)
 
 # Hallucination Detection Configuration
 hallucination_detection:
