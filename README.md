@@ -10,7 +10,7 @@ An AI-powered YouTube news aggregator that crawls AI-focused YouTube channels, t
 This system automatically:
 1. Downloads videos from pre-configured YouTube channels
 2. Extracts audio from videos to WAV format
-3. Transcribes audio using MLX Whisper (large-v3 model) with multiple output formats
+3. Transcribes audio using MLX Whisper (medium.en for English, medium for other languages) with automatic translation to English and multiple output formats
 4. Segments transcripts into topic-based sections using AI analysis
 5. Aggregates related topic segments across multiple videos
 6. Generates news articles from aggregated content using AI agents
@@ -110,6 +110,10 @@ cp config/config.yaml.template config/config.yaml
 Edit `config/config.yaml` to add your YouTube channels. Each channel can be configured with:
 - `url`: YouTube channel URL
 - `name`: Display name
+- `language`: Source language code (e.g., "en", "de", "ja") - **Required**
+  - English channels (`"en"`): Transcribed in English
+  - Non-English channels: Automatically translated to English
+- `download-limiter`: Maximum videos to download (or -1 for unlimited)
 - `category`: Channel category (optional, for structured format)
 - `description` or `what_you_get`: Channel description (for structured format)
 - `vibe`: Free-form channel description (alternative flexible format)
@@ -118,7 +122,7 @@ Channels can use either:
 - **Structured format**: `category` + `description` (or `what_you_get`)
 - **Flexible format**: `vibe` only
 
-See `config/config.yaml` for examples of the 16 pre-configured AI-focused channels.
+See `config/config.yaml` for examples of pre-configured AI-focused channels in multiple languages.
 
 ### 3. Environment Variables
 
@@ -159,7 +163,7 @@ just help
 #### Video Processing Pipeline
 - `just download-videos` - Download videos from configured YouTube channels
 - `just extract-audio` - Convert downloaded videos to WAV audio files
-- `just transcribe` - Transcribe audio files using MLX Whisper (large-v3)
+- `just transcribe` - Transcribe audio files using MLX Whisper (medium.en/medium with auto-translation)
 - `just analyze-transcripts` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
@@ -187,7 +191,9 @@ just download-videos
 # Step 2: Extract audio from videos (converts to 16kHz mono WAV)
 just extract-audio
 
-# Step 3: Transcribe audio using MLX Whisper large-v3
+# Step 3: Transcribe audio using MLX Whisper (medium.en/medium)
+# English channels: transcribed in English (medium.en model)
+# Non-English channels: translated to English (medium model)
 # Generates: .txt, .srt, .vtt, .tsv, .json files
 just transcribe
 
@@ -204,7 +210,8 @@ just archive-videos
 **Notes:**
 - All operations are idempotent (safe to re-run)
 - Files are organized by channel name
-- Transcription uses the Whisper large-v3 model for best quality
+- Transcription uses Whisper medium.en (English) and medium (multilingual) models
+- Channels are grouped by language to minimize model switching
 - Models are cached in `~/.cache/huggingface/hub/`
 - Archive step frees up disk space by moving videos and deleting intermediate audio
 
@@ -235,6 +242,88 @@ USE_YOUTUBE_METADATA=true               # Use video metadata in prompts (default
 ```bash
 USE_YOUTUBE_METADATA=false just transcribe
 ```
+
+### Multi-Language Transcription Support
+
+The transcription pipeline supports videos in any language supported by Whisper (100+ languages). Videos from non-English channels are automatically translated to English during transcription.
+
+**How It Works:**
+- Each channel in `config/config.yaml` specifies its source language using the `language` field
+- **English channels** (`language: "en"`): Transcribed directly in English using the optimized `medium.en` model
+- **Non-English channels** (e.g., `language: "de"`, `language: "ja"`): Translated to English using the multilingual `medium` model during transcription
+- Channels are **grouped by language** during processing to minimize model switching overhead
+- All transcript outputs are in English for consistent downstream processing
+
+**Configuration Example:**
+```yaml
+channels:
+  # English channel - uses medium.en model
+  - url: https://www.youtube.com/@AIExplained
+    name: AI Explained
+    language: "en"  # Source language: English
+    download-limiter: 20
+
+  # German channel - uses medium model with translation
+  - url: https://www.youtube.com/@TheMorpheusVlogs/videos
+    name: The Morpheus
+    language: "de"  # Source language: German → translates to English
+    download-limiter: 1
+
+  # Japanese channel - uses medium model with translation
+  - url: https://www.youtube.com/@SomeJapaneseChannel
+    name: Japanese Tech Channel
+    language: "ja"  # Source language: Japanese → translates to English
+    download-limiter: 10
+```
+
+**Models Used:**
+- **English-only model**: `mlx-community/whisper-medium.en-mlx` (769M parameters)
+  - Optimized for English transcription
+  - Task: `transcribe` (same language output)
+  - 99.3% accuracy on technical AI/ML terminology
+
+- **Multilingual model**: `mlx-community/whisper-medium-mlx` (769M parameters)
+  - Supports 100+ languages
+  - Task: `translate` (translates to English)
+  - Used for all non-English source languages
+
+**Processing Flow:**
+```
+1. Script groups channels by language: {en: [...], de: [...], ja: [...]}
+2. For each language group:
+   - Loads appropriate model once (medium.en for 'en', medium for others)
+   - Processes all channels in that language group
+   - Minimizes model switching for better performance
+3. For English channels:
+   - Task: transcribe
+   - Language: en
+   - Model: medium.en
+4. For non-English channels:
+   - Task: translate
+   - Language: de, ja, etc.
+   - Model: medium
+   - Output: English transcripts
+```
+
+**Supported Languages:**
+All languages supported by Whisper are available, including:
+- European: de (German), fr (French), es (Spanish), it (Italian), pt (Portuguese), etc.
+- Asian: ja (Japanese), zh (Chinese), ko (Korean), hi (Hindi), etc.
+- Middle Eastern: ar (Arabic), fa (Persian), he (Hebrew), tr (Turkish), etc.
+- And 90+ more languages
+
+For a complete list, see the Whisper documentation or `src/util/whisper_languages.py`.
+
+**Benefits:**
+- **Single output language**: All transcripts in English for consistent processing
+- **Optimized performance**: Language grouping reduces model loading overhead
+- **Automatic translation**: No separate translation step needed
+- **High quality**: Whisper's built-in translation produces natural English output
+- **YouTube metadata preserved**: Title and description used as context (in original language)
+
+**First Run Note:**
+- On first use, the multilingual model (~1.5GB) will be downloaded and cached
+- Subsequent runs will use the cached model from `~/.cache/huggingface/hub/`
 
 ### Transcript Hallucination Detection
 
@@ -421,6 +510,45 @@ topic_segmentation:
 - Compatible with existing error handling (ValueError → SegmentationResult with success=False)
 - Comprehensive test coverage with 44 tests for validation logic
 
+## Troubleshooting
+
+### Browser Cookie Authentication
+
+The video downloader uses `yt-dlp` with browser cookies for authentication with YouTube. The browser selection is controlled by the `BROWSER` environment variable.
+
+**Default Configuration:**
+- **Location**: `scripts/config.sh:96`
+- **Default value**: `chrome`
+
+**Changing the Browser:**
+
+If you need to use a different browser (Firefox, Safari, Edge, etc.), you can override the default in two ways:
+
+1. **Per-command override:**
+   ```bash
+   BROWSER=firefox just download-videos
+   ```
+
+2. **Session-wide override:**
+   ```bash
+   export BROWSER=firefox
+   just download-videos
+   ```
+
+**Supported Browsers:**
+- `chrome` (default)
+- `firefox`
+- `safari`
+- `edge`
+- `brave`
+- `opera`
+- Any browser supported by yt-dlp's `--cookies-from-browser` option
+
+**Common Issues:**
+- If video downloads fail with authentication errors, ensure the specified browser is installed and you're logged into YouTube in that browser
+- If using a browser profile, cookies must be accessible from the default profile
+- On macOS, you may need to grant Terminal access to the browser's data in System Preferences → Security & Privacy
+
 ## Development
 
 ### Development Guidelines
@@ -463,7 +591,8 @@ just ci
 The system is configured via `config/config.yaml`. The configuration defines:
 
 - **Channels**: List of YouTube channels to monitor
-  - Each channel has a URL, name, and optional metadata
+  - Each channel has a URL, name, source language (`language`), and optional metadata
+  - The `language` field specifies the source language (e.g., "en", "de", "ja")
   - Channels can use structured format (`category` + `description`/`what_you_get`) or flexible format (`vibe`)
 
 - **Hallucination Detection**: Sliding window analysis parameters
@@ -624,7 +753,10 @@ This project is in active development. Current implementation status:
 - ✅ Basic project structure
 - ✅ Video downloading pipeline (`scripts/yt-downloader.sh`)
 - ✅ Audio extraction pipeline (`scripts/convert_to_audio.sh`)
-- ✅ Transcription pipeline with MLX Whisper large-v3 (`scripts/transcribe_audio.sh`)
+- ✅ Multi-language transcription pipeline with MLX Whisper (`scripts/transcribe_audio.sh`)
+  - ✅ Language grouping for optimized processing
+  - ✅ Automatic translation of non-English content to English
+  - ✅ medium.en model for English, medium model for other languages
 - ✅ Transcript hallucination detection (`scripts/transcript-hallucination-detection.py`)
 - ✅ Video archiving and cleanup (`scripts/archive-videos.sh`)
 - ✅ HTML newspaper frontend (Nuxt-based, `frontend/newspaper/`)
@@ -667,9 +799,11 @@ The following vulnerabilities are intentionally ignored in dependency audits:
 
 ### Video Processing Features
 
+- **Multi-language Support**: Automatic translation from 100+ languages to English
 - **Multiple Transcript Formats**: Generates .txt, .srt, .vtt, .tsv, and .json files
 - **Idempotent Operations**: All scripts skip already-processed files
 - **Channel-based Organization**: Files organized by YouTube channel
+- **Language Grouping**: Processes channels by language to minimize model switching
 - **Efficient Processing**: Uses all CPU cores for audio conversion
 - **Apple Silicon Optimized**: MLX Whisper leverages Metal acceleration
 

@@ -52,7 +52,7 @@ OUTPUT_DIR="$DATA_DIR/output"
 
 # --- Video/Audio Processing Settings ---
 # Whitelist of allowed video file extensions
-ALLOWED_EXTENSIONS=("mp4" "webm" "m4a" "mov" "m4v" "avi" "mkv" "flv")
+ALLOWED_EXTENSIONS=("mp4" "mkv" "webm" "m4a" "mov" "m4v" "avi" "flv")
 
 # VERBOSE: Set to "true" to show individual operations/messages
 # Can be overridden via environment: VERBOSE=true ./script.sh
@@ -76,9 +76,14 @@ SILENCE_MIN_DURATION="${SILENCE_MIN_DURATION:-1}"
 ENABLE_SILENCE_REMOVAL="${ENABLE_SILENCE_REMOVAL:-true}"
 
 # --- Transcription Settings (transcribe_audio.sh) ---
-# Whisper model to use for transcription
-MODEL_NAME="${MODEL_NAME:-medium.en}"
-MODEL_REPO="${MODEL_REPO:-mlx-community/whisper-medium.en-mlx}"
+# Whisper models
+# English-only model (optimized for English content)
+MODEL_EN_NAME="${MODEL_EN_NAME:-medium.en}"
+MODEL_EN_REPO="${MODEL_EN_REPO:-mlx-community/whisper-medium.en-mlx}"
+
+# Multilingual model (supports all languages, used for translation)
+MODEL_MULTI_NAME="${MODEL_MULTI_NAME:-medium}"
+MODEL_MULTI_REPO="${MODEL_MULTI_REPO:-mlx-community/whisper-medium-mlx}"
 
 # Anti-hallucination settings
 # If hallucination detected after N seconds of silence, seek past silence and retry

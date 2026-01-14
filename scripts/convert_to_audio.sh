@@ -214,6 +214,16 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
         else
             echo "  Processing: $filename"
 
+            # Check if file has an audio stream before processing
+            has_audio=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_type \
+                -of default=noprint_wrappers=1:nokey=1 "$input_file" 2>/dev/null)
+
+            if [ -z "$has_audio" ]; then
+                echo "    ⚠️  Skipping: No audio stream found (video-only file)"
+                echo "  ---"
+                continue
+            fi
+
             if [ "$ENABLE_SILENCE_REMOVAL" = "true" ]; then
                 # === TWO-PASS PROCESSING WITH SILENCE REMOVAL ===
 
@@ -341,7 +351,7 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
             echo "  ---"
         fi
 
-    done < <(find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -print0)
+    done < <(find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -print0)
 
     # Print skip summary if any files were skipped
     if [ $skipped_count -gt 0 ]; then
