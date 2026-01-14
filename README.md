@@ -325,6 +325,64 @@ For a complete list, see the Whisper documentation or `src/util/whisper_language
 - On first use, the multilingual model (~1.5GB) will be downloaded and cached
 - Subsequent runs will use the cached model from `~/.cache/huggingface/hub/`
 
+### Language Detection
+
+The system includes a FastText-based language detector that supports 176 languages.
+
+**Model Download:**
+
+The language detection model is automatically downloaded during initialization:
+
+```bash
+just init
+```
+
+The model (lid.176.ftz, 917KB) is downloaded to `data/models/fasttext/` as configured in `config.yaml`.
+
+**Usage:**
+
+```python
+from pathlib import Path
+from src.config import Config
+from src.nlp import LanguageDetector
+
+# Load configuration
+config = Config(Path("config/config.yaml"))
+
+# Initialize detector with model path from config
+model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
+detector = LanguageDetector(model_path=model_path)
+
+# Detect language
+language_code = detector.detect_language("Hello world")  # Returns: "en"
+
+# Get detailed results with confidence
+result = detector.detect("Bonjour le monde", k=1)
+print(f"Language: {result.language}, Confidence: {result.confidence}")
+# Output: Language: fr, Confidence: 0.958
+
+# Get top-k predictions
+results = detector.detect("Hello", k=3)
+for r in results:
+    print(f"{r.language}: {r.confidence:.3f}")
+```
+
+**Supported Languages:**
+
+The detector supports 176 languages including:
+- Common: English, Spanish, French, German, Italian, Portuguese, Russian, Chinese, Japanese, Arabic
+- And 166 more languages
+
+Use `detector.get_supported_languages()` to get the full list of language codes and names.
+
+**Model Information:**
+
+- **Model:** FastText lid.176.ftz (compressed)
+- **Size:** 917KB
+- **Languages:** 176
+- **Source:** [FastText language identification](https://fasttext.cc/docs/en/language-identification.html)
+- **Location:** `{data_models_dir}/fasttext/` (configured in config.yaml)
+
 ### Transcript Hallucination Detection
 
 After transcription, the system analyzes all transcripts to detect and report any hallucinations that may have occurred during the transcription process. This post-processing analysis uses repetition pattern detection to identify anomalous loops and repetitive sequences.
