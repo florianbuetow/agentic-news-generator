@@ -36,9 +36,11 @@ mkdir -p "$OUTPUT_DIR"
 # Create download archive file in the output directory
 ARCHIVE_FILE="$OUTPUT_DIR/downloaded.txt"
 
+# Run yt-dlp and capture exit code
 yt-dlp --cookies-from-browser $BROWSER \
        --download-archive "$ARCHIVE_FILE" \
        --no-abort-on-error \
+       --ignore-errors \
        --lazy-playlist \
        --match-filter "availability=public" \
        --match-filters "!is_live" \
@@ -46,6 +48,20 @@ yt-dlp --cookies-from-browser $BROWSER \
        --min-sleep-interval 1 \
        --max-sleep-interval 5 \
        --write-info-json \
-       -f "bestvideo+(bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio)+best" \
+       -f "bestvideo+bestaudio/best" \
        -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
        "$URL"
+
+exit_code=$?
+
+# Exit code 0: All videos succeeded
+# Exit code 1: Some videos failed (private, members-only, deleted, etc.)
+# Exit code > 1: Fatal error (network, auth, etc.)
+#
+# We treat exit code 1 as success since we expect some videos to be unavailable
+# and the goal is to download as many videos as possible, not all of them.
+if [ $exit_code -eq 0 ] || [ $exit_code -eq 1 ]; then
+    exit 0
+else
+    exit $exit_code
+fi

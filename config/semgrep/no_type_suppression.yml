@@ -5,6 +5,7 @@ rules:
     message: |
       Type-suppression is not allowed.
       Do NOT add or keep: '# type: ignore' (including '[code]').
+      For import-untyped errors, check if type stubs exist: try `uv pip search types-<package-name>` and `uv pip install types-<package-name>`. If unavailable, create stub files in `stubs/<package-name>/__init__.pyi`.
       Fix the underlying typing issue instead: adjust annotations/signatures, add guards for Optional/Union,
       correct generics/collections types, or refactor into typed helpers. If you believe suppression is required,
       do not patch—explain why and propose a refactor that avoids suppression.

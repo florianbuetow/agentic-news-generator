@@ -504,6 +504,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "topic_segmentation": {
@@ -553,6 +554,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
         }
@@ -580,6 +582,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "topic_segmentation": {
@@ -616,6 +619,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "topic_segmentation": {
