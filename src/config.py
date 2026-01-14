@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
 class ParagraphConfig(BaseModel):
@@ -64,6 +64,37 @@ class ChannelConfig(BaseModel):
         alias="download-limiter",
         description="Max videos to download: 0=skip, -1=unlimited, >0=exact limit",
     )
+    language: str = Field(
+        ...,
+        description="ISO language code for channel content (e.g., 'en', 'de', 'ja').",
+    )
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, language: str) -> str:
+        """Validate that the language code is supported by Whisper.
+
+        Args:
+            language: Language code to validate.
+
+        Returns:
+            The validated language code.
+
+        Raises:
+            ValueError: If the language code is not supported by Whisper.
+        """
+        from src.util.whisper_languages import WhisperLanguages
+
+        supported = WhisperLanguages.get_supported_languages()
+
+        if language not in supported:
+            raise ValueError(
+                f"Invalid language code: '{language}'. "
+                f"Must be one of Whisper's supported languages. "
+                f"Supported codes: {', '.join(sorted(supported.keys()))}"
+            )
+
+        return language
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
