@@ -152,9 +152,7 @@ def append_new_video_ids(archive_file: Path, video_ids: list[str]) -> None:
             f.write(f"youtube {video_id}\n")
 
 
-def process_channel(
-    channel: ChannelConfig, video_ids: list[str], videos_dir: Path
-) -> tuple[int, int]:
+def process_channel(channel: ChannelConfig, video_ids: list[str], videos_dir: Path) -> tuple[int, int]:
     """Process members-only videos for a single channel.
 
     Args:
@@ -187,31 +185,24 @@ def process_channel(
     append_new_video_ids(archive_file, new_video_ids)
 
     if duplicate_count > 0:
-        print(
-            f"✓ {sanitized_name}: Appended {len(new_video_ids)} new video ID(s) "
-            f"({duplicate_count} already archived)"
-        )
+        print(f"✓ {sanitized_name}: Appended {len(new_video_ids)} new video ID(s) ({duplicate_count} already archived)")
     else:
         print(f"✓ {sanitized_name}: Appended {len(new_video_ids)} video ID(s)")
 
     return len(new_video_ids), duplicate_count
 
 
-def main() -> None:
-    """Parse download log and archive members-only video IDs."""
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
-    download_log_path = Path("reports/video-download.log")
+def load_config(config_path: Path) -> Config:
+    """Load configuration from file.
 
-    # Check if download log exists
-    if not download_log_path.exists():
-        print(f"No download log found at {download_log_path}")
-        print("Nothing to do.")
-        return
+    Args:
+        config_path: Path to config.yaml
 
-    # Load configuration
+    Returns:
+        Loaded Config object
+    """
     try:
-        config = Config(config_path)
+        return Config(config_path)
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -219,21 +210,20 @@ def main() -> None:
         print(f"Error loading config: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Parse download log
-    url_to_video_ids = parse_download_log(download_log_path)
 
-    if not url_to_video_ids:
-        print("No members-only videos found in download log.")
-        return
+def process_all_channels(
+    url_to_video_ids: dict[str, list[str]], url_to_channel: dict[str, ChannelConfig], videos_dir: Path
+) -> tuple[int, int, list[tuple[str, int]]]:
+    """Process all channels and archive video IDs.
 
-    total_videos = sum(len(ids) for ids in url_to_video_ids.values())
-    print(f"Found {total_videos} members-only videos to archive")
+    Args:
+        url_to_video_ids: Mapping of channel URL to video IDs
+        url_to_channel: Mapping of URL to channel config
+        videos_dir: Base directory for video downloads
 
-    # Build URL mapping
-    url_to_channel = build_url_to_channel_map(config.get_channels())
-    videos_dir = config.getDataDownloadsVideosDir()
-
-    # Process each channel
+    Returns:
+        Tuple of (total_archived, total_duplicates, unknown_urls)
+    """
     total_archived = 0
     total_duplicates = 0
     unknown_urls: list[tuple[str, int]] = []
@@ -251,13 +241,23 @@ def main() -> None:
         except Exception as e:
             print(f"✗ {channel.name}: Failed to process - {e}", file=sys.stderr)
 
-    # Report unknown URLs
+    return total_archived, total_duplicates, unknown_urls
+
+
+def print_summary(total_archived: int, total_duplicates: int, unknown_urls: list[tuple[str, int]], total_videos: int) -> None:
+    """Print processing summary.
+
+    Args:
+        total_archived: Number of successfully archived videos
+        total_duplicates: Number of duplicate videos skipped
+        unknown_urls: List of unknown channel URLs and their video counts
+        total_videos: Total number of videos processed
+    """
     if unknown_urls:
         print()
         for url, count in unknown_urls:
             print(f"⚠ {url}: Channel not found in config (skipping {count} video(s))")
 
-    # Summary
     total_skipped = sum(count for _, count in unknown_urls)
     print()
     if total_duplicates > 0:
@@ -266,6 +266,35 @@ def main() -> None:
         print(f"Summary: {total_archived}/{total_videos} video ID(s) successfully archived")
         if total_skipped > 0:
             print(f"         {total_skipped}/{total_videos} video ID(s) skipped (channel not in config)")
+
+
+def main() -> None:
+    """Parse download log and archive members-only video IDs."""
+    project_root = Path(__file__).parent.parent
+    config_path = project_root / "config" / "config.yaml"
+    download_log_path = Path("reports/video-download.log")
+
+    if not download_log_path.exists():
+        print(f"No download log found at {download_log_path}")
+        print("Nothing to do.")
+        return
+
+    config = load_config(config_path)
+    url_to_video_ids = parse_download_log(download_log_path)
+
+    if not url_to_video_ids:
+        print("No members-only videos found in download log.")
+        return
+
+    total_videos = sum(len(ids) for ids in url_to_video_ids.values())
+    print(f"Found {total_videos} members-only videos to archive")
+
+    url_to_channel = build_url_to_channel_map(config.get_channels())
+    videos_dir = config.getDataDownloadsVideosDir()
+
+    total_archived, total_duplicates, unknown_urls = process_all_channels(url_to_video_ids, url_to_channel, videos_dir)
+
+    print_summary(total_archived, total_duplicates, unknown_urls, total_videos)
 
 
 if __name__ == "__main__":
