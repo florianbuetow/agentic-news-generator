@@ -48,7 +48,7 @@ yt-dlp --cookies-from-browser $BROWSER \
        --min-sleep-interval 1 \
        --max-sleep-interval 5 \
        --write-info-json \
-       -f "bestvideo+(bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio)+best" \
+       -f "bestvideo+bestaudio/best" \
        -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
        "$URL"
 
