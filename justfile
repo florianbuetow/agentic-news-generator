@@ -48,13 +48,21 @@ all:
 
 # Download YouTube videos from channels in config.yaml
 download-videos:
-    @echo ""
-    @printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
-    @uv run scripts/yt-downloader.py
-    @echo ""
-    @printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
-    @bash scripts/move-metadata.sh
-    @echo ""
+    #!/usr/bin/env bash
+    set +e
+    mkdir -p reports
+    echo ""
+    printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
+    uv run scripts/yt-downloader.py 2>&1 | tee reports/video-download.log
+    download_exit_code=${PIPESTATUS[0]}
+    echo ""
+    printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
+    bash scripts/move-metadata.sh
+    echo ""
+    printf "\033[0;34m=== Adding Members-Only Videos to Skip List ===\033[0m\n"
+    uv run scripts/parse-and-archive-membersonly.py
+    echo ""
+    exit $download_exit_code
 
 # Convert downloaded videos to WAV audio files
 extract-audio:
