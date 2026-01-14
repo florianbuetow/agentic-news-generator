@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Shell Script Parameter Detector using Autogen v0.7.5
+"""Shell Script Parameter Detector using Autogen v0.7.5.
 
 This tool uses a local LLM via Autogen to analyze shell scripts and determine
 whether they rely on environment variables or accept parameters via command line
@@ -58,13 +58,9 @@ class AnalysisResult:
     """Result of analyzing a shell script for environment variable violations."""
 
     file_path: str
-    status: str  # "PASS" or "FAIL"
-    violating_env_vars: list[str]  # Env vars used but not from CLI args or files
-    all_env_vars: list[str]  # All environment variables detected in the script
-    uses_cli_args: bool  # Does the script accept CLI arguments?
-    reads_from_files: bool  # Does the script read config from files?
-    explanation: str  # Why it failed (if status is FAIL)
-    confidence: float  # 0.0-1.0
+    status: str  # "PASS" or "FAIL" or "ERROR"
+    env_vars: list[str]  # Environment variables detected
+    summary: str  # Explanation of the analysis
 
 
 # =============================================================================
@@ -75,7 +71,7 @@ class AnalysisResult:
 class ScriptFileHashCache:
     """Manages hash-based caching to skip unchanged shell script files."""
 
-    def __init__(self, cache_file: str = ".cache/shell_script_hashes.json"):
+    def __init__(self, cache_file: str = ".cache/shell_script_hashes.json") -> None:
         """Initialize the hash cache.
 
         Args:
@@ -99,7 +95,7 @@ class ScriptFileHashCache:
                 return {}
         return {}
 
-    def _save_cache(self):
+    def _save_cache(self) -> None:
         """Save the hash cache to JSON file."""
         os.makedirs(os.path.dirname(self.cache_file), exist_ok=True)
         with open(self.cache_file, "w", encoding="utf-8") as f:
@@ -138,7 +134,7 @@ class ScriptFileHashCache:
 
         return cached_entry.get("hash") != current_hash
 
-    def update_file_hash(self, file_path: str, status: str = "UNKNOWN"):
+    def update_file_hash(self, file_path: str, status: str = "UNKNOWN") -> None:
         """Update the hash for a file after scanning.
 
         Args:
@@ -164,7 +160,7 @@ class ScriptFileHashCache:
         """
         return self.cache.get(file_path)
 
-    def remove_file(self, file_path: str):
+    def remove_file(self, file_path: str) -> None:
         """Remove a file from the cache.
 
         Args:
@@ -288,7 +284,7 @@ def check_api_available(base_url: str, timeout: int = 5) -> bool:
 class MarkdownReportWriter:
     """Generates markdown reports for shell script parameter analysis."""
 
-    def __init__(self, report_path: str = "reports/shell_env_var_violations.md"):
+    def __init__(self, report_path: str = "reports/shell_env_var_violations.md") -> None:
         """Initialize the report writer.
 
         Args:
@@ -296,7 +292,7 @@ class MarkdownReportWriter:
         """
         self.report_path = report_path
 
-    def write_report(self, results: list[AnalysisResult], model: str):
+    def write_report(self, results: list[AnalysisResult], model: str) -> None:
         """Write a markdown report of shell script environment variable violations.
 
         Args:
@@ -334,21 +330,14 @@ class MarkdownReportWriter:
                 for result in sorted(failed_scripts, key=lambda r: r.file_path):
                     _ = f.write(f"### {result.file_path}\n\n")
 
-                    _ = f.write(f"**Status:** ❌ FAIL\n\n")
+                    _ = f.write("**Status:** ❌ FAIL\n\n")
 
-                    _ = f.write("**Violating Environment Variables:**\n")
-                    for var in result.violating_env_vars:
+                    _ = f.write("**Environment Variables:**\n")
+                    for var in result.env_vars:
                         _ = f.write(f"- `{var}`\n")
                     _ = f.write("\n")
 
-                    if result.all_env_vars:
-                        _ = f.write(f"**All Environment Variables Found:** {', '.join(f'`{v}`' for v in result.all_env_vars)}\n\n")
-
-                    _ = f.write(f"**Reads from Files:** {'Yes' if result.reads_from_files else 'No'}\n")
-                    _ = f.write(f"**Uses CLI Arguments:** {'Yes' if result.uses_cli_args else 'No'}\n\n")
-
-                    _ = f.write(f"**Explanation:** {result.explanation}\n\n")
-                    _ = f.write(f"**Confidence:** {result.confidence:.2f}\n\n")
+                    _ = f.write(f"**Summary:** {result.summary}\n\n")
                     _ = f.write("---\n\n")
             else:
                 _ = f.write("No violations found.\n\n")
@@ -360,13 +349,12 @@ class MarkdownReportWriter:
 
                 for result in sorted(passed_scripts, key=lambda r: r.file_path):
                     _ = f.write(f"### {result.file_path}\n\n")
-                    _ = f.write(f"**Status:** ✅ PASS\n\n")
+                    _ = f.write("**Status:** ✅ PASS\n\n")
 
-                    if result.all_env_vars:
-                        _ = f.write(f"**All Environment Variables:** {', '.join([f'`{v}`' for v in result.all_env_vars])}\n\n")
+                    if result.env_vars:
+                        _ = f.write(f"**Environment Variables:** {', '.join([f'`{v}`' for v in result.env_vars])}\n\n")
 
-                    _ = f.write(f"**Uses CLI Arguments:** {'Yes' if result.uses_cli_args else 'No'}\n\n")
-                    _ = f.write(f"**Reads From Files:** {'Yes' if result.reads_from_files else 'No'}\n\n")
+                    _ = f.write(f"**Summary:** {result.summary}\n\n")
 
                     _ = f.write("---\n\n")
             else:
@@ -389,49 +377,86 @@ class ShellScriptParameterAnalyzer:
     """Uses Autogen v0.7.5 to analyze shell scripts for parameter handling."""
 
     # System prompt defining analysis criteria
-    SYSTEM_PROMPT = """You are a shell script analysis expert. Your task is to detect environment variable violations.
+    SYSTEM_PROMPT = """You are a security expert specializing in code reviews of POSIX sh and bash scripts.
+Your task is to analyze the script provided in <shell_script> and determine whether it relies on environment variables.
+You must strictly follow <rules> and execute <steps> in order, and you must output exactly the JSON
+described in <output_format> (no extra keys, no extra text, no extra markdown around it).
 
-DEFINITION OF VIOLATION:
-A script FAILS if it uses environment variables that are NOT:
-1. Passed to the script as command line arguments, OR
-2. Read from a configuration file by the script
+<rules>
+- Treat any variable expansion ($VAR, ${VAR}, ${VAR:-...}, ${!VAR}) as an environment read unless the variable is
+  proven defined/assigned earlier in the script in the same execution path or is a shell special parameter.
+- Do NOT consider variables "safe" if they are introduced via sourcing (. file, source file), eval, command
+  substitution that imports the environment, or any external command output; treat these as violations.
+- Do NOT allow configuration from files; any dependence on environment variables or sourced configuration is a violation.
+- A variable is "proven defined" only if it is assigned a value in the script before its first use
+  (e.g., VAR=..., local VAR=..., declare VAR=..., VAR+=..., read VAR, for VAR in ..., VAR=($@), etc.).
+- Assignments from command-line arguments are allowed only if the value is derived from
+  $1..$N, $@, $*, or $OPTARG within explicit argument parsing (e.g., getopts/case/shift loop).
+- Variables defined by loop constructs (for VAR in ..., while read VAR, select VAR) count as
+  defined starting at the loop header/body, but any use before that is a violation.
+- Treat uppercase names (^[A-Z][A-Z0-9_]*$) as especially likely environment variables;
+  include them in the suspected list unless proven defined earlier.
+- Treat references to common env vars (PATH, HOME, USER, SHELL, TMPDIR, LANG, LC_*, CI, GITHUB_*,
+  AWS_*, etc.) as violations unless proven defined earlier in the script.
+- Shell special parameters are NOT environment variables and must NOT be reported:
+  $0, $1..$9, ${10}, $#, $?, $, $!, $@, $*, $_, $-, $IFS
+  (note: IFS is a normal variable; if used without assignment, treat as violation).
+- If a variable is only set conditionally and later used outside/after the conditional,
+  and you cannot prove it is always set before use, treat that use as a violation.
+- If any of these features appear, automatically FAIL and list them as "dynamic/unsafe":
+  source, ., eval, declare -n, export, set -a, env, printenv.
+- Your analysis must be conservative: when uncertain, assume it is an environment dependency and FAIL.
+- Do not execute the script; reason purely from the text.
+- Your output must be valid JSON and must follow <output_format> exactly (no extra keys, no commentary outside JSON).
+</rules>
 
-ANALYSIS STEPS:
-1. Identify ALL environment variables used in the script (e.g., $VAR, ${VAR}, ${VAR:-default})
-2. Determine if the script accepts command line arguments ($1, $2, getopts, etc.)
-3. Determine if the script reads configuration from files (source, ., cat, read, etc.)
-4. For each environment variable, check if it's:
-   - Passed as a CLI argument to the script
-   - Read from a file within the script
-5. List ONLY the environment variables that are violations (not from CLI args or files)
+<steps>
+1) Read the entire script in <shell_script>.
+2) Identify and record all variable expansions and indirect expansions
+   (e.g., $VAR, ${VAR}, ${VAR:-x}, ${!VAR}) and ignore shell special parameters.
+3) Identify all definitions/assignments of variables that occur in the script text
+   (VAR=, local/declare/typeset, read VAR, for VAR in, while read VAR, etc.) and
+   note the earliest point each variable is definitely defined.
+4) Detect argument parsing and CLI-derived assignments (getopts, case "$1", shift loops) and
+   mark variables as "CLI-bound" only if the RHS is derived from $1..$N, $@, $*, or $OPTARG.
+5) Detect any forbidden/dynamic constructs (source, ., eval, declare -n, export, set -a, env,
+   printenv). If present, mark FAIL.
+6) For each variable expansion, decide whether it is proven defined before first use.
+   If not proven defined, classify it as a suspected environment variable read.
+7) If any suspected environment variable reads exist (or any forbidden/dynamic constructs exist),
+   the script FAILS; otherwise PASS.
+8) Produce the JSON output exactly as in <output_format>, including: pass/fail score,
+   the sorted unique list of suspected environment variables, and the required summary text.
+</steps>
 
-PASS/FAIL CRITERIA:
-- PASS: Script uses NO environment variables, OR all env vars are passed as CLI args or read from files
-- FAIL: Script uses environment variables that are loaded directly from the environment
-
-IMPORTANT NOTES:
-- If a script sources another file (e.g., "source config.sh"), those env vars are READ FROM A FILE (NOT a violation)
-- If a script expects CLI arguments that map to env vars, those are NOT violations
-- Common violations: API_KEY, DATABASE_URL, SECRET_TOKEN loaded directly from environment
-- Not violations: HOME, PATH, USER (standard system env vars are acceptable)
-
-Respond with JSON only (no other text):
+<output_format>
 {
-    "all_env_vars": ["VAR1", "VAR2", ...],
-    "violating_env_vars": ["VAR3", "VAR4", ...],
-    "uses_cli_args": true/false,
-    "reads_from_files": true/false,
-    "status": "PASS" or "FAIL",
-    "explanation": "Clear explanation of why it failed, listing the specific violating variables and what should be done",
-    "confidence": 0.0-1.0
-}"""
+  "score": "PASS|FAIL",
+  "env_vars": ["VAR1", "VAR2"],
+  "summary": "The script uses several environment variables: VAR1, VAR2. These variables should either be provided via \
+command-line arguments, sourced from a configuration file, or removed if they are not required for the script's operation."
+}
+</output_format>
+
+<example_output>
+{
+  "score": "FAIL",
+  "env_vars": ["HOME", "TOKEN"],
+  "summary": "The script uses several environment variables: HOME, TOKEN. These variables should either be provided via \
+command-line arguments, sourced from a configuration file, or removed if they are not required for the script's operation."
+}
+</example_output>
+
+<shell_script>
+{{PASTE_SHELL_SCRIPT_HERE}}
+</shell_script>"""
 
     def __init__(
         self,
         model: str = "qwen2.5-7b-instruct-mlx",
         base_url: str = "http://localhost:1234/v1",
         api_key: str = "local",
-    ):
+    ) -> None:
         """Initialize the Autogen model client.
 
         Args:
@@ -464,20 +489,11 @@ Respond with JSON only (no other text):
             AnalysisResult with analysis
         """
         try:
-            # Build prompt
-            prompt = f"""Analyze this shell script for parameter handling:
+            # Build prompt by replacing placeholder with script content
+            prompt = self.SYSTEM_PROMPT.replace("{{PASTE_SHELL_SCRIPT_HERE}}", script.content)
 
-File: {script.file_path}
-
-```bash
-{script.content}
-```
-
-Provide a detailed analysis of how this script handles parameters. Respond with JSON only."""
-
-            # Create messages for the model
+            # Create single user message with complete prompt
             messages = [
-                UserMessage(content=self.SYSTEM_PROMPT, source="system"),
                 UserMessage(content=prompt, source="user"),
             ]
 
@@ -501,12 +517,8 @@ Provide a detailed analysis of how this script handles parameters. Respond with 
             return AnalysisResult(
                 file_path=script.file_path,
                 status="ERROR",
-                violating_env_vars=[],
-                all_env_vars=[],
-                uses_cli_args=False,
-                reads_from_files=False,
-                explanation=f"Analysis failed: {str(e)}",
-                confidence=0.0,
+                env_vars=[],
+                summary=f"Analysis failed: {str(e)}",
             )
 
     def _parse_response(self, response_text: str, script: ShellScript) -> AnalysisResult:
@@ -549,13 +561,9 @@ Provide a detailed analysis of how this script handles parameters. Respond with 
 
             return AnalysisResult(
                 file_path=script.file_path,
-                status=data.get("status", "UNKNOWN"),
-                violating_env_vars=data.get("violating_env_vars", []),
-                all_env_vars=data.get("all_env_vars", []),
-                uses_cli_args=data.get("uses_cli_args", False),
-                reads_from_files=data.get("reads_from_files", False),
-                explanation=data.get("explanation", ""),
-                confidence=data.get("confidence", 0.0),
+                status=data.get("score", "UNKNOWN"),  # Map "score" to "status"
+                env_vars=data.get("env_vars", []),
+                summary=data.get("summary", ""),
             )
 
         except json.JSONDecodeError as e:
@@ -567,12 +575,8 @@ Provide a detailed analysis of how this script handles parameters. Respond with 
             return AnalysisResult(
                 file_path=script.file_path,
                 status="ERROR",
-                violating_env_vars=[],
-                all_env_vars=[],
-                uses_cli_args=False,
-                reads_from_files=False,
-                explanation="Failed to parse LLM response",
-                confidence=0.0,
+                env_vars=[],
+                summary="Failed to parse LLM response",
             )
 
         except Exception as e:
@@ -582,12 +586,8 @@ Provide a detailed analysis of how this script handles parameters. Respond with 
             return AnalysisResult(
                 file_path=script.file_path,
                 status="ERROR",
-                violating_env_vars=[],
-                all_env_vars=[],
-                uses_cli_args=False,
-                reads_from_files=False,
-                explanation="Failed to parse LLM response",
-                confidence=0.0,
+                env_vars=[],
+                summary="Failed to parse LLM response",
             )
 
     async def analyze_batch(self, scripts: list[ShellScript]) -> list[AnalysisResult]:
@@ -602,7 +602,7 @@ Provide a detailed analysis of how this script handles parameters. Respond with 
         results: list[AnalysisResult] = []
 
         for i, script in enumerate(scripts):
-            print(f"Analyzing [{i+1}/{len(scripts)}]: {script.file_path} ... ", end="", flush=True)
+            print(f"Analyzing [{i + 1}/{len(scripts)}]: {script.file_path} ... ", end="", flush=True)
 
             result = await self.analyze(script)
             results.append(result)
@@ -629,7 +629,7 @@ class ShellScriptAnalysisOrchestrator:
         base_url: str = "http://localhost:1234/v1",
         api_key: str = "local",
         use_cache: bool = True,
-    ):
+    ) -> None:
         """Initialize orchestrator.
 
         Args:
@@ -684,12 +684,160 @@ class ShellScriptAnalysisOrchestrator:
         print(f"Analyzing {len(all_scripts)} shell script(s)...\n")
         results = asyncio.run(self.analyzer.analyze_batch(all_scripts))
 
-        # Step 4: Update cache for scanned files
+        # Step 4: Update cache for scanned files (only cache files that passed)
         if self.use_cache and self.cache is not None:
             for result in results:
-                self.cache.update_file_hash(result.file_path, result.status)
+                # Only cache files with no violations - files with failures must be re-scanned
+                if result.status == "PASS":
+                    self.cache.update_file_hash(result.file_path, result.status)
+                    print(f"✓ Cached clean file: {result.file_path}")
 
         return results, all_scripts
+
+
+# =============================================================================
+# Test Mode Handlers
+# =============================================================================
+
+
+def test_discover(root_path: str) -> None:
+    """Test Phase 1: Discover shell script files."""
+    print("=== Test Phase 1: Discover Shell Script Files ===")
+    finder = ShellScriptFinder()
+    script_files = finder.find_shell_scripts(root_path)
+    print(f"\nFound {len(script_files)} shell script files:")
+    for f in script_files:
+        print(f"  - {f}")
+    sys.exit(0)
+
+
+def test_extract(root_path: str) -> None:
+    """Test Phase 2: Extract script content from one file."""
+    print("=== Test Phase 2: Extract Script Content ===")
+    finder = ShellScriptFinder()
+    script_files = finder.find_shell_scripts(root_path)
+    if not script_files:
+        print("No shell script files found")
+        sys.exit(1)
+
+    # Use first script file
+    script_file = script_files[0]
+    print(f"\nExtracting from: {script_file}")
+
+    extractor = ShellScriptExtractor()
+    script = extractor.extract(script_file)
+    if script:
+        print("\nScript extracted successfully:")
+        print(f"  - File path: {script.file_path}")
+        print(f"  - Line count: {script.line_count}")
+        print(f"  - Content length: {len(script.content)} chars")
+        print("\nFirst 500 characters of content:")
+        print(script.content[:500])
+    else:
+        print("Failed to extract script")
+    sys.exit(0)
+
+
+def test_analyze(root_path: str, model: str, base_url: str, api_key: str) -> None:
+    """Test Phase 3: Analyze one script."""
+    print("=== Test Phase 3: Analyze Shell Script ===")
+    finder = ShellScriptFinder()
+    script_files = finder.find_shell_scripts(root_path)
+    if not script_files:
+        print("No shell script files found")
+        sys.exit(1)
+
+    # Extract from first file
+    extractor = ShellScriptExtractor()
+    script = extractor.extract(script_files[0])
+    if not script:
+        print("Failed to extract script")
+        sys.exit(1)
+
+    # Analyze first script
+    analyzer = ShellScriptParameterAnalyzer(
+        model=model,
+        base_url=base_url,
+        api_key=api_key,
+    )
+    result = asyncio.run(analyzer.analyze(script))
+    print("\nAnalysis result:")
+    print(f"  File: {result.file_path}")
+    print(f"  Status: {result.status}")
+    print(f"  Environment variables: {result.env_vars}")
+    print(f"  Summary: {result.summary}")
+    sys.exit(0)
+
+
+def run_full_analysis(root_path: str, model: str, base_url: str, api_key: str, use_cache: bool, file: str | None) -> None:
+    """Run full analysis on scripts."""
+    print("=== Shell Script Parameter Analysis ===")
+    print(f"Model: {model}")
+    print(f"Base URL: {base_url}")
+
+    if file:
+        print(f"Analyzing single file: {file}")
+
+    print()
+
+    if file:
+        # Analyze single file
+        extractor = ShellScriptExtractor()
+        analyzer = ShellScriptParameterAnalyzer(
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+        )
+
+        script = extractor.extract(file)
+        if not script:
+            print(f"Failed to extract script from {file}")
+            sys.exit(1)
+
+        print(f"Analyzing {file}...\n")
+        results = asyncio.run(analyzer.analyze_batch([script]))
+    else:
+        orchestrator = ShellScriptAnalysisOrchestrator(
+            model=model,
+            base_url=base_url,
+            api_key=api_key,
+            use_cache=use_cache,
+        )
+        results, _ = orchestrator.run(root_path)
+
+    # Write markdown report
+    report_writer = MarkdownReportWriter()
+    report_writer.write_report(results, model)
+
+    # Output results summary
+    print()
+    print("=" * 60)
+    print("SUMMARY")
+    print("=" * 60)
+
+    failed_results = [r for r in results if r.status == "FAIL"]
+    passed_results = [r for r in results if r.status == "PASS"]
+
+    print(f"✅ Passed: {len(passed_results)}")
+    print(f"❌ Failed: {len(failed_results)}")
+    print()
+
+    if failed_results:
+        print("Failed Scripts:")
+        print("-" * 60)
+        for result in failed_results:
+            print(f"\nFile: {result.file_path} FAIL 🛑")
+            print(f"Vars: {', '.join(result.env_vars)}")
+            print()
+            print(f"Issue: {result.summary}")
+            print()
+        print("📄 Full report: reports/shell_env_var_violations.md")
+        print()
+        sys.exit(1)
+    else:
+        print("✅ All scripts passed - no environment variable violations")
+        print()
+        sys.exit(0)
 
 
 # =============================================================================
@@ -697,7 +845,7 @@ class ShellScriptAnalysisOrchestrator:
 # =============================================================================
 
 
-def main():
+def main() -> None:
     """Main entry point for shell script parameter detector."""
     parser = argparse.ArgumentParser(
         description="Analyze shell scripts for parameter handling (env vars vs CLI args) using AI (Autogen v0.7.5)"
@@ -742,156 +890,24 @@ def main():
     args = parser.parse_args()
 
     # Check API availability for tests that require the model
-    if args.test in ["analyze", "full"]:
-        if not check_api_available(args.base_url):
-            print(f"\n⚠️  WARNING: Cannot connect to LLM API at {args.base_url}")
-            print("Please ensure:")
-            print("  1. LM Studio (or your LLM server) is running")
-            print("  2. The server is accessible at the configured base URL")
-            print(f"  3. The API endpoint {args.base_url}/models is reachable")
-            print("\nCannot run the script without an available model API.")
-            sys.exit(2)
+    if args.test in ["analyze", "full"] and not check_api_available(args.base_url):
+        print(f"\n⚠️  WARNING: Cannot connect to LLM API at {args.base_url}")
+        print("Please ensure:")
+        print("  1. LM Studio (or your LLM server) is running")
+        print("  2. The server is accessible at the configured base URL")
+        print(f"  3. The API endpoint {args.base_url}/models is reachable")
+        print("\nCannot run the script without an available model API.")
+        sys.exit(2)
 
     try:
         if args.test == "discover":
-            # Test Phase 1: Discover shell script files
-            print("=== Test Phase 1: Discover Shell Script Files ===")
-            finder = ShellScriptFinder()
-            script_files = finder.find_shell_scripts(args.root_path)
-            print(f"\nFound {len(script_files)} shell script files:")
-            for f in script_files:
-                print(f"  - {f}")
-            sys.exit(0)
-
+            test_discover(args.root_path)
         elif args.test == "extract":
-            # Test Phase 2: Extract script content from one file
-            print("=== Test Phase 2: Extract Script Content ===")
-            finder = ShellScriptFinder()
-            script_files = finder.find_shell_scripts(args.root_path)
-            if not script_files:
-                print("No shell script files found")
-                sys.exit(1)
-
-            # Use first script file
-            script_file = script_files[0]
-            print(f"\nExtracting from: {script_file}")
-
-            extractor = ShellScriptExtractor()
-            script = extractor.extract(script_file)
-            if script:
-                print(f"\nScript extracted successfully:")
-                print(f"  - File path: {script.file_path}")
-                print(f"  - Line count: {script.line_count}")
-                print(f"  - Content length: {len(script.content)} chars")
-                print(f"\nFirst 500 characters of content:")
-                print(script.content[:500])
-            else:
-                print("Failed to extract script")
-            sys.exit(0)
-
+            test_extract(args.root_path)
         elif args.test == "analyze":
-            # Test Phase 3: Analyze one script
-            print("=== Test Phase 3: Analyze Shell Script ===")
-            finder = ShellScriptFinder()
-            script_files = finder.find_shell_scripts(args.root_path)
-            if not script_files:
-                print("No shell script files found")
-                sys.exit(1)
-
-            # Extract from first file
-            extractor = ShellScriptExtractor()
-            script = extractor.extract(script_files[0])
-            if not script:
-                print("Failed to extract script")
-                sys.exit(1)
-
-            # Analyze first script
-            analyzer = ShellScriptParameterAnalyzer(
-                model=args.model,
-                base_url=args.base_url,
-                api_key=args.api_key,
-            )
-            result = asyncio.run(analyzer.analyze(script))
-            print("\nAnalysis result:")
-            print(f"  File: {result.file_path}")
-            print(f"  Status: {result.status}")
-            print(f"  Violating env vars: {result.violating_env_vars}")
-            print(f"  All env vars: {result.all_env_vars}")
-            print(f"  Uses CLI args: {result.uses_cli_args}")
-            print(f"  Reads from files: {result.reads_from_files}")
-            print(f"  Explanation: {result.explanation}")
-            print(f"  Confidence: {result.confidence:.2f}")
-            sys.exit(0)
-
+            test_analyze(args.root_path, args.model, args.base_url, args.api_key)
         else:
-            # Full analysis
-            print("=== Shell Script Parameter Analysis ===" )
-            print(f"Model: {args.model}")
-            print(f"Base URL: {args.base_url}")
-
-            if args.file:
-                print(f"Analyzing single file: {args.file}")
-
-            print()
-
-            if args.file:
-                # Analyze single file
-                extractor = ShellScriptExtractor()
-                analyzer = ShellScriptParameterAnalyzer(
-                    model=args.model,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
-                )
-
-                script = extractor.extract(args.file)
-                if not script:
-                    print(f"Failed to extract script from {args.file}")
-                    sys.exit(1)
-
-                print(f"Analyzing {args.file}...\n")
-                results = asyncio.run(analyzer.analyze_batch([script]))
-            else:
-                orchestrator = ShellScriptAnalysisOrchestrator(
-                    model=args.model,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
-                    use_cache=not args.no_cache,
-                )
-                results, _ = orchestrator.run(args.root_path)
-
-            # Write markdown report
-            report_writer = MarkdownReportWriter()
-            report_writer.write_report(results, args.model)
-
-            # Output results summary
-            print()
-            print("=" * 60)
-            print("SUMMARY")
-            print("=" * 60)
-
-            failed_results = [r for r in results if r.status == "FAIL"]
-            passed_results = [r for r in results if r.status == "PASS"]
-
-            print(f"✅ Passed: {len(passed_results)}")
-            print(f"❌ Failed: {len(failed_results)}")
-            print()
-
-            if failed_results:
-                print("Failed Scripts:")
-                print("-" * 60)
-                for result in failed_results:
-                    print(f"\nFile: {result.file_path} FAIL 🛑")
-                    print(f"Vars: {', '.join(result.violating_env_vars)}")
-                    print()
-                    print(f"Issue: {result.explanation}")
-                    print()
-                print(f"📄 Full report: reports/shell_env_var_violations.md")
-                print()
-                sys.exit(1)
-            else:
-                print("✅ All scripts passed - no environment variable violations")
-                print()
-                sys.exit(0)
+            run_full_analysis(args.root_path, args.model, args.base_url, args.api_key, not args.no_cache, args.file)
 
     except KeyboardInterrupt:
         print("\n\nInterrupted by user")
