@@ -29,6 +29,44 @@ init:
     @printf "\033[0;32m✓ Development environment ready\033[0m\n"
     @echo ""
 
+# Check if all required tools and prerequisites are available
+check:
+    @echo ""
+    @printf "\033[0;34m=== Checking System Prerequisites ===\033[0m\n"
+    @command -v ffmpeg &> /dev/null && echo "✓ ffmpeg" || (echo "✗ ffmpeg missing (install with: brew install ffmpeg)" && exit 1)
+    @command -v jq &> /dev/null && echo "✓ jq" || (echo "✗ jq missing (install with: brew install jq)" && exit 1)
+    @command -v just &> /dev/null && echo "✓ just" || (echo "✗ just missing (install with: brew install just)" && exit 1)
+    @command -v uv &> /dev/null && echo "✓ uv" || (echo "✗ uv missing (install with: brew install uv)" && exit 1)
+    @command -v node &> /dev/null && echo "✓ node" || (echo "✗ node missing (install with: brew install node)" && exit 1)
+    @command -v npm &> /dev/null && echo "✓ npm" || (echo "✗ npm missing (install with: brew install node)" && exit 1)
+    @printf "\033[0;32m✓ All system prerequisites are installed\033[0m\n"
+    @echo ""
+    @printf "\033[0;34m=== Checking Virtual Environment ===\033[0m\n"
+    @if [ ! -d ".venv" ]; then \
+        echo "✗ Virtual environment not found"; \
+        echo ""; \
+        printf "\033[0;33mPlease run 'just init' to initialize the development environment\033[0m\n"; \
+        echo ""; \
+        exit 1; \
+    fi
+    @echo "✓ Virtual environment exists"
+    @echo ""
+    @printf "\033[0;34m=== Checking Python Tools ===\033[0m\n"
+    @uv run mypy --version &> /dev/null && echo "✓ mypy" || (echo "✗ mypy missing (run: just init)" && exit 1)
+    @uv run pytest --version &> /dev/null && echo "✓ pytest" || (echo "✗ pytest missing (run: just init)" && exit 1)
+    @uv run ruff --version &> /dev/null && echo "✓ ruff" || (echo "✗ ruff missing (run: just init)" && exit 1)
+    @uv run pyright --version &> /dev/null && echo "✓ pyright" || (echo "✗ pyright missing (run: just init)" && exit 1)
+    @uv run bandit --version &> /dev/null && echo "✓ bandit" || (echo "✗ bandit missing (run: just init)" && exit 1)
+    @uv run deptry --version &> /dev/null && echo "✓ deptry" || (echo "✗ deptry missing (run: just init)" && exit 1)
+    @uv run codespell --version &> /dev/null && echo "✓ codespell" || (echo "✗ codespell missing (run: just init)" && exit 1)
+    @uv run pip-audit --version &> /dev/null && echo "✓ pip-audit" || (echo "✗ pip-audit missing (run: just init)" && exit 1)
+    @uv run semgrep --version &> /dev/null && echo "✓ semgrep" || (echo "✗ semgrep missing (run: just init)" && exit 1)
+    @uv run pygount --version &> /dev/null && echo "✓ pygount" || (echo "✗ pygount missing (run: just init)" && exit 1)
+    @printf "\033[0;32m✓ All Python tools are installed\033[0m\n"
+    @echo ""
+    @printf "\033[0;32m✓ All required tools and prerequisites are available\033[0m\n"
+    @echo ""
+
 # Run the main application
 run:
     @echo ""
