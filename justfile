@@ -408,9 +408,25 @@ ai-review-unit-tests:
 ai-review-unit-tests-nocache:
     @echo ""
     @printf "\033[0;34m=== Reviewing Unit Tests with AI (No Cache) ===\033[0m\n"
-    @rm -rf .cache/test_file_hashes.json
+    @rm -rf .cache/unit_test_hashes.json
     @printf "\033[0;33m✓ Cache cleared\033[0m\n"
     @uv run python tools/fake_test_detector/detect_fake_tests.py --no-cache
+    @echo ""
+
+# Run AI-powered shell script reviewer (detects env var violations)
+ai-review-shell-scripts:
+    @echo ""
+    @printf "\033[0;34m=== Reviewing Shell Scripts for Env Var Violations ===\033[0m\n"
+    @uv run python tools/shellscript_env_var_args_detector/detect_env_violations.py
+    @echo ""
+
+# Run AI-powered shell script reviewer (clear cache and force re-scan)
+ai-review-shell-scripts-nocache:
+    @echo ""
+    @printf "\033[0;34m=== Reviewing Shell Scripts for Env Var Violations (No Cache) ===\033[0m\n"
+    @rm -rf .cache/shell_script_hashes.json
+    @printf "\033[0;33m✓ Cache cleared\033[0m\n"
+    @uv run python tools/shellscript_env_var_args_detector/detect_env_violations.py --no-cache
     @echo ""
 
 # Run unit tests only (fast)
@@ -568,6 +584,7 @@ ci-ai:
     printf "\033[0;34m=== Running AI-Based CI Checks ===\033[0m\n"
     echo ""
     just ai-review-unit-tests-nocache
+    just ai-review-shell-scripts-nocache
     echo ""
     printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
     echo ""
