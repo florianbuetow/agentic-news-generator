@@ -95,10 +95,7 @@ def transcribe_single_file(
     # Don't capture output so user can see real-time transcription progress
     result = subprocess.run(cmd)
 
-    if result.returncode != 0:
-        return False
-
-    return True
+    return result.returncode == 0
 
 
 def process_single_wav_file(  # noqa: C901
