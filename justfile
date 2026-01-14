@@ -115,7 +115,7 @@ transcribe:
     set +e  # Don't exit on error
     echo ""
     printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
-    bash scripts/transcribe_audio.sh
+    uv run python scripts/transcribe_audio.py
     transcribe_exit_code=$?
     echo ""
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
