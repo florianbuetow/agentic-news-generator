@@ -201,6 +201,7 @@ extend_exclude = [
     "reports",
     "notes",
     "tools/fake_test_detector",
+    "tools/shellscript_env_var_args_detector",
 ]
 
 # Ignore Jupyter notebooks (not part of production code)
