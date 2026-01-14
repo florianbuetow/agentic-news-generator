@@ -504,7 +504,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
-                    "languages": ["en"],
+                    "language": "en",
                 }
             ],
             "topic_segmentation": {
@@ -554,7 +554,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
-                    "languages": ["en"],
+                    "language": "en",
                 }
             ],
         }
@@ -582,7 +582,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
-                    "languages": ["en"],
+                    "language": "en",
                 }
             ],
             "topic_segmentation": {
@@ -619,7 +619,7 @@ class TestConfigWithTopicSegmentation:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
-                    "languages": ["en"],
+                    "language": "en",
                 }
             ],
             "topic_segmentation": {
