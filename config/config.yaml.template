@@ -52,6 +52,31 @@ hallucination_detection:
   coef_sequence_length: 0.6665380000
   intercept: -6.7770510000
 
+# Transcription Configuration (MLX Whisper)
+transcription:
+  # Whisper models
+  model_en_name: "medium.en"  # English-only model name
+  model_en_repo: "mlx-community/whisper-medium.en-mlx"  # English-only model repository
+  model_multi_name: "medium"  # Multilingual model name
+  model_multi_repo: "mlx-community/whisper-medium-mlx"  # Multilingual model repository
+
+  # Anti-hallucination settings
+  hallucination_silence_threshold: 2.0  # Seek past silence after N seconds if hallucination detected
+  compression_ratio_threshold: 2.0  # Lower = stricter (default 2.4, we use 2.0)
+
+  # Metadata configuration
+  use_youtube_metadata: true  # Use video title/description in prompts
+  description_max_length: 500  # Maximum characters to include from video description
+
+  # Processing configuration
+  sleep_between_files: 5  # Seconds to pause between transcribing files
+
+  # Metadata subdirectory names
+  metadata_video_subdir: "video"  # Subdirectory for video metadata (.info.json)
+
+  # Output verbosity
+  verbose: false  # Set to true for detailed output
+
 # Topic Segmentation Agent Configuration
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio
