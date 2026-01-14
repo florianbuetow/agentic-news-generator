@@ -233,6 +233,7 @@ def temp_config_with_paths() -> Any:
         config_content = f"""
 paths:
   data_dir: {data_dir}
+  data_models_dir: {data_dir / "models"}
   data_downloads_dir: {data_dir / "downloads"}
   data_downloads_videos_dir: {data_dir / "downloads" / "videos"}
   data_downloads_transcripts_dir: {data_dir / "downloads" / "transcripts"}
