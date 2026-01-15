@@ -631,6 +631,49 @@ just ci-ai          # Verbose output
 just ci-ai-quiet    # Quiet mode (only errors)
 ```
 
+### Analysis Reports
+
+The project includes comprehensive analysis reports in `reports/analysis/` that document findings from AI-powered code quality checks and model performance evaluations.
+
+#### Shell Script Analysis Report
+
+**Purpose:** Identify shell scripts that don't follow project rules, specifically scripts that use environment variables without properly passing them as command-line arguments or reading them from configuration files.
+
+**Background:** As part of maintaining code quality and preventing hidden dependencies, the project enforces a rule that all shell scripts must explicitly handle their configuration. Scripts that rely on undeclared environment variables create maintenance issues and make it difficult to understand script dependencies.
+
+**Report Location:** `reports/analysis/shell_script_analysis/`
+
+**Key Findings:**
+- Identifies violating scripts that use environment variables incorrectly
+- Provides actionable recommendations for fixing each violation
+- Helps maintain explicit configuration management across the codebase
+
+**Related Command:** `just ai-review-shell-scripts`
+
+#### Model Performance Analysis Report
+
+**Purpose:** Determine the most efficient LLM model for local development and local LLM serving on a laptop, balancing speed, accuracy, and memory usage.
+
+**Background:** The project uses local LLMs (via LM Studio) for AI-powered code quality checks. Selecting the right model is critical for developer productivity - a model that's too slow will bottleneck the development workflow, while a model that's too inaccurate will produce unreliable results. This analysis evaluated 10 different models on a shell script classification task to identify the optimal model for local development.
+
+**Report Location:** `reports/analysis/model_performance/`
+
+**Key Findings:**
+- Comparative analysis of 10 models on shell script classification
+- Performance metrics: F1 score (accuracy), execution time (speed), model size (memory)
+- Pareto frontier analysis identifying optimal speed/accuracy trade-offs
+- Model recommendations for different use cases:
+  - **Speed-first with acceptable accuracy**: Fastest model with F1 ≥ 0.90
+  - **Accuracy-first**: Highest F1 score regardless of speed
+  - **Size efficiency**: Best accuracy per GB of memory
+  - **Balanced**: Top 3 models on the Pareto frontier
+
+**Interactive Notebook:** `notebooks/shellscript_analyzer/shellscript_analyzer.ipynb`
+
+**Visualizations:** `notebooks/shellscript_analyzer/gfx/`
+
+These reports help developers make informed decisions about tooling configuration and understand the trade-offs involved in local LLM deployment for development workflows.
+
 ## Configuration
 
 The system is configured via `config/config.yaml`. The configuration defines:
