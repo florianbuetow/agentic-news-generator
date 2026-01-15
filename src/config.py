@@ -192,7 +192,6 @@ class PathsConfig(BaseModel):
     data_archive_dir: str = Field(..., description="Archive directory path", min_length=1)
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
     reports_dir: str = Field(..., description="Model benchmark reports directory path", min_length=1)
-    notebooks_gfx_dir: str = Field(..., description="Notebook visualizations output directory path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -547,14 +546,6 @@ class Config:
             Path object pointing to the reports directory.
         """
         return Path(self._paths.reports_dir)
-
-    def getNotebooksGfxDir(self) -> Path:
-        """Get the notebooks/gfx directory path.
-
-        Returns:
-            Path object pointing to the notebooks/gfx directory.
-        """
-        return Path(self._paths.notebooks_gfx_dir)
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.

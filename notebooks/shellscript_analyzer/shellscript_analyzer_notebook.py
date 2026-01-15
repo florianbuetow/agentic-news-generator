@@ -51,7 +51,7 @@ _config = Config("config/config.yaml")
 
 # Configuration constants
 REPORTS_DIR = _config.getReportsDir()
-OUTPUT_DIR = _config.getNotebooksGfxDir()
+OUTPUT_DIR = Path(__file__).parent / "gfx"  # Save images in same folder as notebook
 CSV_PATTERN = "*.csv"
 JPEG_DPI = 300
 IMAGE_PREFIX = "shell_script_classification_"
