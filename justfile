@@ -508,6 +508,9 @@ ci-quiet:
     just init > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Init failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "\033[0;32m✓ Init passed\033[0m\n"
 
+    just code-config > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-config failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Code-config passed\033[0m\n"
+
     just code-format > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-format failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "\033[0;32m✓ Code-format passed\033[0m\n"
 
