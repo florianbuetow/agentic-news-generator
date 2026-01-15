@@ -246,8 +246,26 @@ class LanguageDetector:
         fasttext.FastText.eprint = lambda x: None
         self._model = fasttext.load_model(str(self._model_path))
 
+    @staticmethod
+    def _filter_alpha_words(text: str) -> str:
+        """Filter text to keep only words containing alphabetic characters.
+
+        Args:
+            text: Input text to filter.
+
+        Returns:
+            Text with only words containing at least one alphabetic character.
+            Returns empty string if no alphabetic words remain.
+        """
+        words = text.split()
+        alpha_words = [word for word in words if any(c.isalpha() for c in word)]
+        return " ".join(alpha_words)
+
     def detect(self, text: str, k: int) -> DetectionResult | list[DetectionResult]:
         """Detect the language of the given text.
+
+        Filters out non-alphabetic words before detection. If no alphabetic words
+        remain after filtering, returns '??' as the language code.
 
         Args:
             text: The text to analyze (should be UTF-8 encoded).
@@ -255,14 +273,24 @@ class LanguageDetector:
 
         Returns:
             DetectionResult if k=1, otherwise list of DetectionResult sorted by confidence.
+            Returns '??' language code if no alphabetic words found.
         """
         if not text or text.isspace():
             if k == 1:
                 return DetectionResult(language="", confidence=0.0)
             return []
 
+        # Filter to keep only words containing alphabetic characters
+        filtered_text = self._filter_alpha_words(text)
+
+        # If no alphabetic words remain, return '??' as language code
+        if not filtered_text or filtered_text.isspace():
+            if k == 1:
+                return DetectionResult(language="??", confidence=0.0)
+            return [DetectionResult(language="??", confidence=0.0)]
+
         # FastText doesn't handle newlines well - replace with spaces
-        clean_text = re.sub(r"\s+", " ", text.strip())
+        clean_text = re.sub(r"\s+", " ", filtered_text.strip())
 
         if self._model is None:
             raise RuntimeError("Model must be loaded before calling detect()")
@@ -286,6 +314,7 @@ class LanguageDetector:
 
         Returns:
             ISO 639-1 language code (e.g., "en", "de", "fr").
+            Returns '??' if text contains no alphabetic words.
             Returns empty string for empty/whitespace input.
         """
         result = self.detect(text, k=1)
