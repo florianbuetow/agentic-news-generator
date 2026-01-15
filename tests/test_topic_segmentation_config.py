@@ -14,6 +14,7 @@ def get_valid_paths_config() -> dict[str, str]:
     """Return a valid paths configuration dictionary for tests."""
     return {
         "data_dir": "./data/",
+        "data_models_dir": "./data/models/",
         "data_downloads_dir": "./data/downloads",
         "data_downloads_videos_dir": "./data/downloads/videos/",
         "data_downloads_transcripts_dir": "./data/downloads/transcripts",
