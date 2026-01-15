@@ -247,7 +247,7 @@ class LanguageDetector:
         self._model = fasttext.load_model(str(self._model_path))
 
     @staticmethod
-    def _filter_alpha_words(text: str) -> str:
+    def filter_alpha_words(text: str) -> str:
         """Filter text to keep only words containing alphabetic characters.
 
         Args:
@@ -281,7 +281,7 @@ class LanguageDetector:
             return []
 
         # Filter to keep only words containing alphabetic characters
-        filtered_text = self._filter_alpha_words(text)
+        filtered_text = self.filter_alpha_words(text)
 
         # If no alphabetic words remain, return '??' as language code
         if not filtered_text or filtered_text.isspace():

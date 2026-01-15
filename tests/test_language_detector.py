@@ -306,30 +306,30 @@ class TestLanguageDetectorWithModel:
         assert lang_code == "??"
 
     def test_filter_alpha_words_keeps_alpha(self) -> None:
-        """Test that _filter_alpha_words keeps words with alphabetic characters."""
-        filtered = LanguageDetector._filter_alpha_words("Hello 123 world test")
+        """Test that filter_alpha_words keeps words with alphabetic characters."""
+        filtered = LanguageDetector.filter_alpha_words("Hello 123 world test")
         assert "Hello" in filtered
         assert "world" in filtered
         assert "test" in filtered
 
     def test_filter_alpha_words_removes_non_alpha(self) -> None:
-        """Test that _filter_alpha_words removes pure non-alpha words."""
-        filtered = LanguageDetector._filter_alpha_words("Hello 123 456 world")
+        """Test that filter_alpha_words removes pure non-alpha words."""
+        filtered = LanguageDetector.filter_alpha_words("Hello 123 456 world")
         assert "123" not in filtered
         assert "456" not in filtered
 
     def test_filter_alpha_words_keeps_mixed_words(self) -> None:
-        """Test that _filter_alpha_words keeps words with both alpha and non-alpha."""
-        filtered = LanguageDetector._filter_alpha_words("test123 hello456world")
+        """Test that filter_alpha_words keeps words with both alpha and non-alpha."""
+        filtered = LanguageDetector.filter_alpha_words("test123 hello456world")
         assert "test123" in filtered
         assert "hello456world" in filtered
 
     def test_filter_alpha_words_empty_input(self) -> None:
-        """Test that _filter_alpha_words handles empty input."""
-        filtered = LanguageDetector._filter_alpha_words("")
+        """Test that filter_alpha_words handles empty input."""
+        filtered = LanguageDetector.filter_alpha_words("")
         assert filtered == ""
 
     def test_filter_alpha_words_only_non_alpha(self) -> None:
-        """Test that _filter_alpha_words returns empty for non-alpha only input."""
-        filtered = LanguageDetector._filter_alpha_words("123 456 !!! ###")
+        """Test that filter_alpha_words returns empty for non-alpha only input."""
+        filtered = LanguageDetector.filter_alpha_words("123 456 !!! ###")
         assert filtered == ""
