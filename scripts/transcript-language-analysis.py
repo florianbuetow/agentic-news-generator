@@ -127,6 +127,8 @@ def analyze_file(txt_file: Path, detector: LanguageDetector, target_words: int =
     languages = []
     for chunk in chunks:
         lang_code = detector.detect_language(chunk)
+        if lang_code == "??":
+            print(f"  ⚠️  Warning: No alphabetic words found in chunk from {txt_file.name}")
         languages.append(lang_code if lang_code else "unknown")
 
     return FileLanguageResult(filename=txt_file.name, languages=languages, word_count=total_words)
