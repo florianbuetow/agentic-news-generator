@@ -272,3 +272,64 @@ class TestLanguageDetectorWithModel:
         assert detector.get_language_name("EN") == "English"
         assert detector.get_language_name("De") == "German"
         assert detector.get_language_name("FR") == "French"
+
+    def test_detect_filters_non_alpha_words(self, detector: LanguageDetector) -> None:
+        """Test that non-alpha words are filtered before detection."""
+        # Text with numbers and symbols mixed with English words
+        text = "Hello 123 456 world !!! ### test"
+        result = detector.detect(text, k=1)
+        assert isinstance(result, DetectionResult)
+        assert result.language == "en"
+
+    def test_detect_only_non_alpha_returns_unknown_language(self, detector: LanguageDetector) -> None:
+        """Test that text with only non-alpha characters returns '??' language code."""
+        # Only numbers and symbols, no alphabetic characters
+        text = "123 456 789 !!! ### $$$ %%% @@@"
+        result = detector.detect(text, k=1)
+        assert isinstance(result, DetectionResult)
+        assert result.language == "??"
+        assert result.confidence == 0.0
+
+    def test_detect_only_non_alpha_with_k_greater_1(self, detector: LanguageDetector) -> None:
+        """Test that non-alpha only text with k>1 returns list with '??' language."""
+        text = "123 456 !!! ###"
+        results = detector.detect(text, k=3)
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert results[0].language == "??"
+        assert results[0].confidence == 0.0
+
+    def test_detect_language_only_non_alpha(self, detector: LanguageDetector) -> None:
+        """Test detect_language returns '??' for non-alpha only text."""
+        text = "123 456 !!! ###"
+        lang_code = detector.detect_language(text)
+        assert lang_code == "??"
+
+    def test_filter_alpha_words_keeps_alpha(self) -> None:
+        """Test that _filter_alpha_words keeps words with alphabetic characters."""
+        filtered = LanguageDetector._filter_alpha_words("Hello 123 world test")
+        assert "Hello" in filtered
+        assert "world" in filtered
+        assert "test" in filtered
+
+    def test_filter_alpha_words_removes_non_alpha(self) -> None:
+        """Test that _filter_alpha_words removes pure non-alpha words."""
+        filtered = LanguageDetector._filter_alpha_words("Hello 123 456 world")
+        assert "123" not in filtered
+        assert "456" not in filtered
+
+    def test_filter_alpha_words_keeps_mixed_words(self) -> None:
+        """Test that _filter_alpha_words keeps words with both alpha and non-alpha."""
+        filtered = LanguageDetector._filter_alpha_words("test123 hello456world")
+        assert "test123" in filtered
+        assert "hello456world" in filtered
+
+    def test_filter_alpha_words_empty_input(self) -> None:
+        """Test that _filter_alpha_words handles empty input."""
+        filtered = LanguageDetector._filter_alpha_words("")
+        assert filtered == ""
+
+    def test_filter_alpha_words_only_non_alpha(self) -> None:
+        """Test that _filter_alpha_words returns empty for non-alpha only input."""
+        filtered = LanguageDetector._filter_alpha_words("123 456 !!! ###")
+        assert filtered == ""
