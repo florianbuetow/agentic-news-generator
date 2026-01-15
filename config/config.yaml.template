@@ -1,6 +1,7 @@
 # Project directories
 paths:
   data_dir: ./data/
+  data_models_dir: ./data/models/
   data_downloads_dir: ./data/downloads
   data_downloads_videos_dir: ./data/downloads/videos/
   data_downloads_transcripts_dir: ./data/downloads/transcripts
@@ -17,23 +18,33 @@ paths:
   data_logs_dir: ./logs
   data_output_articles_dir: ./data/output/articles
 
+  # Model benchmark and visualization paths
+  reports_dir: reports
+
 channels:
+  # Example 1: English channel
   - url: https://www.youtube.com/@ExampleChannel1
     name: Example Channel One
     category: example_category
     description: "Description of what content this channel provides."
     download-limiter: 20  # 0=skip downloads, -1=unlimited (99999), >0=max videos to download
+    language: "en"  # Source language: English (transcribed in English)
 
+  # Example 2: German channel (will be translated to English)
   - url: https://www.youtube.com/@ExampleChannel2
     name: Example Channel Two
     category: another_example_category
     description: "Another description of channel content and value proposition."
     download-limiter: -1  # Unlimited downloads
+    language: "de"  # Source language: German (translated to English)
 
+  # Example 3: Japanese channel (will be translated to English)
   - name: Example Channel Three
     url: https://www.youtube.com/@ExampleChannel3
-    vibe: "alternative format using vibe field instead of category/what_you_get"
+    category: japanese_tech_channel
+    description: "Japanese-language channel about technology."
     download-limiter: 0  # Skip this channel entirely
+    language: "ja"  # Source language: Japanese (translated to English)
 
 # Hallucination Detection Configuration
 hallucination_detection:
@@ -47,6 +58,31 @@ hallucination_detection:
   coef_repetitions: 0.8888460000
   coef_sequence_length: 0.6665380000
   intercept: -6.7770510000
+
+# Transcription Configuration (MLX Whisper)
+transcription:
+  # Whisper models
+  model_en_name: "medium.en"  # English-only model name
+  model_en_repo: "mlx-community/whisper-medium.en-mlx"  # English-only model repository
+  model_multi_name: "medium"  # Multilingual model name
+  model_multi_repo: "mlx-community/whisper-medium-mlx"  # Multilingual model repository
+
+  # Anti-hallucination settings
+  hallucination_silence_threshold: 2.0  # Seek past silence after N seconds if hallucination detected
+  compression_ratio_threshold: 2.0  # Lower = stricter (default 2.4, we use 2.0)
+
+  # Metadata configuration
+  use_youtube_metadata: true  # Use video title/description in prompts
+  description_max_length: 500  # Maximum characters to include from video description
+
+  # Processing configuration
+  sleep_between_files: 5  # Seconds to pause between transcribing files
+
+  # Metadata subdirectory names
+  metadata_video_subdir: "video"  # Subdirectory for video metadata (.info.json)
+
+  # Output verbosity
+  verbose: false  # Set to true for detailed output
 
 # Topic Segmentation Agent Configuration
 topic_segmentation:

@@ -22,11 +22,51 @@ init:
     @printf "\033[0;34m=== Initializing Development Environment ===\033[0m\n"
     @echo "Creating directories from config.yaml..."
     @bash scripts/init-directories.sh
+    @echo "Downloading FastText language detection models..."
+    @bash scripts/download-fasttext-models.sh
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @echo "Installing frontend dependencies..."
     @cd frontend/newspaper && npm install
     @printf "\033[0;32m✓ Development environment ready\033[0m\n"
+    @echo ""
+
+# Check if all required tools and prerequisites are available
+check:
+    @echo ""
+    @printf "\033[0;34m=== Checking System Prerequisites ===\033[0m\n"
+    @command -v ffmpeg &> /dev/null && echo "✓ ffmpeg" || (echo "✗ ffmpeg missing (install with: brew install ffmpeg)" && exit 1)
+    @command -v jq &> /dev/null && echo "✓ jq" || (echo "✗ jq missing (install with: brew install jq)" && exit 1)
+    @command -v just &> /dev/null && echo "✓ just" || (echo "✗ just missing (install with: brew install just)" && exit 1)
+    @command -v uv &> /dev/null && echo "✓ uv" || (echo "✗ uv missing (install with: brew install uv)" && exit 1)
+    @command -v node &> /dev/null && echo "✓ node" || (echo "✗ node missing (install with: brew install node)" && exit 1)
+    @command -v npm &> /dev/null && echo "✓ npm" || (echo "✗ npm missing (install with: brew install node)" && exit 1)
+    @printf "\033[0;32m✓ All system prerequisites are installed\033[0m\n"
+    @echo ""
+    @printf "\033[0;34m=== Checking Virtual Environment ===\033[0m\n"
+    @if [ ! -d ".venv" ]; then \
+        echo "✗ Virtual environment not found"; \
+        echo ""; \
+        printf "\033[0;33mPlease run 'just init' to initialize the development environment\033[0m\n"; \
+        echo ""; \
+        exit 1; \
+    fi
+    @echo "✓ Virtual environment exists"
+    @echo ""
+    @printf "\033[0;34m=== Checking Python Tools ===\033[0m\n"
+    @uv run mypy --version &> /dev/null && echo "✓ mypy" || (echo "✗ mypy missing (run: just init)" && exit 1)
+    @uv run pytest --version &> /dev/null && echo "✓ pytest" || (echo "✗ pytest missing (run: just init)" && exit 1)
+    @uv run ruff --version &> /dev/null && echo "✓ ruff" || (echo "✗ ruff missing (run: just init)" && exit 1)
+    @uv run pyright --version &> /dev/null && echo "✓ pyright" || (echo "✗ pyright missing (run: just init)" && exit 1)
+    @uv run bandit --version &> /dev/null && echo "✓ bandit" || (echo "✗ bandit missing (run: just init)" && exit 1)
+    @uv run deptry --version &> /dev/null && echo "✓ deptry" || (echo "✗ deptry missing (run: just init)" && exit 1)
+    @uv run codespell --version &> /dev/null && echo "✓ codespell" || (echo "✗ codespell missing (run: just init)" && exit 1)
+    @uv run pip-audit --version &> /dev/null && echo "✓ pip-audit" || (echo "✗ pip-audit missing (run: just init)" && exit 1)
+    @uv run semgrep --version &> /dev/null && echo "✓ semgrep" || (echo "✗ semgrep missing (run: just init)" && exit 1)
+    @uv run pygount --version &> /dev/null && echo "✓ pygount" || (echo "✗ pygount missing (run: just init)" && exit 1)
+    @printf "\033[0;32m✓ All Python tools are installed\033[0m\n"
+    @echo ""
+    @printf "\033[0;32m✓ All required tools and prerequisites are available\033[0m\n"
     @echo ""
 
 # Run the main application
@@ -48,13 +88,21 @@ all:
 
 # Download YouTube videos from channels in config.yaml
 download-videos:
-    @echo ""
-    @printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
-    @uv run scripts/yt-downloader.py
-    @echo ""
-    @printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
-    @bash scripts/move-metadata.sh
-    @echo ""
+    #!/usr/bin/env bash
+    set +e
+    mkdir -p reports
+    echo ""
+    printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
+    uv run scripts/yt-downloader.py 2>&1 | tee reports/video-download.log
+    download_exit_code=${PIPESTATUS[0]}
+    echo ""
+    printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
+    bash scripts/move-metadata.sh
+    echo ""
+    printf "\033[0;34m=== Adding Members-Only Videos to Skip List ===\033[0m\n"
+    uv run scripts/parse-and-archive-membersonly.py
+    echo ""
+    exit $download_exit_code
 
 # Convert downloaded videos to WAV audio files
 extract-audio:
@@ -69,14 +117,26 @@ transcribe:
     set +e  # Don't exit on error
     echo ""
     printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
-    bash scripts/transcribe_audio.sh
+    uv run python scripts/transcribe_audio.py
     transcribe_exit_code=$?
     echo ""
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
     bash scripts/move-transcript-metadata.sh
     echo ""
-    # Exit with the original transcription exit code
-    exit $transcribe_exit_code
+    printf "\033[0;34m=== Analyzing Transcript Languages ===\033[0m\n"
+    uv run scripts/transcript-language-analysis.py
+    language_exit_code=$?
+    echo ""
+    # Exit with error if transcription failed OR non-English detected
+    if [ $transcribe_exit_code -ne 0 ]; then
+        printf "\033[0;31m✗ Transcription failed\033[0m\n"
+        exit $transcribe_exit_code
+    fi
+    if [ $language_exit_code -ne 0 ]; then
+        printf "\033[0;31m✗ Non-English transcripts detected\033[0m\n"
+        exit $language_exit_code
+    fi
+    exit 0
 
 # Archive processed videos
 archive-videos:
@@ -162,12 +222,8 @@ newspaper-generate:
     echo ""
     printf "\033[0;34m=== Generating Newspaper Website ===\033[0m\n"
 
-    # Check if markdown articles exist
-    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
-        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
-        echo "  Please generate the articles first"
-        exit 1
-    fi
+    # Validate articles directory using config
+    uv run scripts/validate_articles_dir.py
 
     # Preprocess markdown articles (extract YAML frontmatter only)
     echo "Preprocessing markdown articles..."
@@ -199,18 +255,14 @@ newspaper-serve:
     echo ""
     printf "\033[0;34m=== Starting Newspaper Development Server ===\033[0m\n"
 
-    # Check if markdown articles exist
-    if [ ! -d "data/input/newspaper/articles" ] || [ -z "$(ls -A data/input/newspaper/articles/*.md 2>/dev/null)" ]; then
-        printf "\033[0;31m✗ Error: No markdown articles found in data/input/newspaper/articles/\033[0m\n"
-        echo "  Please generate the articles first"
-        exit 1
-    fi
+    # Validate articles directory using config
+    uv run scripts/validate_articles_dir.py
 
-    # Check if port 3000 is available
-    if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
-        printf "\033[0;31m✗ Error: Port 3000 is already in use\033[0m\n"
-        echo "  Please stop the service using port 3000 and try again"
-        echo "  You can find the process with: lsof -i :3000"
+    # Check if port 12000 is available
+    if lsof -Pi :12000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        printf "\033[0;31m✗ Error: Port 12000 is already in use\033[0m\n"
+        echo "  Please stop the service using port 12000 and try again"
+        echo "  You can find the process with: lsof -i :12000"
         exit 1
     fi
 
@@ -226,14 +278,14 @@ newspaper-serve:
 
     # Start development server in background
     echo ""
-    printf "\033[0;32m✓ Starting development server at http://localhost:3000\033[0m\n"
+    printf "\033[0;32m✓ Starting development server at http://localhost:12000\033[0m\n"
     echo ""
     cd frontend/newspaper && npm run dev &
     DEV_PID=$!
 
     # Wait for server to start, then open browser
     sleep 3
-    open http://localhost:3000
+    open http://localhost:12000
 
     # Wait for dev server to exit (allows Ctrl+C)
     wait $DEV_PID
@@ -384,9 +436,25 @@ ai-review-unit-tests:
 ai-review-unit-tests-nocache:
     @echo ""
     @printf "\033[0;34m=== Reviewing Unit Tests with AI (No Cache) ===\033[0m\n"
-    @rm -rf .cache/test_file_hashes.json
+    @rm -rf .cache/unit_test_hashes.json
     @printf "\033[0;33m✓ Cache cleared\033[0m\n"
     @uv run python tools/fake_test_detector/detect_fake_tests.py --no-cache
+    @echo ""
+
+# Run AI-powered shell script reviewer (detects env var violations)
+ai-review-shell-scripts:
+    @echo ""
+    @printf "\033[0;34m=== Reviewing Shell Scripts for Env Var Violations ===\033[0m\n"
+    @uv run python tools/shellscript_analyzer/shellscript_analyzer.py
+    @echo ""
+
+# Run AI-powered shell script reviewer (clear cache and force re-scan)
+ai-review-shell-scripts-nocache:
+    @echo ""
+    @printf "\033[0;34m=== Reviewing Shell Scripts for Env Var Violations (No Cache) ===\033[0m\n"
+    @rm -rf .cache/shell_script_hashes.json
+    @printf "\033[0;33m✓ Cache cleared\033[0m\n"
+    @uv run python tools/shellscript_analyzer/shellscript_analyzer.py --no-cache
     @echo ""
 
 # Run unit tests only (fast)
@@ -491,6 +559,53 @@ ci-quiet:
     printf "\033[0;32m✓ All CI checks passed\033[0m\n"
     echo ""
 
+# Run the complete pipeline quietly (only show errors and warnings)
+all-quiet:
+    #!/usr/bin/env bash
+    set +e  # Don't exit on error for download-videos
+    echo ""
+    printf "\033[0;34m=== Running Complete Pipeline (Quiet Mode) ===\033[0m\n"
+    TMPFILE=$(mktemp)
+    trap "rm -f $TMPFILE" EXIT
+
+    printf "🚀 Starting ci-quiet...\n"
+    just ci-quiet || exit 1
+    printf "✅ Completed ci-quiet\n"
+
+    printf "🚀 Starting download-videos...\n"
+    if just download-videos > $TMPFILE 2>&1; then
+        printf "✅ Completed download-videos\n"
+    else
+        printf "\033[0;33m⚠ Download-videos failed (continuing...)\033[0m\n"
+        cat $TMPFILE
+    fi
+
+    set -e  # Exit on error for remaining steps
+
+    printf "🚀 Starting extract-audio...\n"
+    just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed extract-audio\n"
+
+    printf "🚀 Starting transcribe...\n"
+    just transcribe > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcribe failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed transcribe\n"
+
+    printf "🚀 Starting archive-videos...\n"
+    just archive-videos > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Archive-videos failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed archive-videos\n"
+
+    printf "🚀 Starting analyze-transcripts-hallucinations...\n"
+    just analyze-transcripts-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Analyze-transcripts-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed analyze-transcripts-hallucinations\n"
+
+    printf "🚀 Starting transcripts-remove-hallucinations...\n"
+    just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed transcripts-remove-hallucinations\n"
+
+    echo ""
+    printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"
+    echo ""
+
 # Run AI-based CI checks (AI-powered test validation, will grow in the future)
 # This pipeline is separate from regular CI and includes AI-assisted code quality checks
 ci-ai:
@@ -500,6 +615,26 @@ ci-ai:
     printf "\033[0;34m=== Running AI-Based CI Checks ===\033[0m\n"
     echo ""
     just ai-review-unit-tests-nocache
+    just ai-review-shell-scripts-nocache
+    echo ""
+    printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
+    echo ""
+
+# Run AI-based CI checks silently (only show output on errors)
+ci-ai-quiet:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Running AI-Based CI Checks (Quiet Mode) ===\033[0m\n"
+    TMPFILE=$(mktemp)
+    trap "rm -f $TMPFILE" EXIT
+
+    just ai-review-unit-tests-nocache > $TMPFILE 2>&1 || { printf "\033[0;31m✗ AI-review-unit-tests failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ AI-review-unit-tests passed\033[0m\n"
+
+    just ai-review-shell-scripts-nocache > $TMPFILE 2>&1 || { printf "\033[0;31m✗ AI-review-shell-scripts failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ AI-review-shell-scripts passed\033[0m\n"
+
     echo ""
     printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
     echo ""

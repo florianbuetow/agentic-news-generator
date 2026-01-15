@@ -10,7 +10,7 @@ An AI-powered YouTube news aggregator that crawls AI-focused YouTube channels, t
 This system automatically:
 1. Downloads videos from pre-configured YouTube channels
 2. Extracts audio from videos to WAV format
-3. Transcribes audio using MLX Whisper (large-v3 model) with multiple output formats
+3. Transcribes audio using MLX Whisper (medium.en for English, medium for other languages) with automatic translation to English and multiple output formats
 4. Segments transcripts into topic-based sections using AI analysis
 5. Aggregates related topic segments across multiple videos
 6. Generates news articles from aggregated content using AI agents
@@ -110,6 +110,10 @@ cp config/config.yaml.template config/config.yaml
 Edit `config/config.yaml` to add your YouTube channels. Each channel can be configured with:
 - `url`: YouTube channel URL
 - `name`: Display name
+- `language`: Source language code (e.g., "en", "de", "ja") - **Required**
+  - English channels (`"en"`): Transcribed in English
+  - Non-English channels: Automatically translated to English
+- `download-limiter`: Maximum videos to download (or -1 for unlimited)
 - `category`: Channel category (optional, for structured format)
 - `description` or `what_you_get`: Channel description (for structured format)
 - `vibe`: Free-form channel description (alternative flexible format)
@@ -118,7 +122,7 @@ Channels can use either:
 - **Structured format**: `category` + `description` (or `what_you_get`)
 - **Flexible format**: `vibe` only
 
-See `config/config.yaml` for examples of the 16 pre-configured AI-focused channels.
+See `config/config.yaml` for examples of pre-configured AI-focused channels in multiple languages.
 
 ### 3. Environment Variables
 
@@ -159,7 +163,7 @@ just help
 #### Video Processing Pipeline
 - `just download-videos` - Download videos from configured YouTube channels
 - `just extract-audio` - Convert downloaded videos to WAV audio files
-- `just transcribe` - Transcribe audio files using MLX Whisper (large-v3)
+- `just transcribe` - Transcribe audio files using MLX Whisper (medium.en/medium with auto-translation)
 - `just analyze-transcripts` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
@@ -187,7 +191,9 @@ just download-videos
 # Step 2: Extract audio from videos (converts to 16kHz mono WAV)
 just extract-audio
 
-# Step 3: Transcribe audio using MLX Whisper large-v3
+# Step 3: Transcribe audio using MLX Whisper (medium.en/medium)
+# English channels: transcribed in English (medium.en model)
+# Non-English channels: translated to English (medium model)
 # Generates: .txt, .srt, .vtt, .tsv, .json files
 just transcribe
 
@@ -204,7 +210,8 @@ just archive-videos
 **Notes:**
 - All operations are idempotent (safe to re-run)
 - Files are organized by channel name
-- Transcription uses the Whisper large-v3 model for best quality
+- Transcription uses Whisper medium.en (English) and medium (multilingual) models
+- Channels are grouped by language to minimize model switching
 - Models are cached in `~/.cache/huggingface/hub/`
 - Archive step frees up disk space by moving videos and deleting intermediate audio
 
@@ -235,6 +242,146 @@ USE_YOUTUBE_METADATA=true               # Use video metadata in prompts (default
 ```bash
 USE_YOUTUBE_METADATA=false just transcribe
 ```
+
+### Multi-Language Transcription Support
+
+The transcription pipeline supports videos in any language supported by Whisper (100+ languages). Videos from non-English channels are automatically translated to English during transcription.
+
+**How It Works:**
+- Each channel in `config/config.yaml` specifies its source language using the `language` field
+- **English channels** (`language: "en"`): Transcribed directly in English using the optimized `medium.en` model
+- **Non-English channels** (e.g., `language: "de"`, `language: "ja"`): Translated to English using the multilingual `medium` model during transcription
+- Channels are **grouped by language** during processing to minimize model switching overhead
+- All transcript outputs are in English for consistent downstream processing
+
+**Configuration Example:**
+```yaml
+channels:
+  # English channel - uses medium.en model
+  - url: https://www.youtube.com/@AIExplained
+    name: AI Explained
+    language: "en"  # Source language: English
+    download-limiter: 20
+
+  # German channel - uses medium model with translation
+  - url: https://www.youtube.com/@TheMorpheusVlogs/videos
+    name: The Morpheus
+    language: "de"  # Source language: German → translates to English
+    download-limiter: 1
+
+  # Japanese channel - uses medium model with translation
+  - url: https://www.youtube.com/@SomeJapaneseChannel
+    name: Japanese Tech Channel
+    language: "ja"  # Source language: Japanese → translates to English
+    download-limiter: 10
+```
+
+**Models Used:**
+- **English-only model**: `mlx-community/whisper-medium.en-mlx` (769M parameters)
+  - Optimized for English transcription
+  - Task: `transcribe` (same language output)
+  - 99.3% accuracy on technical AI/ML terminology
+
+- **Multilingual model**: `mlx-community/whisper-medium-mlx` (769M parameters)
+  - Supports 100+ languages
+  - Task: `translate` (translates to English)
+  - Used for all non-English source languages
+
+**Processing Flow:**
+```
+1. Script groups channels by language: {en: [...], de: [...], ja: [...]}
+2. For each language group:
+   - Loads appropriate model once (medium.en for 'en', medium for others)
+   - Processes all channels in that language group
+   - Minimizes model switching for better performance
+3. For English channels:
+   - Task: transcribe
+   - Language: en
+   - Model: medium.en
+4. For non-English channels:
+   - Task: translate
+   - Language: de, ja, etc.
+   - Model: medium
+   - Output: English transcripts
+```
+
+**Supported Languages:**
+All languages supported by Whisper are available, including:
+- European: de (German), fr (French), es (Spanish), it (Italian), pt (Portuguese), etc.
+- Asian: ja (Japanese), zh (Chinese), ko (Korean), hi (Hindi), etc.
+- Middle Eastern: ar (Arabic), fa (Persian), he (Hebrew), tr (Turkish), etc.
+- And 90+ more languages
+
+For a complete list, see the Whisper documentation or `src/util/whisper_languages.py`.
+
+**Benefits:**
+- **Single output language**: All transcripts in English for consistent processing
+- **Optimized performance**: Language grouping reduces model loading overhead
+- **Automatic translation**: No separate translation step needed
+- **High quality**: Whisper's built-in translation produces natural English output
+- **YouTube metadata preserved**: Title and description used as context (in original language)
+
+**First Run Note:**
+- On first use, the multilingual model (~1.5GB) will be downloaded and cached
+- Subsequent runs will use the cached model from `~/.cache/huggingface/hub/`
+
+### Language Detection
+
+The system includes a FastText-based language detector that supports 176 languages.
+
+**Model Download:**
+
+The language detection model is automatically downloaded during initialization:
+
+```bash
+just init
+```
+
+The model (lid.176.ftz, 917KB) is downloaded to `data/models/fasttext/` as configured in `config.yaml`.
+
+**Usage:**
+
+```python
+from pathlib import Path
+from src.config import Config
+from src.nlp import LanguageDetector
+
+# Load configuration
+config = Config(Path("config/config.yaml"))
+
+# Initialize detector with model path from config
+model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
+detector = LanguageDetector(model_path=model_path)
+
+# Detect language
+language_code = detector.detect_language("Hello world")  # Returns: "en"
+
+# Get detailed results with confidence
+result = detector.detect("Bonjour le monde", k=1)
+print(f"Language: {result.language}, Confidence: {result.confidence}")
+# Output: Language: fr, Confidence: 0.958
+
+# Get top-k predictions
+results = detector.detect("Hello", k=3)
+for r in results:
+    print(f"{r.language}: {r.confidence:.3f}")
+```
+
+**Supported Languages:**
+
+The detector supports 176 languages including:
+- Common: English, Spanish, French, German, Italian, Portuguese, Russian, Chinese, Japanese, Arabic
+- And 166 more languages
+
+Use `detector.get_supported_languages()` to get the full list of language codes and names.
+
+**Model Information:**
+
+- **Model:** FastText lid.176.ftz (compressed)
+- **Size:** 917KB
+- **Languages:** 176
+- **Source:** [FastText language identification](https://fasttext.cc/docs/en/language-identification.html)
+- **Location:** `{data_models_dir}/fasttext/` (configured in config.yaml)
 
 ### Transcript Hallucination Detection
 
@@ -421,6 +568,45 @@ topic_segmentation:
 - Compatible with existing error handling (ValueError → SegmentationResult with success=False)
 - Comprehensive test coverage with 44 tests for validation logic
 
+## Troubleshooting
+
+### Browser Cookie Authentication
+
+The video downloader uses `yt-dlp` with browser cookies for authentication with YouTube. The browser selection is controlled by the `BROWSER` environment variable.
+
+**Default Configuration:**
+- **Location**: `scripts/config.sh:96`
+- **Default value**: `chrome`
+
+**Changing the Browser:**
+
+If you need to use a different browser (Firefox, Safari, Edge, etc.), you can override the default in two ways:
+
+1. **Per-command override:**
+   ```bash
+   BROWSER=firefox just download-videos
+   ```
+
+2. **Session-wide override:**
+   ```bash
+   export BROWSER=firefox
+   just download-videos
+   ```
+
+**Supported Browsers:**
+- `chrome` (default)
+- `firefox`
+- `safari`
+- `edge`
+- `brave`
+- `opera`
+- Any browser supported by yt-dlp's `--cookies-from-browser` option
+
+**Common Issues:**
+- If video downloads fail with authentication errors, ensure the specified browser is installed and you're logged into YouTube in that browser
+- If using a browser profile, cookies must be accessible from the default profile
+- On macOS, you may need to grant Terminal access to the browser's data in System Preferences → Security & Privacy
+
 ## Development
 
 ### Development Guidelines
@@ -458,12 +644,101 @@ Run all checks:
 just ci
 ```
 
+### AI-Powered Code Quality Checks
+
+The project includes AI-powered code quality tools that analyze code using local LLMs:
+
+#### Unit Test Quality Detection
+Detects fake/trivial unit tests that don't provide real test coverage:
+
+```bash
+just ai-review-unit-tests          # With caching
+just ai-review-unit-tests-nocache  # Force re-scan all files
+```
+
+- **Cache**: `.cache/unit_test_hashes.json`
+- **Report**: `reports/fake_test_report.md`
+- **Model**: Local LLM via LM Studio
+
+#### Shell Script Environment Variable Detection
+Detects shell scripts that rely on environment variables not passed as CLI arguments or read from files:
+
+```bash
+just ai-review-shell-scripts          # With caching
+just ai-review-shell-scripts-nocache  # Force re-scan all files
+```
+
+- **Cache**: `.cache/shell_script_hashes.json`
+- **Report**: `reports/shell_env_var_violations.md`
+- **Model**: Local LLM via LM Studio
+- **Target**: All `.sh` files in `scripts/` directory
+
+**Violation Rules:**
+- Scripts **FAIL** if they use environment variables that are NOT:
+  1. Passed as command line arguments to the script, OR
+  2. Read from a configuration file by the script (e.g., `source config.sh`)
+- Standard system env vars (`HOME`, `PATH`, `USER`) are acceptable
+- Detects violating variables and provides actionable recommendations
+
+#### Run All AI Checks
+
+Run all AI-based CI checks together:
+
+```bash
+just ci-ai          # Verbose output
+just ci-ai-quiet    # Quiet mode (only errors)
+```
+
+### Analysis Reports
+
+The project includes comprehensive analysis reports in `reports/analysis/` that document findings from AI-powered code quality checks and model performance evaluations.
+
+#### Shell Script Analysis Report
+
+**Purpose:** Identify shell scripts that don't follow project rules, specifically scripts that use environment variables without properly passing them as command-line arguments or reading them from configuration files.
+
+**Background:** As part of maintaining code quality and preventing hidden dependencies, the project enforces a rule that all shell scripts must explicitly handle their configuration. Scripts that rely on undeclared environment variables create maintenance issues and make it difficult to understand script dependencies.
+
+**Report Location:** `reports/analysis/shell_script_analysis/`
+
+**Key Findings:**
+- Identifies violating scripts that use environment variables incorrectly
+- Provides actionable recommendations for fixing each violation
+- Helps maintain explicit configuration management across the codebase
+
+**Related Command:** `just ai-review-shell-scripts`
+
+#### Model Performance Analysis Report
+
+**Purpose:** Determine the most efficient LLM model for local development and local LLM serving on a laptop, balancing speed, accuracy, and memory usage.
+
+**Background:** The project uses local LLMs (via LM Studio) for AI-powered code quality checks. Selecting the right model is critical for developer productivity - a model that's too slow will bottleneck the development workflow, while a model that's too inaccurate will produce unreliable results. This analysis evaluated 10 different models on a shell script classification task to identify the optimal model for local development.
+
+**Report Location:** `reports/analysis/model_performance/`
+
+**Key Findings:**
+- Comparative analysis of 10 models on shell script classification
+- Performance metrics: F1 score (accuracy), execution time (speed), model size (memory)
+- Pareto frontier analysis identifying optimal speed/accuracy trade-offs
+- Model recommendations for different use cases:
+  - **Speed-first with acceptable accuracy**: Fastest model with F1 ≥ 0.90
+  - **Accuracy-first**: Highest F1 score regardless of speed
+  - **Size efficiency**: Best accuracy per GB of memory
+  - **Balanced**: Top 3 models on the Pareto frontier
+
+**Interactive Notebook:** `notebooks/shellscript_analyzer/shellscript_analyzer.ipynb`
+
+**Visualizations:** `notebooks/shellscript_analyzer/gfx/`
+
+These reports help developers make informed decisions about tooling configuration and understand the trade-offs involved in local LLM deployment for development workflows.
+
 ## Configuration
 
 The system is configured via `config/config.yaml`. The configuration defines:
 
 - **Channels**: List of YouTube channels to monitor
-  - Each channel has a URL, name, and optional metadata
+  - Each channel has a URL, name, source language (`language`), and optional metadata
+  - The `language` field specifies the source language (e.g., "en", "de", "ja")
   - Channels can use structured format (`category` + `description`/`what_you_get`) or flexible format (`vibe`)
 
 - **Hallucination Detection**: Sliding window analysis parameters
@@ -624,7 +899,10 @@ This project is in active development. Current implementation status:
 - ✅ Basic project structure
 - ✅ Video downloading pipeline (`scripts/yt-downloader.sh`)
 - ✅ Audio extraction pipeline (`scripts/convert_to_audio.sh`)
-- ✅ Transcription pipeline with MLX Whisper large-v3 (`scripts/transcribe_audio.sh`)
+- ✅ Multi-language transcription pipeline with MLX Whisper (`scripts/transcribe_audio.sh`)
+  - ✅ Language grouping for optimized processing
+  - ✅ Automatic translation of non-English content to English
+  - ✅ medium.en model for English, medium model for other languages
 - ✅ Transcript hallucination detection (`scripts/transcript-hallucination-detection.py`)
 - ✅ Video archiving and cleanup (`scripts/archive-videos.sh`)
 - ✅ HTML newspaper frontend (Nuxt-based, `frontend/newspaper/`)
@@ -667,9 +945,11 @@ The following vulnerabilities are intentionally ignored in dependency audits:
 
 ### Video Processing Features
 
+- **Multi-language Support**: Automatic translation from 100+ languages to English
 - **Multiple Transcript Formats**: Generates .txt, .srt, .vtt, .tsv, and .json files
 - **Idempotent Operations**: All scripts skip already-processed files
 - **Channel-based Organization**: Files organized by YouTube channel
+- **Language Grouping**: Processes channels by language to minimize model switching
 - **Efficient Processing**: Uses all CPU cores for audio conversion
 - **Apple Silicon Optimized**: MLX Whisper leverages Metal acceleration
 

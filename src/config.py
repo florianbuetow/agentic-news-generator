@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
 class ParagraphConfig(BaseModel):
@@ -64,6 +64,37 @@ class ChannelConfig(BaseModel):
         alias="download-limiter",
         description="Max videos to download: 0=skip, -1=unlimited, >0=exact limit",
     )
+    language: str = Field(
+        ...,
+        description="ISO language code for channel content (e.g., 'en', 'de', 'ja').",
+    )
+
+    @field_validator("language")
+    @classmethod
+    def validate_language(cls, language: str) -> str:
+        """Validate that the language code is supported by Whisper.
+
+        Args:
+            language: Language code to validate.
+
+        Returns:
+            The validated language code.
+
+        Raises:
+            ValueError: If the language code is not supported by Whisper.
+        """
+        from src.util.whisper_languages import WhisperLanguages
+
+        supported = WhisperLanguages.get_supported_languages()
+
+        if language not in supported:
+            raise ValueError(
+                f"Invalid language code: '{language}'. "
+                f"Must be one of Whisper's supported languages. "
+                f"Supported codes: {', '.join(sorted(supported.keys()))}"
+            )
+
+        return language
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -113,10 +144,52 @@ class ArticleGenerationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class TranscriptionConfig(BaseModel):
+    """Configuration for MLX Whisper transcription."""
+
+    model_en_name: str = Field(..., description="English-only Whisper model name")
+    model_en_repo: str = Field(..., description="English-only Whisper model repository")
+    model_multi_name: str = Field(..., description="Multilingual Whisper model name")
+    model_multi_repo: str = Field(..., description="Multilingual Whisper model repository")
+    hallucination_silence_threshold: float = Field(
+        ...,
+        description="Silence threshold in seconds for hallucination detection",
+    )
+    compression_ratio_threshold: float = Field(
+        ...,
+        description="Compression ratio threshold for hallucination detection",
+    )
+    use_youtube_metadata: bool = Field(
+        ...,
+        description="Whether to use YouTube video metadata in transcription prompts",
+    )
+    description_max_length: int = Field(
+        ...,
+        ge=0,
+        description="Maximum characters to include from video description",
+    )
+    sleep_between_files: int = Field(
+        ...,
+        ge=0,
+        description="Seconds to pause between transcribing files",
+    )
+    metadata_video_subdir: str = Field(
+        ...,
+        description="Subdirectory name for video metadata (.info.json files)",
+    )
+    verbose: bool = Field(
+        ...,
+        description="Enable verbose output during transcription",
+    )
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class PathsConfig(BaseModel):
     """Configuration for all project directory paths."""
 
     data_dir: str = Field(..., description="Root data directory path", min_length=1)
+    data_models_dir: str = Field(..., description="ML models directory path", min_length=1)
     data_downloads_dir: str = Field(..., description="Downloads directory path", min_length=1)
     data_downloads_videos_dir: str = Field(..., description="Downloaded videos directory path", min_length=1)
     data_downloads_transcripts_dir: str = Field(..., description="Transcripts directory path", min_length=1)
@@ -134,6 +207,7 @@ class PathsConfig(BaseModel):
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
     data_logs_dir: str = Field(..., description="Logs directory path", min_length=1)
     data_output_articles_dir: str = Field(..., description="Generated articles directory path", min_length=1)
+    reports_dir: str = Field(..., description="Model benchmark reports directory path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -166,6 +240,10 @@ class Config:
         # Validate article_generation section if present
         if "article_generation" in self._data:
             self._article_generation = self._validate_article_generation()
+
+        # Validate transcription section if present
+        if "transcription" in self._data:
+            self._transcription = self._validate_transcription()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -304,6 +382,21 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Article generation configuration validation failed: {error_messages}") from e
 
+    def _validate_transcription(self) -> TranscriptionConfig:
+        """Validate transcription configuration.
+
+        Returns:
+            Validated TranscriptionConfig instance.
+
+        Raises:
+            ValueError: If transcription configuration is invalid.
+        """
+        try:
+            return TranscriptionConfig.model_validate(self._data["transcription"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Transcription configuration validation failed: {error_messages}") from e
+
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -415,6 +508,14 @@ class Config:
             Path object pointing to the data directory (relative or absolute).
         """
         return Path(self._paths.data_dir)
+
+    def getDataModelsDir(self) -> Path:
+        """Get the data models directory path.
+
+        Returns:
+            Path object for the models directory (e.g., ./data/models/).
+        """
+        return Path(self._paths.data_models_dir)
 
     def getDataDownloadsDir(self) -> Path:
         """Get the data downloads directory path.
@@ -536,6 +637,14 @@ class Config:
         """
         return Path(self._paths.data_output_articles_dir)
 
+    def getReportsDir(self) -> Path:
+        """Get the reports directory path.
+
+        Returns:
+            Path object pointing to the reports directory.
+        """
+        return Path(self._paths.reports_dir)
+
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.
 
@@ -548,3 +657,115 @@ class Config:
         if "article_compiler" not in self._data:
             raise KeyError("Missing required key 'article_compiler' in config file")
         return ArticleCompilerConfig.model_validate(self._data["article_compiler"])
+
+    # Transcription Configuration Getters
+
+    def getTranscriptionModelEnName(self) -> str:
+        """Get English Whisper model name.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.model_en_name
+
+    def getTranscriptionModelEnRepo(self) -> str:
+        """Get English Whisper model repository.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.model_en_repo
+
+    def getTranscriptionModelMultiName(self) -> str:
+        """Get multilingual Whisper model name.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.model_multi_name
+
+    def getTranscriptionModelMultiRepo(self) -> str:
+        """Get multilingual Whisper model repository.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.model_multi_repo
+
+    def getTranscriptionHallucinationSilenceThreshold(self) -> float:
+        """Get hallucination silence threshold in seconds.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.hallucination_silence_threshold
+
+    def getTranscriptionCompressionRatioThreshold(self) -> float:
+        """Get compression ratio threshold.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.compression_ratio_threshold
+
+    def getTranscriptionUseYoutubeMetadata(self) -> bool:
+        """Get whether to use YouTube metadata in prompts.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.use_youtube_metadata
+
+    def getTranscriptionMetadataVideoSubdir(self) -> str:
+        """Get metadata video subdirectory name.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.metadata_video_subdir
+
+    def getTranscriptionVerbose(self) -> bool:
+        """Get verbose output flag.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.verbose
+
+    def getTranscriptionDescriptionMaxLength(self) -> int:
+        """Get maximum description length in characters.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.description_max_length
+
+    def getTranscriptionSleepBetweenFiles(self) -> int:
+        """Get sleep duration between files in seconds.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.sleep_between_files

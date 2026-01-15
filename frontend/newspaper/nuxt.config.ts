@@ -32,6 +32,11 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/newspaper.css'],
 
+  // Development server configuration
+  devServer: {
+    port: 12000
+  },
+
   // Static site generation
   nitro: {
     prerender: {

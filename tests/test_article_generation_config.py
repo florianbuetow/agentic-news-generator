@@ -14,6 +14,7 @@ def get_valid_paths_config() -> dict[str, str]:
     """Return a valid paths configuration dictionary for tests."""
     return {
         "data_dir": "./data/",
+        "data_models_dir": "./data/models/",
         "data_downloads_dir": "./data/downloads",
         "data_downloads_videos_dir": "./data/downloads/videos/",
         "data_downloads_transcripts_dir": "./data/downloads/transcripts",
@@ -29,6 +30,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./logs",
         "data_output_articles_dir": "./data/output/articles",
+        "reports_dir": "reports",
     }
 
 
@@ -382,6 +384,7 @@ class TestConfigWithArticleGeneration:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "article_generation": {
@@ -428,6 +431,7 @@ class TestConfigWithArticleGeneration:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
         }
@@ -455,6 +459,7 @@ class TestConfigWithArticleGeneration:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "article_generation": {
@@ -491,6 +496,7 @@ class TestConfigWithArticleGeneration:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "article_generation": {
@@ -532,6 +538,7 @@ class TestConfigWithArticleGeneration:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
             "article_generation": {
@@ -576,6 +583,7 @@ class TestConfigWithArticleGeneration:
                     "category": "test",
                     "description": "Test description",
                     "download-limiter": 20,
+                    "language": "en",
                 }
             ],
         }

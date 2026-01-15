@@ -14,6 +14,7 @@ def get_valid_paths_config() -> dict[str, str]:
     """Return a valid paths configuration dictionary."""
     return {
         "data_dir": "./data/",
+        "data_models_dir": "./data/models/",
         "data_downloads_dir": "./data/downloads",
         "data_downloads_videos_dir": "./data/downloads/videos/",
         "data_downloads_transcripts_dir": "./data/downloads/transcripts",
@@ -29,6 +30,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./logs",
         "data_output_articles_dir": "./data/output/articles",
+        "reports_dir": "reports",
     }
 
 
@@ -172,6 +174,7 @@ class TestConfigPaths:
         try:
             config = Config(temp_path)
             assert isinstance(config.getDataDir(), Path)
+            assert isinstance(config.getDataModelsDir(), Path)
             assert isinstance(config.getDataDownloadsDir(), Path)
             assert isinstance(config.getDataDownloadsVideosDir(), Path)
             assert isinstance(config.getDataDownloadsTranscriptsDir(), Path)
@@ -202,6 +205,7 @@ class TestConfigPaths:
             config = Config(temp_path)
             # Path normalizes paths, so "./data/" becomes "data"
             assert config.getDataDir() == Path("./data/")
+            assert config.getDataModelsDir() == Path("./data/models/")
             assert config.getDataDownloadsDir() == Path("./data/downloads")
             assert config.getDataDownloadsVideosDir() == Path("./data/downloads/videos/")
             assert config.getDataDownloadsTranscriptsDir() == Path("./data/downloads/transcripts")

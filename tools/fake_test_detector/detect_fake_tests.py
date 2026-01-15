@@ -76,7 +76,7 @@ class DetectionResult:
 class TestFileHashCache:
     """Manages hash-based caching to skip unchanged test files."""
 
-    def __init__(self, cache_file: str = ".cache/test_file_hashes.json"):
+    def __init__(self, cache_file: str = ".cache/unit_test_hashes.json"):
         """Initialize the hash cache.
 
         Args:
