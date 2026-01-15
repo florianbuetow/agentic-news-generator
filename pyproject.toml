@@ -68,7 +68,7 @@ dev = [
 line-length = 140
 indent-width = 4
 target-version = "py312"
-exclude = [".git", ".ruff_cache", ".venv", ".vscode", "reports", "tools/fake_test_detector"]
+exclude = [".git", ".ruff_cache", ".venv", ".vscode", "reports", "tools/fake_test_detector", "notebooks"]
 
 [tool.ruff.lint]
 # Core errors & warnings, Google-style docs, types, bugbear, quotes, imports, naming
@@ -204,6 +204,7 @@ extend_exclude = [
     "notes",
     "tools/fake_test_detector",
     "tools/shellscript_env_var_args_detector",
+    "tools/shellscript_analyzer",
 ]
 
 # Ignore Jupyter notebooks (not part of production code)
@@ -228,6 +229,7 @@ json_output = "reports/deptry/deptry.json"
 
 [tool.deptry.per_rule_ignores]
 # Add specific package ignores with comments explaining why
+DEP002 = ["seaborn"]  # Used in Jupyter notebooks (notebooks/ directory)
 
 [tool.codespell]
 # Paths to check

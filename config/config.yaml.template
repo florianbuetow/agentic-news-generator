@@ -15,6 +15,9 @@ paths:
   data_archive_dir: ./data/archive
   data_archive_videos_dir: ./data/archive/videos
 
+  # Model benchmark and visualization paths
+  reports_dir: reports
+
 channels:
   # Example 1: English channel
   - url: https://www.youtube.com/@ExampleChannel1
