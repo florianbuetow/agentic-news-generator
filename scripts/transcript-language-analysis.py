@@ -42,10 +42,12 @@ class FileLanguageResult:
         """Check if file contains only English.
 
         Returns:
-            True if all chunks are English or file is empty.
+            True if all chunks are English, empty, or contain no detectable language (??).
         """
         unique_langs = set(self.languages)
-        return unique_langs == {"en"} or unique_langs == set()
+        # Accept English-only, empty, or combinations with '??' (no alphabetic words)
+        acceptable_langs = {"en", "??"}
+        return unique_langs.issubset(acceptable_langs) or unique_langs == set()
 
 
 @dataclass
