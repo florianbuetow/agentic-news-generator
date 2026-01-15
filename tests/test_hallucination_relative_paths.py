@@ -246,6 +246,8 @@ paths:
   data_temp_dir: {data_dir / "temp"}
   data_archive_dir: {data_dir / "archive"}
   data_archive_videos_dir: {data_dir / "archive" / "videos"}
+  reports_dir: reports
+  notebooks_gfx_dir: notebooks/gfx
 
 channels: []
 

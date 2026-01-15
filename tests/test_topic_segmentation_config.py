@@ -27,6 +27,8 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_temp_dir": "./data/temp",
         "data_archive_dir": "./data/archive",
         "data_archive_videos_dir": "./data/archive/videos",
+        "reports_dir": "reports",
+        "notebooks_gfx_dir": "notebooks/gfx",
     }
 
 
