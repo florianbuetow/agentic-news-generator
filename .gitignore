@@ -192,7 +192,7 @@ cython_debug/
 .ruff_cache/
 
 # Reports (ignore all except analysis/)
-reports/
+reports/*
 !reports/analysis/
 
 # PyPI configuration file
