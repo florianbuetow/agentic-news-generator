@@ -191,8 +191,9 @@ cython_debug/
 # Ruff stuff:
 .ruff_cache/
 
-# Reports
+# Reports (ignore all except analysis/)
 reports/
+!reports/analysis/
 
 # PyPI configuration file
 .pypirc
@@ -232,7 +233,6 @@ frontend/newspaper/.fleet
 frontend/newspaper/.env.*
 !frontend/newspaper/.env.example
 frontend/newspaper/content/articles/
->>>>>>> main
 
 # Data files
 data/
