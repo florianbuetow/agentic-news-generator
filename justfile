@@ -22,6 +22,8 @@ init:
     @printf "\033[0;34m=== Initializing Development Environment ===\033[0m\n"
     @echo "Creating directories from config.yaml..."
     @bash scripts/init-directories.sh
+    @echo "Downloading FastText language detection models..."
+    @bash scripts/download-fasttext-models.sh
     @echo "Installing Python dependencies..."
     @uv sync --all-extras
     @echo "Installing frontend dependencies..."
@@ -121,8 +123,20 @@ transcribe:
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
     bash scripts/move-transcript-metadata.sh
     echo ""
-    # Exit with the original transcription exit code
-    exit $transcribe_exit_code
+    printf "\033[0;34m=== Analyzing Transcript Languages ===\033[0m\n"
+    uv run scripts/transcript-language-analysis.py
+    language_exit_code=$?
+    echo ""
+    # Exit with error if transcription failed OR non-English detected
+    if [ $transcribe_exit_code -ne 0 ]; then
+        printf "\033[0;31m✗ Transcription failed\033[0m\n"
+        exit $transcribe_exit_code
+    fi
+    if [ $language_exit_code -ne 0 ]; then
+        printf "\033[0;31m✗ Non-English transcripts detected\033[0m\n"
+        exit $language_exit_code
+    fi
+    exit 0
 
 # Archive processed videos
 archive-videos:

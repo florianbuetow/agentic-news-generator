@@ -176,6 +176,7 @@ class PathsConfig(BaseModel):
     """Configuration for all project directory paths."""
 
     data_dir: str = Field(..., description="Root data directory path", min_length=1)
+    data_models_dir: str = Field(..., description="ML models directory path", min_length=1)
     data_downloads_dir: str = Field(..., description="Downloads directory path", min_length=1)
     data_downloads_videos_dir: str = Field(..., description="Downloaded videos directory path", min_length=1)
     data_downloads_transcripts_dir: str = Field(..., description="Transcripts directory path", min_length=1)
@@ -432,6 +433,14 @@ class Config:
             Path object pointing to the data directory (relative or absolute).
         """
         return Path(self._paths.data_dir)
+
+    def getDataModelsDir(self) -> Path:
+        """Get the data models directory path.
+
+        Returns:
+            Path object for the models directory (e.g., ./data/models/).
+        """
+        return Path(self._paths.data_models_dir)
 
     def getDataDownloadsDir(self) -> Path:
         """Get the data downloads directory path.
