@@ -52,19 +52,19 @@ Forces a complete re-scan of all scripts, ignoring the hash-based cache.
 
 ```bash
 # Analyze all scripts
-uv run python tools/shellscript_env_var_args_detector/detect_shell_params.py
+uv run python tools/shellscript_analyzer/detect_shell_params.py
 
 # Analyze a specific script
-uv run python tools/shellscript_env_var_args_detector/detect_shell_params.py --file scripts/convert_to_audio.sh
+uv run python tools/shellscript_analyzer/detect_shell_params.py --file scripts/convert_to_audio.sh
 
 # Run discovery test (find all scripts)
-uv run python tools/shellscript_env_var_args_detector/detect_shell_params.py --test discover
+uv run python tools/shellscript_analyzer/detect_shell_params.py --test discover
 
 # Run extraction test (extract content from first script)
-uv run python tools/shellscript_env_var_args_detector/detect_shell_params.py --test extract
+uv run python tools/shellscript_analyzer/detect_shell_params.py --test extract
 
 # Run analysis test (analyze first script)
-uv run python tools/shellscript_env_var_args_detector/detect_shell_params.py --test analyze
+uv run python tools/shellscript_analyzer/detect_shell_params.py --test analyze
 ```
 
 ## Requirements
@@ -84,7 +84,7 @@ export LM_STUDIO_API_KEY="local"
 Or with command-line arguments:
 
 ```bash
-uv run python tools/shellscript_env_var_args_detector/detect_shell_params.py \
+uv run python tools/shellscript_analyzer/detect_shell_params.py \
   --base-url http://localhost:1234/v1 \
   --model qwen2.5-7b-instruct-mlx \
   --api-key local

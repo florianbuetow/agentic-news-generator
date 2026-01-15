@@ -7,10 +7,10 @@ arguments. It helps identify scripts that should be more configurable or explici
 about their dependencies.
 
 Usage:
-    python tools/shellscript_env_var_args_detector/detect_shell_params.py                    # Run full detection
-    python tools/shellscript_env_var_args_detector/detect_shell_params.py --test discover    # Test file discovery
-    python tools/shellscript_env_var_args_detector/detect_shell_params.py --test extract     # Test script extraction
-    python tools/shellscript_env_var_args_detector/detect_shell_params.py --test analyze     # Test agent analysis
+    python tools/shellscript_analyzer/detect_shell_params.py                    # Run full detection
+    python tools/shellscript_analyzer/detect_shell_params.py --test discover    # Test file discovery
+    python tools/shellscript_analyzer/detect_shell_params.py --test extract     # Test script extraction
+    python tools/shellscript_analyzer/detect_shell_params.py --test analyze     # Test agent analysis
 """
 
 import argparse

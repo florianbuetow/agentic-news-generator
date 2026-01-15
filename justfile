@@ -417,7 +417,7 @@ ai-review-unit-tests-nocache:
 ai-review-shell-scripts:
     @echo ""
     @printf "\033[0;34m=== Reviewing Shell Scripts for Env Var Violations ===\033[0m\n"
-    @uv run python tools/shellscript_env_var_args_detector/detect_env_violations.py
+    @uv run python tools/shellscript_analyzer/shellscript_analyzer.py
     @echo ""
 
 # Run AI-powered shell script reviewer (clear cache and force re-scan)
@@ -426,7 +426,7 @@ ai-review-shell-scripts-nocache:
     @printf "\033[0;34m=== Reviewing Shell Scripts for Env Var Violations (No Cache) ===\033[0m\n"
     @rm -rf .cache/shell_script_hashes.json
     @printf "\033[0;33m✓ Cache cleared\033[0m\n"
-    @uv run python tools/shellscript_env_var_args_detector/detect_env_violations.py --no-cache
+    @uv run python tools/shellscript_analyzer/shellscript_analyzer.py --no-cache
     @echo ""
 
 # Run unit tests only (fast)

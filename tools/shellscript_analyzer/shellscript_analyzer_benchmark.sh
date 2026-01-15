@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Change to project root directory (parent of notebooks/)
-cd "$(dirname "$0")/.."
+# Change to project root directory (two levels up from tools/shellscript_analyzer/)
+cd "$(dirname "$0")/../.."
 
 # Array of models to test (ordered from smallest to largest)
 models=(
     "qwen2.5-7b-instruct-mlx"
+    "deepseek/deepseek-r1-0528-qwen3-8b"
     "nvidia/nemotron-3-nano"
     "mistralai/devstral-small-2-2512"
     "mistral-small-3.2-24b-instruct-2506-mlx@4bit"
     "google/gemma-3-27b"
-    "qwen/qwen3-coder-30b"
     "mistral-small-3.2-24b-instruct-2506-mlx@6bit"
+    "qwen/qwen3-coder-30b"
     "qwen3-30b-a3b-thinking-2507-mlx@6bit"
-    "kimi-linear-48b-a3b-instruct"
-    "wizardcoder-33b-v1.1-mlx"
     "glm-4-32b-0414"
 )
 
@@ -90,6 +89,17 @@ for model in "${models[@]}"; do
     log_path="reports/${log_filename}.log"
     csv_path="reports/${log_filename}.csv"
 
+    # Skip if CSV already exists
+    if [ -f "$csv_path" ]; then
+        echo ""
+        echo "======================================"
+        echo "[$current/$total_models] Model: $model"
+        echo "======================================"
+        echo "  ⏭️  SKIPPED - CSV file already exists: $csv_path"
+        echo ""
+        continue
+    fi
+
     echo ""
     echo "======================================"
     echo "[$current/$total_models] Model: $model"
@@ -115,8 +125,8 @@ for model in "${models[@]}"; do
 
         # Run the detector (capture exit code but don't let it stop the script)
         set +e  # Temporarily disable exit on error
-        uv run python tools/shellscript_env_var_args_detector/detect_env_violations.py \
-            --root-path tools/shellscript_env_var_args_detector/example_tests/ \
+        uv run python tools/shellscript_analyzer/shellscript_analyzer.py \
+            --root-path tools/shellscript_analyzer/example_tests/ \
             --model "$model" \
             --no-cache 2>&1
         exit_code=$?
