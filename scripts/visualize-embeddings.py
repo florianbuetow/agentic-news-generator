@@ -137,8 +137,8 @@ def load_embeddings(json_path: Path) -> EmbeddingsData:
 class SegmentInfo:
     """Information about a segment including position and topics."""
 
-    start_token: int
-    end_token: int
+    start_word: int
+    end_word: int
     specific_topics: list[str]
 
 
@@ -158,7 +158,7 @@ def load_segments(json_path: Path) -> tuple[list[int], float, list[SegmentInfo]]
     # Get threshold from config
     threshold = data.get("config", {}).get("threshold_value", 0.4)
 
-    # Boundaries are at end_token of each segment except the last
+    # Boundaries are at end_word of each segment except the last
     segments = data.get("segments", [])
     boundaries: list[int] = []
     segment_infos: list[SegmentInfo] = []
@@ -166,13 +166,13 @@ def load_segments(json_path: Path) -> tuple[list[int], float, list[SegmentInfo]]
     for i, seg in enumerate(segments):
         segment_infos.append(
             SegmentInfo(
-                start_token=seg["start_token"],
-                end_token=seg["end_token"],
+                start_word=seg["start_word"],
+                end_word=seg["end_word"],
                 specific_topics=[],  # Will be filled from topics JSON
             )
         )
         if i < len(segments) - 1:
-            boundaries.append(seg["end_token"])
+            boundaries.append(seg["end_word"])
 
     return boundaries, threshold, segment_infos
 
@@ -220,8 +220,8 @@ def _draw_segment_backgrounds(
 
     for i, seg in enumerate(segment_infos):
         # Clamp segment bounds to visible range
-        seg_start = max(seg.start_token, x_min)
-        seg_end = min(seg.end_token, x_max)
+        seg_start = max(seg.start_word, x_min)
+        seg_end = min(seg.end_word, x_max)
 
         if seg_start >= seg_end:
             continue
@@ -258,22 +258,19 @@ def _plot_single_distance(
     offsets: list[int],
     distance: int,
     stride: int,
-    boundaries: list[int] | None,
-    threshold: float | None,
-    segment_infos: list[SegmentInfo] | None,
+    boundaries: list[int],
+    threshold: float,
+    segment_infos: list[SegmentInfo],
     is_top_plot: bool,
 ) -> None:
     """Plot similarity curve for a single distance on given axes."""
     positions, similarities = compute_similarities_at_distance(embeddings, offsets, distance, stride)
 
     if not positions:
-        ax.text(0.5, 0.5, "Insufficient data", ha="center", va="center", transform=ax.transAxes)
-        ax.set_ylabel(f"{distance}w")
-        return
+        raise ValueError(f"Insufficient data for distance {distance}")
 
     # Draw segment backgrounds first (behind everything)
-    if segment_infos:
-        _draw_segment_backgrounds(ax, segment_infos, offsets[0], offsets[-1], is_top_plot)
+    _draw_segment_backgrounds(ax, segment_infos, offsets[0], offsets[-1], is_top_plot)
 
     # Plot as filled area
     ax.fill_between(positions, similarities, alpha=0.3, color="steelblue")
@@ -284,12 +281,10 @@ def _plot_single_distance(
     ax.axhline(y=0.8, color="green", linestyle=":", linewidth=0.5, alpha=0.5)
 
     # Draw threshold line
-    if threshold is not None:
-        ax.axhline(y=threshold, color="red", linestyle="-", linewidth=1.0, alpha=0.7)
+    ax.axhline(y=threshold, color="red", linestyle="-", linewidth=1.0, alpha=0.7)
 
     # Draw vertical boundary lines
-    if boundaries:
-        _draw_boundary_markers(ax, boundaries)
+    _draw_boundary_markers(ax, boundaries)
 
     # Axis labels and limits
     actual_skip = max(1, round(distance / stride))
@@ -301,9 +296,7 @@ def _plot_single_distance(
     # Add statistics text
     mean_sim = np.mean(similarities)
     min_sim = np.min(similarities)
-    stats_text = f"μ={mean_sim:.2f} min={min_sim:.2f}"
-    if boundaries:
-        stats_text += f" bounds={len(boundaries)}"
+    stats_text = f"μ={mean_sim:.2f} min={min_sim:.2f} bounds={len(boundaries)}"
     ax.text(
         0.98,
         0.95,
@@ -322,9 +315,8 @@ def _create_offset_to_timestamp_mapper(offsets: list[int], timestamps: list[floa
     Returns:
         Tuple of (mapper_function, max_timestamp).
     """
-    if not timestamps or all(t == 0.0 for t in timestamps):
-        # No timestamps available, return identity mapper
-        return lambda x: float(x), 0.0
+    if not timestamps:
+        raise ValueError("timestamps list cannot be empty")
 
     offsets_arr = np.array(offsets, dtype=np.float64)
     timestamps_arr = np.array(timestamps, dtype=np.float64)
@@ -349,24 +341,25 @@ def create_visualization(
     model_name: str,
     title: str,
     output_path: Path,
-    boundaries: list[int] | None = None,
-    threshold: float | None = None,
-    segment_infos: list[SegmentInfo] | None = None,
-    timestamps: list[float] | None = None,
+    boundaries: list[int],
+    threshold: float,
+    segment_infos: list[SegmentInfo],
+    timestamps: list[float],
 ) -> None:
     """Create stacked visualization of similarities at different distances."""
     # Filter distances that are feasible given the data
-    max_offset = offsets[-1] if offsets else 0
+    if not offsets:
+        raise ValueError("offsets list cannot be empty")
+    max_offset = offsets[-1]
     feasible_distances = [d for d in DISTANCES if d < max_offset // 2]
 
     if not feasible_distances:
-        print(f"  Warning: Not enough data for visualization (max offset: {max_offset})")
-        return
+        raise ValueError(f"Not enough data for visualization (max offset: {max_offset})")
 
-    # Create offset-to-timestamp mapper if timestamps available
-    has_timestamps = timestamps is not None and len(timestamps) > 0 and any(t > 0 for t in timestamps)
+    # Create offset-to-timestamp mapper
+    has_timestamps = len(timestamps) > 0 and any(t > 0 for t in timestamps)
     format_xaxis: Callable[[float, int], str] | None = None
-    if has_timestamps and timestamps is not None:
+    if has_timestamps:
         offset_to_time, _ = _create_offset_to_timestamp_mapper(offsets, timestamps)
 
         def format_xaxis_fn(x: float, _pos: int) -> str:
@@ -427,27 +420,25 @@ def process_embeddings_file(json_path: Path, output_dir: Path) -> bool:
         print("  Warning: Too few embeddings for meaningful visualization")
         return False
 
-    # Try to load segmentation JSON for boundaries and threshold
+    # Load segmentation JSON for boundaries and threshold (required)
     # File naming: input_embeddings.json -> input_segmentation.json
     segments_path = Path(str(json_path).replace("_embeddings.json", "_segmentation.json"))
-    boundaries: list[int] | None = None
-    threshold: float | None = None
-    segment_infos: list[SegmentInfo] | None = None
-    if segments_path.exists():
-        boundaries, threshold, segment_infos = load_segments(segments_path)
-        print(f"  Loaded {len(boundaries)} boundaries, threshold={threshold}")
+    if not segments_path.exists():
+        raise FileNotFoundError(f"Required segmentation file not found: {segments_path}")
+    boundaries, threshold, segment_infos = load_segments(segments_path)
+    print(f"  Loaded {len(boundaries)} boundaries, threshold={threshold}")
 
-        # Try to load topics JSON and merge into segment_infos
-        # File naming: input_embeddings.json -> input_topics.json
-        topics_path = Path(str(json_path).replace("_embeddings.json", "_topics.json"))
-        if topics_path.exists():
-            topics_list = load_topics(topics_path)
-            if len(topics_list) == len(segment_infos):
-                for seg_info, topics in zip(segment_infos, topics_list, strict=True):
-                    seg_info.specific_topics = topics
-                print(f"  Loaded topics for {len(segment_infos)} segments")
-            else:
-                print(f"  Warning: Topics count ({len(topics_list)}) doesn't match segments ({len(segment_infos)})")
+    # Load topics JSON and merge into segment_infos (required)
+    # File naming: input_embeddings.json -> input_topics.json
+    topics_path = Path(str(json_path).replace("_embeddings.json", "_topics.json"))
+    if not topics_path.exists():
+        raise FileNotFoundError(f"Required topics file not found: {topics_path}")
+    topics_list = load_topics(topics_path)
+    if len(topics_list) != len(segment_infos):
+        raise ValueError(f"Topics count ({len(topics_list)}) doesn't match segments ({len(segment_infos)})")
+    for seg_info, topics in zip(segment_infos, topics_list, strict=True):
+        seg_info.specific_topics = topics
+    print(f"  Loaded topics for {len(segment_infos)} segments")
 
     # Create output path
     output_filename = json_path.name.replace("_embeddings.json", "_similarity.jpg")
