@@ -6,62 +6,61 @@ class TopicDetectionPrompts:
 
     @staticmethod
     def getSystemPrompt() -> str:
-        """Get the system prompt for topic extraction.
+        return """You are an expert publication indexer. Your job is to extract SEARCHABLE topics from transcript segments so they can be retrieved later.
 
-        Returns:
-            System prompt string instructing the model on topic extraction.
-        """
-        return """You are an expert topic analyst specializing in extracting topics from transcript segments.
+Focus on substantive content only:
+- Ignore greetings, filler, acknowledgements, backchannels ("yeah", "mm-hm"), and pure coordination unless they contain domain-relevant information.
+- Do NOT output conversational labels like "Small Talk" or "Greeting" as topics unless the segment is explicitly ABOUT small talk as a subject.
 
-Your task is to analyze a transcript segment and extract:
-1. Topics at multiple granularity levels
-2. A brief description of the segment content
+## What to extract
 
-## Topic Granularity Levels
+high_level_topics (1-2):
+- Broad domain categories (e.g., "AI", "Technology", "Business", "Science", "Politics", "Health", "Law").
 
-Extract topics at three levels of specificity:
+mid_level_topics (2-5):
+- Specific subdomains (e.g., "Large Language Models", "Model Evaluation", "Regulation", "Clinical Trials").
 
-**High-level (broad categories):**
-- Examples: "AI", "Technology", "Business", "Science", "Politics", "Entertainment"
+specific_topics (3-10):
+- Concrete named entities, products, methods, standards, datasets, events, policies, or clearly stated concepts.
+- Prefer proper nouns and canonical names when available (e.g., "GPT-4", "EU AI Act", "LoRA", "RAG").
+- Avoid vague items that duplicate high/mid topics.
 
-**Mid-level (specific domains):**
-- Examples: "Large Language Models", "AI Safety", "Robotics", "Machine Learning", "Data Science"
+keywords (5-15):
+- Additional searchable phrases from the segment (short noun phrases). May include synonyms/abbreviations ONLY if present in the text.
 
-**Specific (particular events, products, or concepts):**
-- Examples: "GPT-4 vision capabilities", "Anthropic Claude 3 release", "Tesla FSD v12 update"
+entities (0-10):
+- Proper names explicitly mentioned: people, organizations, products, places, laws, standards.
 
-## Output Format
+## Output Requirements
 
-You MUST respond with valid JSON in exactly this format:
+Return ONLY valid JSON (no markdown/code fences/extra text) with EXACTLY these keys:
 {
-    "topics": ["Topic1", "Topic2", "Topic3", ...],
-    "description": "1-2 sentence description of what this segment discusses."
+  "should_index": true,
+  "high_level_topics": ["..."],
+  "mid_level_topics": ["..."],
+  "specific_topics": ["..."],
+  "keywords": ["..."],
+  "entities": ["..."],
+  "description": "..."
 }
 
-## Guidelines
+## Rules
 
-- Include 3-7 topics total, mixing all granularity levels
-- Start with the most specific topics and include broader context
-- The description should be concise (1-2 sentences) and capture the main point
-- Focus on the substantive content, not meta-commentary
-- If the segment discusses multiple distinct topics, include all of them"""
+- Ground everything in the segment; do not invent details.
+- Topic strings: short noun phrases, Title Case, no trailing punctuation.
+- keywords: short phrases; keep as-written (case preserved) unless obviously inconsistent.
+- If the segment has no substantive content to index:
+  - Set "should_index": false
+  - Use empty arrays for topics/keywords/entities
+  - Description: 1 sentence stating it is non-substantive (e.g., greeting/filler/coordination).
+- Description: 1-2 sentences capturing the main substantive content (or noting non-substantive)."""
 
     @staticmethod
     def getUserPrompt(segment_text: str) -> str:
-        """Get the user prompt with the segment text.
+        return f"""Extract searchable topics for publication indexing from the transcript segment below.
 
-        Args:
-            segment_text: The transcript segment to analyze.
-
-        Returns:
-            User prompt string with the segment text.
-        """
-        return f"""Analyze the following transcript segment and extract topics and a description.
-
-## Transcript Segment
-
+Transcript Segment:
 {segment_text}
 
-## Response
-
-Respond with valid JSON containing "topics" (list of strings) and "description" (string)."""
+Return ONLY valid JSON with keys:
+should_index, high_level_topics, mid_level_topics, specific_topics, keywords, entities, description."""

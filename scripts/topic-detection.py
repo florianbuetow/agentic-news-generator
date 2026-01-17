@@ -43,7 +43,9 @@ class SegmentTopics(BaseModel):
     segment_id: int
     start_timestamp: str
     end_timestamp: str
-    topics: list[str]
+    high_level_topics: list[str]
+    mid_level_topics: list[str]
+    specific_topics: list[str]
     description: str
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -151,7 +153,9 @@ def process_transcript(srt_path: Path, config: Config) -> TranscriptTopics:
                 segment_id=i + 1,
                 start_timestamp=format_timedelta(seg.start),
                 end_timestamp=format_timedelta(seg.end),
-                topics=topics.topics,
+                high_level_topics=topics.high_level_topics,
+                mid_level_topics=topics.mid_level_topics,
+                specific_topics=topics.specific_topics,
                 description=topics.description,
             )
         )
@@ -217,36 +221,31 @@ def main() -> int:
     print()
 
     success_count = 0
-    failure_count = 0
 
-    # Process each transcript
+    # Process each transcript - fail fast on first error
     for srt_file in srt_files:
         relative_path = srt_file.relative_to(base_dir)
         print(f"Processing: {relative_path}")
 
-        try:
-            result = process_transcript(srt_file, config)
+        result = process_transcript(srt_file, config)
 
-            # Write JSON output
-            output_path = output_dir / relative_path.with_suffix(".topics.json")
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write JSON output
+        output_path = output_dir / relative_path.with_suffix(".topics.json")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(result.model_dump(), f, indent=2, ensure_ascii=False)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result.model_dump(), f, indent=2, ensure_ascii=False)
 
-            print(f"  → {result.total_segments} segments extracted → {output_path}")
-            success_count += 1
-        except Exception as e:
-            print(f"  Error processing {srt_file}: {e}", file=sys.stderr)
-            failure_count += 1
+        print(f"  → {result.total_segments} segments extracted → {output_path}")
+        success_count += 1
 
         print()
 
     # Summary
     print("=" * 50)
-    print(f"Completed: {success_count} succeeded, {failure_count} failed")
+    print(f"Completed: {success_count} succeeded")
 
-    return 1 if failure_count > 0 else 0
+    return 0
 
 
 if __name__ == "__main__":

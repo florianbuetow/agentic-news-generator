@@ -7,16 +7,25 @@ class TopicDetectionResult(BaseModel):
     """Result of topic detection for a text segment.
 
     Attributes:
-        topics: List of topics at multiple granularity levels:
-                - High-level: "AI", "Technology", "Business"
-                - Mid-level: "Large Language Models", "AI Safety", "Robotics"
-                - Specific: "GPT-4 vision capabilities", "Anthropic Claude 3 release"
+        high_level_topics: Broad category topics (e.g., "AI", "Technology", "Business").
+        mid_level_topics: Specific domain topics (e.g., "Large Language Models", "AI Safety").
+        specific_topics: Particular events/products/concepts (e.g., "GPT-4 vision capabilities").
         description: 1-2 sentence description of the segment content.
     """
 
-    topics: list[str] = Field(
+    high_level_topics: list[str] = Field(
         ...,
-        description="List of topics at various granularity levels",
+        description="Broad category topics (1-2)",
+        min_length=1,
+    )
+    mid_level_topics: list[str] = Field(
+        ...,
+        description="Specific domain topics (1-3)",
+        min_length=1,
+    )
+    specific_topics: list[str] = Field(
+        ...,
+        description="Particular events, products, or concepts discussed (1-3)",
         min_length=1,
     )
     description: str = Field(
