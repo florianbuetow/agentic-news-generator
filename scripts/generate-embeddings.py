@@ -50,7 +50,7 @@ def srt_entry_to_data(entry: SRTEntry) -> SRTEntryData:
     )
 
 
-def process_srt(srt_path: Path, config: Config) -> EmbeddingsOutput:
+def process_srt(srt_path: Path, config: Config) -> tuple[EmbeddingsOutput, bool]:
     """Process a single SRT file and generate embeddings.
 
     Args:
@@ -58,7 +58,8 @@ def process_srt(srt_path: Path, config: Config) -> EmbeddingsOutput:
         config: Configuration object.
 
     Returns:
-        EmbeddingsOutput with tokens, SRT entries, and embeddings.
+        Tuple of (EmbeddingsOutput, is_short) where is_short indicates
+        the text was shorter than window_size.
     """
     td_config = config.get_topic_detection_config()
     sw_config = td_config.sliding_window
@@ -81,13 +82,12 @@ def process_srt(srt_path: Path, config: Config) -> EmbeddingsOutput:
         stride=sw_config.stride,
         threshold_method=sw_config.threshold_method,
         threshold_value=sw_config.threshold_value,
-        min_segment_tokens=sw_config.min_segment_tokens,
         smoothing_passes=sw_config.smoothing_passes,
     )
 
     # 4. Generate embeddings
     print("  Generating embeddings...")
-    tokens, chunk_data = segmenter.generate_embeddings(text)
+    words, chunk_data, is_short = segmenter.generate_embeddings(text)
     print(f"  Generated {len(chunk_data.chunk_positions)} windows")
 
     # 5. Build output structure
@@ -107,15 +107,95 @@ def process_srt(srt_path: Path, config: Config) -> EmbeddingsOutput:
         stride=sw_config.stride,
     )
 
-    return EmbeddingsOutput(
+    output = EmbeddingsOutput(
         source_file=str(srt_path),
         generated_at=datetime.now().isoformat(),
         config=config_data,
-        total_tokens=len(tokens),
-        tokens=tokens,
+        total_words=len(words),
+        words=words,
         srt_entries=srt_entries_data,
         windows=windows_data,
     )
+    return output, is_short
+
+
+def get_srt_files(args: argparse.Namespace, config: Config) -> tuple[list[Path], Path] | int:
+    """Determine which SRT files to process.
+
+    Args:
+        args: Parsed command line arguments.
+        config: Configuration object.
+
+    Returns:
+        Tuple of (srt_files, base_dir) or an exit code if error.
+    """
+    if args.file:
+        if not args.file.exists():
+            print(f"Error: File not found: {args.file}", file=sys.stderr)
+            return 1
+        if args.file.suffix.lower() != ".srt":
+            print(f"Error: Expected .srt file, got: {args.file}", file=sys.stderr)
+            return 1
+        return [args.file], args.file.parent
+
+    cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
+    if not cleaned_dir.exists():
+        print(f"Error: Cleaned transcripts directory not found: {cleaned_dir}", file=sys.stderr)
+        return 1
+
+    srt_files = sorted(cleaned_dir.rglob("*.srt"))
+    srt_files = [f for f in srt_files if not f.name.startswith("._")]
+    return srt_files, cleaned_dir
+
+
+def process_single_file(
+    srt_file: Path,
+    base_dir: Path,
+    output_dir: Path,
+    config: Config,
+) -> tuple[str, str | None]:
+    """Process a single SRT file.
+
+    Args:
+        srt_file: Path to the SRT file.
+        base_dir: Base directory for relative paths.
+        output_dir: Output directory for embeddings.
+        config: Configuration object.
+
+    Returns:
+        Tuple of (status, relative_path) where status is "success", "skipped",
+        "warning", or "empty".
+    """
+    relative_path = srt_file.relative_to(base_dir)
+    output_subdir = output_dir / relative_path.parent
+    output_filename = relative_path.stem + "_embeddings.json"
+    output_path = output_subdir / output_filename
+
+    if output_path.exists():
+        return "skipped", None
+
+    print(f"Processing: {relative_path}")
+
+    try:
+        embeddings_result, is_short = process_srt(srt_file, config)
+        output_subdir.mkdir(parents=True, exist_ok=True)
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(embeddings_result.model_dump(), f, indent=2, ensure_ascii=False)
+
+        if is_short:
+            print("  ⚠ WARNING: Text too short, created single embedding")
+            print(f"  → {len(embeddings_result.windows)} windows → {output_path}")
+            print()
+            return "warning", None
+
+        print(f"  → {len(embeddings_result.windows)} windows → {output_path}")
+        print()
+        return "success", None
+    except ValueError as e:
+        print(f"  ⚠ SKIPPED: {e}")
+        print()
+        return "empty", str(relative_path)
 
 
 def main() -> int:
@@ -132,76 +212,51 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # Load config
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
     td_config = config.get_topic_detection_config()
 
-    # Output directory
     output_dir = config.getDataDir() / td_config.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Determine files to process
-    if args.file:
-        # Single file mode
-        if not args.file.exists():
-            print(f"Error: File not found: {args.file}", file=sys.stderr)
-            return 1
-        if args.file.suffix.lower() != ".srt":
-            print(f"Error: Expected .srt file, got: {args.file}", file=sys.stderr)
-            return 1
-        srt_files = [args.file]
-        base_dir = args.file.parent
-    else:
-        # Process all cleaned SRT files
-        cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
-        if not cleaned_dir.exists():
-            print(f"Error: Cleaned transcripts directory not found: {cleaned_dir}", file=sys.stderr)
-            return 1
-
-        srt_files = sorted(cleaned_dir.rglob("*.srt"))
-        srt_files = [f for f in srt_files if not f.name.startswith("._")]
-        base_dir = cleaned_dir
+    result = get_srt_files(args, config)
+    if isinstance(result, int):
+        return result
+    srt_files, base_dir = result
 
     if not srt_files:
         print("No SRT files found to process.")
         return 0
 
-    print(f"Found {len(srt_files)} SRT file(s) to process")
+    print(f"Found {len(srt_files)} SRT file(s) to check")
     print(f"Output directory: {output_dir}")
     print()
 
-    success_count = 0
-    failure_count = 0
+    counts = {"success": 0, "skipped": 0, "warning": 0}
+    empty_files: list[str] = []
 
     for srt_file in srt_files:
-        relative_path = srt_file.relative_to(base_dir)
-        print(f"Processing: {relative_path}")
+        status, path = process_single_file(srt_file, base_dir, output_dir, config)
+        if status == "empty" and path:
+            empty_files.append(path)
+        else:
+            counts[status] += 1
 
-        try:
-            embeddings_result = process_srt(srt_file, config)
-
-            # Determine output path: channel/videofilename_embeddings.json
-            output_subdir = output_dir / relative_path.parent
-            output_subdir.mkdir(parents=True, exist_ok=True)
-            output_filename = relative_path.stem + "_embeddings.json"
-            output_path = output_subdir / output_filename
-
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(embeddings_result.model_dump(), f, indent=2, ensure_ascii=False)
-
-            print(f"  → {len(embeddings_result.windows)} windows → {output_path}")
-            success_count += 1
-        except ValueError as e:
-            print(f"  Error: {e}", file=sys.stderr)
-            failure_count += 1
-        print()
-
-    # Summary
     print("=" * 50)
-    print(f"Completed: {success_count} succeeded, {failure_count} failed")
+    summary = f"Completed: {counts['success']} new, {counts['skipped']} skipped"
+    if counts["warning"] > 0:
+        summary += f", {counts['warning']} warnings"
+    if empty_files:
+        summary += f", {len(empty_files)} empty/skipped"
+    print(summary)
 
-    return 1 if failure_count > 0 else 0
+    if empty_files:
+        print()
+        print("Empty/whitespace-only files skipped:")
+        for path in empty_files:
+            print(f"  - {path}")
+
+    return 0
 
 
 if __name__ == "__main__":
