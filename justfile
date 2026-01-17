@@ -85,6 +85,7 @@ all:
     @just archive-videos
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
+    @just topic-detection
 
 # Download YouTube videos from channels in config.yaml
 download-videos:
@@ -162,6 +163,13 @@ transcripts-remove-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
     @uv run python scripts/transcript-hallucination-removal.py
+    @echo ""
+
+# Run topic detection on cleaned transcripts
+topic-detection:
+    @echo ""
+    @printf "\033[0;34m=== Running Topic Detection ===\033[0m\n"
+    @uv run python scripts/topic-detection.py
     @echo ""
 
 # Show processing status of downloads
@@ -587,6 +595,10 @@ all-quiet:
     printf "🚀 Starting transcripts-remove-hallucinations...\n"
     just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed transcripts-remove-hallucinations\n"
+
+    printf "🚀 Starting topic-detection...\n"
+    just topic-detection > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Topic-detection failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed topic-detection\n"
 
     echo ""
     printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"
