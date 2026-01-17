@@ -47,6 +47,22 @@ The pipeline segments continuous text (e.g., podcast transcripts) into topically
                                         └──────────────────────┘
 ```
 
+## Running the Pipeline
+
+The pipeline is executed in three steps via justfile targets:
+
+| Target | Script | Behavior |
+|--------|--------|----------|
+| `just topics-embed` | `scripts/generate-embeddings.py` | Creates `_embeddings.json` files. **Skips existing files** (incremental). |
+| `just topics-boundaries` | `scripts/detect-boundaries.py` | Creates `_segmentation.json` files. **Overwrites existing files** (fast operation). |
+| `just topics-extract` | `scripts/extract-topics.py` | Extracts topics from segments using LLM. |
+| `just topics-all` | Runs all three steps | Complete pipeline execution. |
+
+**Incremental Processing:**
+- `topics-embed` is the slowest step (requires embedding model inference). It skips files that already exist, so you can safely re-run it to process only new transcripts.
+- `topics-boundaries` is fast (pure computation on pre-computed embeddings). It always regenerates all segmentation files, allowing you to experiment with different threshold parameters without re-computing embeddings.
+- `topics-extract` uses LLM inference to extract topic titles and summaries from each segment.
+
 ## Stage 1: Tokenization
 
 The text is split into word-level tokens (not BPE/subword tokens). This provides:
