@@ -44,6 +44,8 @@ class TestLLMConfig:
             max_tokens=32000,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         assert config.model == "qwen3-30b-a3b-thinking-2507-mlx@8bit"
         assert config.api_base == "http://127.0.0.1:1234/v1"
@@ -52,6 +54,8 @@ class TestLLMConfig:
         assert config.max_tokens == 32000
         assert config.temperature == 0.7
         assert config.context_window_threshold == 90
+        assert config.max_retries == 3
+        assert config.retry_delay == 2.0
 
     def test_valid_llm_config_with_none_api_base(self) -> None:
         """Test valid LLM configuration with None api_base."""
@@ -63,6 +67,8 @@ class TestLLMConfig:
             max_tokens=4096,
             temperature=0.5,
             context_window_threshold=85,
+            max_retries=3,
+            retry_delay=2.0,
         )
         assert config.model == "anthropic/claude-3-5-sonnet-20241022"
         assert config.api_base is None
@@ -234,6 +240,8 @@ class TestLLMConfig:
             max_tokens=2048,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         with pytest.raises(ValidationError):
             config.temperature = 0.5
@@ -299,6 +307,8 @@ class TestLLMConfig:
             max_tokens=2048,
             temperature=0.7,
             context_window_threshold=0,
+            max_retries=3,
+            retry_delay=2.0,
         )
         assert config_0.context_window_threshold == 0
 
@@ -311,6 +321,8 @@ class TestLLMConfig:
             max_tokens=2048,
             temperature=0.7,
             context_window_threshold=100,
+            max_retries=3,
+            retry_delay=2.0,
         )
         assert config_100.context_window_threshold == 100
 
@@ -328,6 +340,8 @@ class TestTopicSegmentationConfig:
             max_tokens=32000,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         critic_llm = LLMConfig(
             model="test-critic-model",
@@ -337,6 +351,8 @@ class TestTopicSegmentationConfig:
             max_tokens=32000,
             temperature=0.3,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         config = TopicSegmentationConfig(
             agent_llm=agent_llm,
@@ -473,6 +489,8 @@ class TestTopicSegmentationConfig:
             max_tokens=32000,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         critic_llm = LLMConfig(
             model="test-critic-model",
@@ -482,6 +500,8 @@ class TestTopicSegmentationConfig:
             max_tokens=32000,
             temperature=0.3,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         config = TopicSegmentationConfig(
             agent_llm=agent_llm,
@@ -518,6 +538,8 @@ class TestConfigWithTopicSegmentation:
                     "max_tokens": 32000,
                     "temperature": 0.7,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 "critic_llm": {
                     "model": "test-model",
@@ -527,6 +549,8 @@ class TestConfigWithTopicSegmentation:
                     "max_tokens": 32000,
                     "temperature": 0.3,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 "retry_limit": 3,
             },
@@ -633,6 +657,8 @@ class TestConfigWithTopicSegmentation:
                     "max_tokens": 32000,
                     "temperature": 0.7,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 "critic_llm": {
                     "model": "test-model",
@@ -642,6 +668,8 @@ class TestConfigWithTopicSegmentation:
                     "max_tokens": 32000,
                     "temperature": 0.3,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 # Missing retry_limit
             },

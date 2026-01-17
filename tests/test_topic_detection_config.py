@@ -63,7 +63,6 @@ def get_valid_topic_detection_config() -> dict[str, object]:
             "stride": 25,
             "threshold_method": "relative",
             "threshold_value": 0.4,
-            "min_segment_tokens": 100,
             "smoothing_passes": 1,
         },
         "topic_detection_llm": {
@@ -74,6 +73,8 @@ def get_valid_topic_detection_config() -> dict[str, object]:
             "max_tokens": 4096,
             "temperature": 0.3,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         },
         "output_dir": "output/topics",
     }
@@ -140,14 +141,12 @@ class TestTopicDetectionSlidingWindowConfig:
             stride=25,
             threshold_method="relative",
             threshold_value=0.4,
-            min_segment_tokens=100,
             smoothing_passes=1,
         )
         assert config.window_size == 50
         assert config.stride == 25
         assert config.threshold_method == "relative"
         assert config.threshold_value == 0.4
-        assert config.min_segment_tokens == 100
         assert config.smoothing_passes == 1
 
     def test_window_size_must_be_positive(self) -> None:
@@ -158,7 +157,6 @@ class TestTopicDetectionSlidingWindowConfig:
                 stride=25,
                 threshold_method="relative",
                 threshold_value=0.4,
-                min_segment_tokens=100,
                 smoothing_passes=1,
             )
         errors = exc_info.value.errors()
@@ -172,23 +170,10 @@ class TestTopicDetectionSlidingWindowConfig:
                 stride=0,
                 threshold_method="relative",
                 threshold_value=0.4,
-                min_segment_tokens=100,
                 smoothing_passes=1,
             )
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("stride",) for err in errors)
-
-    def test_min_segment_tokens_can_be_zero(self) -> None:
-        """Test that min_segment_tokens can be zero."""
-        config = TopicDetectionSlidingWindowConfig(
-            window_size=50,
-            stride=25,
-            threshold_method="relative",
-            threshold_value=0.4,
-            min_segment_tokens=0,
-            smoothing_passes=0,
-        )
-        assert config.min_segment_tokens == 0
 
 
 class TestTopicDetectionConfig:
