@@ -72,11 +72,12 @@ def word_position_to_timestamp(word_pos: int, entries: list[SRTEntry]) -> timede
     return entries[-1].end if entries else timedelta(0)
 
 
-def process_embeddings(embeddings_path: Path, config: Config) -> SegmentationOutput:
+def process_embeddings(embeddings_path: Path, data_dir: Path, config: Config) -> SegmentationOutput:
     """Process an embeddings file and detect topic boundaries.
 
     Args:
         embeddings_path: Path to the _embeddings.json file.
+        data_dir: Data directory for computing relative paths.
         config: Configuration object.
 
     Returns:
@@ -148,9 +149,12 @@ def process_embeddings(embeddings_path: Path, config: Config) -> SegmentationOut
         smoothing_passes=sw_config.smoothing_passes,
     )
 
+    # Compute relative path for embeddings file
+    relative_embeddings_path = embeddings_path.relative_to(data_dir)
+
     return SegmentationOutput(
-        source_file=embeddings_data.source_file,
-        embeddings_file=str(embeddings_path),
+        source_file=embeddings_data.source_file,  # Already relative from generate-embeddings
+        embeddings_file=str(relative_embeddings_path),
         segmented_at=datetime.now().isoformat(),
         config=config_data,
         total_segments=len(segment_results),
@@ -177,8 +181,9 @@ def main() -> int:
     config = Config(config_path)
     td_config = config.get_topic_detection_config()
 
-    # Output directory
-    output_dir = config.getDataDir() / td_config.output_dir
+    # Data and output directories
+    data_dir = config.getDataDir()
+    output_dir = data_dir / td_config.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine files to process
@@ -218,7 +223,7 @@ def main() -> int:
         print(f"Processing: {relative_path}")
 
         try:
-            segmentation_result = process_embeddings(embeddings_file, config)
+            segmentation_result = process_embeddings(embeddings_file, data_dir, config)
 
             # Write segmentation JSON output
             # Replace _embeddings.json with _segmentation.json

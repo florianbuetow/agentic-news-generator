@@ -50,11 +50,12 @@ def srt_entry_to_data(entry: SRTEntry) -> SRTEntryData:
     )
 
 
-def process_srt(srt_path: Path, config: Config) -> tuple[EmbeddingsOutput, bool]:
+def process_srt(srt_path: Path, data_dir: Path, config: Config) -> tuple[EmbeddingsOutput, bool]:
     """Process a single SRT file and generate embeddings.
 
     Args:
         srt_path: Path to the SRT file.
+        data_dir: Data directory for computing relative paths.
         config: Configuration object.
 
     Returns:
@@ -107,8 +108,11 @@ def process_srt(srt_path: Path, config: Config) -> tuple[EmbeddingsOutput, bool]
         stride=sw_config.stride,
     )
 
+    # Compute relative path from data_dir for portability
+    relative_source = srt_path.relative_to(data_dir)
+
     output = EmbeddingsOutput(
-        source_file=str(srt_path),
+        source_file=str(relative_source),
         generated_at=datetime.now().isoformat(),
         config=config_data,
         total_words=len(words),
@@ -152,6 +156,7 @@ def process_single_file(
     srt_file: Path,
     base_dir: Path,
     output_dir: Path,
+    data_dir: Path,
     config: Config,
 ) -> tuple[str, str | None]:
     """Process a single SRT file.
@@ -160,6 +165,7 @@ def process_single_file(
         srt_file: Path to the SRT file.
         base_dir: Base directory for relative paths.
         output_dir: Output directory for embeddings.
+        data_dir: Data directory for computing relative source paths.
         config: Configuration object.
 
     Returns:
@@ -177,7 +183,7 @@ def process_single_file(
     print(f"Processing: {relative_path}")
 
     try:
-        embeddings_result, is_short = process_srt(srt_file, config)
+        embeddings_result, is_short = process_srt(srt_file, data_dir, config)
         output_subdir.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, "w", encoding="utf-8") as f:
@@ -216,7 +222,8 @@ def main() -> int:
     config = Config(config_path)
     td_config = config.get_topic_detection_config()
 
-    output_dir = config.getDataDir() / td_config.output_dir
+    data_dir = config.getDataDir()
+    output_dir = data_dir / td_config.output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
     result = get_srt_files(args, config)
@@ -236,7 +243,7 @@ def main() -> int:
     empty_files: list[str] = []
 
     for srt_file in srt_files:
-        status, path = process_single_file(srt_file, base_dir, output_dir, config)
+        status, path = process_single_file(srt_file, base_dir, output_dir, data_dir, config)
         if status == "empty" and path:
             empty_files.append(path)
         else:
