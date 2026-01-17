@@ -20,7 +20,7 @@ class SlidingWindowTopicSegmenter:
     """Unsupervised topic segmenter using embedding-based sliding window analysis.
 
     This class orchestrates a pipeline that:
-    1. Tokenizes input text into words (word-level, not BPE)
+    1. Tokenizes input text into words
     2. Creates overlapping chunks of words
     3. Embeds each chunk using the injected EmbeddingGenerator
     4. Computes similarity between adjacent chunks
@@ -36,7 +36,6 @@ class SlidingWindowTopicSegmenter:
                          - "absolute": fixed similarity threshold
                          - "percentile": bottom N percentile of scores
         threshold_value: Threshold parameter (meaning depends on method).
-        min_segment_tokens: Minimum words per segment (prevents over-segmentation).
         smoothing_passes: Number of smoothing iterations on similarity curve.
     """
 
@@ -47,11 +46,11 @@ class SlidingWindowTopicSegmenter:
         stride: int,
         threshold_method: str,
         threshold_value: float,
-        min_segment_tokens: int,
         smoothing_passes: int,
     ) -> None:
         self.window_size = window_size
         self.stride = stride
+        self.embedding_generator = embedding_generator
 
         # Initialize pipeline components
         self.tokenizer = Tokenizer()
@@ -62,7 +61,7 @@ class SlidingWindowTopicSegmenter:
         )
         self.similarity_calculator = SimilarityCalculator(smoothing_passes=smoothing_passes)
         self.boundary_detector = BoundaryDetector(method=threshold_method, threshold=threshold_value)
-        self.segment_assembler = SegmentAssembler(tokenizer=self.tokenizer, min_segment_tokens=min_segment_tokens)
+        self.segment_assembler = SegmentAssembler(tokenizer=self.tokenizer)
 
     def segment(self, text: str) -> SegmentationResult:
         """Segment text into topically coherent sections.
@@ -79,28 +78,28 @@ class SlidingWindowTopicSegmenter:
                 segments=[],
                 boundary_indices=[],
                 similarity_scores=np.array([]),
-                num_tokens=0,
+                num_words=0,
             )
 
         # Tokenize
-        tokens = self.tokenizer.tokenize(text)
-        num_tokens = len(tokens)
+        words = self.tokenizer.tokenize(text)
+        num_words = len(words)
 
         # Handle text too short for sliding window
-        if num_tokens < 2 * self.window_size:
-            return self._single_segment_result(text, tokens)
+        if num_words < 2 * self.window_size:
+            return self._single_segment_result(text, words)
 
         # Run pipeline
-        chunk_data = self.encoder.encode(tokens)
+        chunk_data = self.encoder.encode(words)
         similarity_data = self.similarity_calculator.calculate(chunk_data)
         boundary_data = self.boundary_detector.detect(similarity_data)
-        segments = self.segment_assembler.assemble(tokens, boundary_data)
+        segments = self.segment_assembler.assemble(words, boundary_data)
 
         return SegmentationResult(
             segments=segments,
             boundary_indices=boundary_data.boundary_indices,
             similarity_scores=similarity_data.scores,
-            num_tokens=num_tokens,
+            num_words=num_words,
             chunk_data=chunk_data,
         )
 
@@ -119,12 +118,12 @@ class SlidingWindowTopicSegmenter:
         if not text or not text.strip():
             return np.array([])
 
-        tokens = self.tokenizer.tokenize(text)
+        words = self.tokenizer.tokenize(text)
 
-        if len(tokens) < 2 * self.window_size:
+        if len(words) < 2 * self.window_size:
             return np.array([])
 
-        chunk_data = self.encoder.encode(tokens)
+        chunk_data = self.encoder.encode(words)
         similarity_data = self.similarity_calculator.calculate(chunk_data)
 
         return similarity_data.scores
@@ -141,7 +140,7 @@ class SlidingWindowTopicSegmenter:
         result = self.segment(text)
         return [seg.text for seg in result.segments]
 
-    def generate_embeddings(self, text: str) -> tuple[list[str], ChunkData]:
+    def generate_embeddings(self, text: str) -> tuple[list[str], ChunkData, bool]:
         """Generate embeddings for text without performing segmentation.
 
         Step 1 of the decoupled pipeline: tokenize and embed only.
@@ -150,78 +149,84 @@ class SlidingWindowTopicSegmenter:
             text: Input text to process.
 
         Returns:
-            Tuple of (tokens, chunk_data) where tokens is the list of word tokens
-            and chunk_data contains the embeddings and chunk positions.
+            Tuple of (words, chunk_data, is_short) where:
+            - words: list of words
+            - chunk_data: embeddings and chunk positions
+            - is_short: True if text was shorter than window_size (warning)
 
         Raises:
-            ValueError: If text is empty or too short for the window size.
+            ValueError: If text is empty.
         """
         if not text or not text.strip():
             raise ValueError("Text is empty or contains only whitespace")
 
-        tokens = self.tokenizer.tokenize(text)
-        num_tokens = len(tokens)
+        words = self.tokenizer.tokenize(text)
+        num_words = len(words)
 
-        if num_tokens < self.window_size:
-            raise ValueError(f"Text has {num_tokens} tokens, but window_size requires at least {self.window_size}")
+        if num_words < self.window_size:
+            # Short text: create single embedding for entire text
+            full_text = self.tokenizer.detokenize(words)
+            embedding = self.embedding_generator.generate([full_text])
+            chunk_data = ChunkData(embeddings=embedding, chunk_positions=[0])
+            return words, chunk_data, True
 
-        chunk_data = self.encoder.encode(tokens)
-        return tokens, chunk_data
+        chunk_data = self.encoder.encode(words)
+        return words, chunk_data, False
 
-    def segment_from_chunk_data(self, tokens: list[str], chunk_data: ChunkData) -> SegmentationResult:
+    def segment_from_chunk_data(self, words: list[str], chunk_data: ChunkData) -> SegmentationResult:
         """Segment text using pre-computed embeddings.
 
         Step 2 of the decoupled pipeline: boundary detection from embeddings.
 
         Args:
-            tokens: List of word tokens (from generate_embeddings).
+            words: List of words (from generate_embeddings).
             chunk_data: Pre-computed embeddings (from generate_embeddings).
 
         Returns:
             SegmentationResult containing segments, boundaries, and scores.
         """
-        num_tokens = len(tokens)
+        num_words = len(words)
 
         # Handle text too short for meaningful segmentation
-        if num_tokens < 2 * self.window_size:
-            text = self.tokenizer.detokenize(tokens)
-            return self._single_segment_result(text, tokens)
+        if num_words < 2 * self.window_size:
+            text = self.tokenizer.detokenize(words)
+            return self._single_segment_result(text, words)
 
         # Run pipeline from similarity calculation onwards
         similarity_data = self.similarity_calculator.calculate(chunk_data)
         boundary_data = self.boundary_detector.detect(similarity_data)
-        segments = self.segment_assembler.assemble(tokens, boundary_data)
+        segments = self.segment_assembler.assemble(words, boundary_data)
 
         return SegmentationResult(
             segments=segments,
             boundary_indices=boundary_data.boundary_indices,
             similarity_scores=similarity_data.scores,
-            num_tokens=num_tokens,
+            num_words=num_words,
             chunk_data=chunk_data,
         )
 
-    def _single_segment_result(self, text: str, tokens: list[str]) -> SegmentationResult:
+    def _single_segment_result(self, text: str, words: list[str]) -> SegmentationResult:
         """Create a result with the entire text as a single segment.
 
         Used when the text is too short for meaningful segmentation.
 
         Args:
             text: Original text.
-            tokens: Tokenized text.
+            words: Tokenized text.
 
         Returns:
             SegmentationResult with one segment.
         """
         segment = Segment(
             text=text,
-            start_token=0,
-            end_token=len(tokens),
-            token_count=len(tokens),
+            start_word=0,
+            end_word=len(words),
+            word_count=len(words),
         )
 
         return SegmentationResult(
             segments=[segment],
             boundary_indices=[],
             similarity_scores=np.array([]),
-            num_tokens=len(tokens),
+            num_words=len(words),
         )

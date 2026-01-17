@@ -91,7 +91,7 @@ def process_embeddings(embeddings_path: Path, config: Config) -> SegmentationOut
         data = json.load(f)
 
     embeddings_data = EmbeddingsOutput.model_validate(data)
-    print(f"  Found {len(embeddings_data.windows)} windows, {embeddings_data.total_tokens} tokens")
+    print(f"  Found {len(embeddings_data.windows)} windows, {embeddings_data.total_words} words")
 
     # 2. Reconstruct ChunkData from loaded embeddings
     embeddings_array = np.array(
@@ -115,18 +115,17 @@ def process_embeddings(embeddings_path: Path, config: Config) -> SegmentationOut
         stride=sw_config.stride,
         threshold_method=sw_config.threshold_method,
         threshold_value=sw_config.threshold_value,
-        min_segment_tokens=sw_config.min_segment_tokens,
         smoothing_passes=sw_config.smoothing_passes,
     )
 
-    result = segmenter.segment_from_chunk_data(embeddings_data.tokens, chunk_data)
+    result = segmenter.segment_from_chunk_data(embeddings_data.words, chunk_data)
     print(f"  Detected {len(result.segments)} segments")
 
     # 6. Map segments to timestamps and build output
     segment_results: list[SegmentData] = []
     for i, seg in enumerate(result.segments):
-        start_time = word_position_to_timestamp(seg.start_token, srt_entries)
-        end_pos = seg.end_token - 1 if seg.end_token > 0 else 0
+        start_time = word_position_to_timestamp(seg.start_word, srt_entries)
+        end_pos = seg.end_word - 1 if seg.end_word > 0 else 0
         end_time = word_position_to_timestamp(end_pos, srt_entries)
 
         segment_results.append(
@@ -135,8 +134,8 @@ def process_embeddings(embeddings_path: Path, config: Config) -> SegmentationOut
                 start_timestamp=format_timedelta(start_time),
                 end_timestamp=format_timedelta(end_time),
                 text=seg.text,
-                start_token=seg.start_token,
-                end_token=seg.end_token,
+                start_word=seg.start_word,
+                end_word=seg.end_word,
             )
         )
 
@@ -146,7 +145,6 @@ def process_embeddings(embeddings_path: Path, config: Config) -> SegmentationOut
         stride=sw_config.stride,
         threshold_method=sw_config.threshold_method,
         threshold_value=sw_config.threshold_value,
-        min_segment_tokens=sw_config.min_segment_tokens,
         smoothing_passes=sw_config.smoothing_passes,
     )
 

@@ -47,8 +47,8 @@ class EmbeddingsOutput(BaseModel):
     source_file: str
     generated_at: str
     config: EmbeddingConfigData
-    total_tokens: int
-    tokens: list[str]
+    total_words: int
+    words: list[str]
     srt_entries: list[SRTEntryData]
     windows: list[WindowData]
 
@@ -63,21 +63,20 @@ class SegmentationConfigData(BaseModel):
     stride: int
     threshold_method: str
     threshold_value: float
-    min_segment_tokens: int
     smoothing_passes: int
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class SegmentData(BaseModel):
-    """A single segment with timestamps and token positions."""
+    """A single segment with timestamps and word positions."""
 
     segment_id: int
     start_timestamp: str
     end_timestamp: str
     text: str
-    start_token: int
-    end_token: int
+    start_word: int
+    end_word: int
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
