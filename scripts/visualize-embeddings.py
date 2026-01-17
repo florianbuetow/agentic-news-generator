@@ -12,10 +12,14 @@ Usage:
 import argparse
 import json
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.axes import Axes
+from matplotlib.ticker import FuncFormatter
 from numpy.typing import NDArray
 
 # Word distances to visualize
@@ -66,23 +70,276 @@ def compute_similarities_at_distance(
     return positions, similarities
 
 
-def load_embeddings(json_path: Path) -> tuple[list[NDArray[np.float32]], list[int], int, str]:
+def parse_srt_timestamp(ts: str) -> float:
+    """Parse SRT timestamp (HH:MM:SS,mmm) to seconds."""
+    parts = ts.replace(",", ".").split(":")
+    hours = int(parts[0])
+    minutes = int(parts[1])
+    seconds = float(parts[2])
+    return hours * 3600 + minutes * 60 + seconds
+
+
+@dataclass
+class EmbeddingsData:
+    """Container for embeddings data loaded from JSON."""
+
+    embeddings: list[NDArray[np.float32]]
+    offsets: list[int]
+    timestamps: list[float]  # Start timestamp in seconds for each window
+    stride: int
+    model_name: str
+
+
+def load_embeddings(json_path: Path) -> EmbeddingsData:
     """Load embeddings from JSON file.
 
     Returns:
-        Tuple of (embeddings, offsets, stride, model_name).
+        EmbeddingsData containing embeddings, offsets, timestamps, stride, and model_name.
     """
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    stride = data["stride"]
-    model_name = data["embedding_model"]
+    config = data["config"]
+    stride = config["stride"]
+    model_name = config["embedding_model"]
     windows = data["windows"]
+    srt_entries = data.get("srt_entries", [])
 
-    embeddings = [np.array(w["embed"], dtype=np.float32) for w in windows]
+    embeddings = [np.array(w["embedding"], dtype=np.float32) for w in windows]
     offsets = [w["offset"] for w in windows]
 
-    return embeddings, offsets, stride, model_name
+    # Build timestamp mapping from srt_entries (word_start -> start_timestamp)
+    # Windows no longer contain timestamps directly; map from word position
+    timestamps: list[float] = []
+    if srt_entries:
+        for w in windows:
+            offset = w["offset"]
+            # Find the SRT entry that contains this word position
+            timestamp = 0.0
+            for entry in srt_entries:
+                if entry["word_start"] <= offset < entry["word_end"]:
+                    timestamp = parse_srt_timestamp(entry["start_timestamp"])
+                    break
+            timestamps.append(timestamp)
+    else:
+        timestamps = [0.0] * len(windows)
+
+    return EmbeddingsData(
+        embeddings=embeddings,
+        offsets=offsets,
+        timestamps=timestamps,
+        stride=stride,
+        model_name=model_name,
+    )
+
+
+@dataclass
+class SegmentInfo:
+    """Information about a segment including position and topics."""
+
+    start_token: int
+    end_token: int
+    specific_topics: list[str]
+
+
+def load_segments(json_path: Path) -> tuple[list[int], float, list[SegmentInfo]]:
+    """Load segments JSON to get boundary positions, threshold, and segment info.
+
+    Args:
+        json_path: Path to the segments JSON file.
+
+    Returns:
+        Tuple of (boundary_positions, threshold_value, segment_infos).
+        boundary_positions are word offsets where topic changes occur.
+    """
+    with open(json_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Get threshold from config
+    threshold = data.get("config", {}).get("threshold_value", 0.4)
+
+    # Boundaries are at end_token of each segment except the last
+    segments = data.get("segments", [])
+    boundaries: list[int] = []
+    segment_infos: list[SegmentInfo] = []
+
+    for i, seg in enumerate(segments):
+        segment_infos.append(
+            SegmentInfo(
+                start_token=seg["start_token"],
+                end_token=seg["end_token"],
+                specific_topics=[],  # Will be filled from topics JSON
+            )
+        )
+        if i < len(segments) - 1:
+            boundaries.append(seg["end_token"])
+
+    return boundaries, threshold, segment_infos
+
+
+def load_topics(json_path: Path) -> list[list[str]]:
+    """Load topics JSON to get specific topics for each segment.
+
+    Args:
+        json_path: Path to the topics JSON file.
+
+    Returns:
+        List of specific_topics lists, one per segment.
+    """
+    with open(json_path, encoding="utf-8") as f:
+        data = json.load(f)
+
+    return [seg.get("specific_topics", []) for seg in data.get("segments", [])]
+
+
+def _draw_boundary_markers(
+    ax: Axes,
+    boundaries: list[int],
+) -> None:
+    """Draw vertical red lines at boundary positions on the plot."""
+    for boundary_pos in boundaries:
+        ax.axvline(
+            x=boundary_pos,
+            color="red",
+            linestyle="-",
+            linewidth=1.5,
+            alpha=0.7,
+            zorder=5,
+        )
+
+
+def _draw_segment_backgrounds(
+    ax: Axes,
+    segment_infos: list[SegmentInfo],
+    x_min: int,
+    x_max: int,
+    is_top_plot: bool,
+) -> None:
+    """Draw alternating colored backgrounds for segments and topic labels on top plot."""
+    colors = ["#f0f0ff", "#fff0f0"]  # Alternating light blue and light red
+
+    for i, seg in enumerate(segment_infos):
+        # Clamp segment bounds to visible range
+        seg_start = max(seg.start_token, x_min)
+        seg_end = min(seg.end_token, x_max)
+
+        if seg_start >= seg_end:
+            continue
+
+        # Draw background span
+        ax.axvspan(seg_start, seg_end, alpha=0.3, color=colors[i % 2], zorder=0)
+
+        # Draw topic labels only on top plot
+        if is_top_plot and seg.specific_topics:
+            # Join topics with comma, truncate if too long
+            topic_text = ", ".join(seg.specific_topics)
+            if len(topic_text) > 50:
+                topic_text = topic_text[:47] + "..."
+
+            # Position label at segment center
+            label_x = (seg_start + seg_end) / 2
+            ax.text(
+                label_x,
+                0.92,
+                topic_text,
+                transform=ax.get_xaxis_transform(),
+                ha="center",
+                va="top",
+                fontsize=7,
+                color="darkblue",
+                bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8, edgecolor="none"),
+                zorder=10,
+            )
+
+
+def _plot_single_distance(
+    ax: Axes,
+    embeddings: list[NDArray[np.float32]],
+    offsets: list[int],
+    distance: int,
+    stride: int,
+    boundaries: list[int] | None,
+    threshold: float | None,
+    segment_infos: list[SegmentInfo] | None,
+    is_top_plot: bool,
+) -> None:
+    """Plot similarity curve for a single distance on given axes."""
+    positions, similarities = compute_similarities_at_distance(embeddings, offsets, distance, stride)
+
+    if not positions:
+        ax.text(0.5, 0.5, "Insufficient data", ha="center", va="center", transform=ax.transAxes)
+        ax.set_ylabel(f"{distance}w")
+        return
+
+    # Draw segment backgrounds first (behind everything)
+    if segment_infos:
+        _draw_segment_backgrounds(ax, segment_infos, offsets[0], offsets[-1], is_top_plot)
+
+    # Plot as filled area
+    ax.fill_between(positions, similarities, alpha=0.3, color="steelblue")
+    ax.plot(positions, similarities, color="steelblue", linewidth=0.8)
+
+    # Add horizontal reference lines
+    ax.axhline(y=0.5, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax.axhline(y=0.8, color="green", linestyle=":", linewidth=0.5, alpha=0.5)
+
+    # Draw threshold line
+    if threshold is not None:
+        ax.axhline(y=threshold, color="red", linestyle="-", linewidth=1.0, alpha=0.7)
+
+    # Draw vertical boundary lines
+    if boundaries:
+        _draw_boundary_markers(ax, boundaries)
+
+    # Axis labels and limits
+    actual_skip = max(1, round(distance / stride))
+    actual_distance = actual_skip * stride
+    ax.set_ylabel(f"{distance}w\n(≈{actual_distance}w)", fontsize=9)
+    ax.set_ylim(0, 1)
+    ax.set_xlim(offsets[0], offsets[-1])
+
+    # Add statistics text
+    mean_sim = np.mean(similarities)
+    min_sim = np.min(similarities)
+    stats_text = f"μ={mean_sim:.2f} min={min_sim:.2f}"
+    if boundaries:
+        stats_text += f" bounds={len(boundaries)}"
+    ax.text(
+        0.98,
+        0.95,
+        stats_text,
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=8,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7),
+    )
+
+
+def _create_offset_to_timestamp_mapper(offsets: list[int], timestamps: list[float]) -> tuple[Callable[[float], float], float]:
+    """Create a function that maps word offsets to timestamps via interpolation.
+
+    Returns:
+        Tuple of (mapper_function, max_timestamp).
+    """
+    if not timestamps or all(t == 0.0 for t in timestamps):
+        # No timestamps available, return identity mapper
+        return lambda x: float(x), 0.0
+
+    offsets_arr = np.array(offsets, dtype=np.float64)
+    timestamps_arr = np.array(timestamps, dtype=np.float64)
+
+    def mapper(offset: float) -> float:
+        return float(np.interp(offset, offsets_arr, timestamps_arr))
+
+    return mapper, timestamps[-1]
+
+
+def _format_timestamp(seconds: float) -> str:
+    """Format seconds as HH:MM."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    return f"{hours:02d}:{minutes:02d}"
 
 
 def create_visualization(
@@ -92,6 +349,10 @@ def create_visualization(
     model_name: str,
     title: str,
     output_path: Path,
+    boundaries: list[int] | None = None,
+    threshold: float | None = None,
+    segment_infos: list[SegmentInfo] | None = None,
+    timestamps: list[float] | None = None,
 ) -> None:
     """Create stacked visualization of similarities at different distances."""
     # Filter distances that are feasible given the data
@@ -102,54 +363,44 @@ def create_visualization(
         print(f"  Warning: Not enough data for visualization (max offset: {max_offset})")
         return
 
+    # Create offset-to-timestamp mapper if timestamps available
+    has_timestamps = timestamps is not None and len(timestamps) > 0 and any(t > 0 for t in timestamps)
+    format_xaxis: Callable[[float, int], str] | None = None
+    if has_timestamps and timestamps is not None:
+        offset_to_time, _ = _create_offset_to_timestamp_mapper(offsets, timestamps)
+
+        def format_xaxis_fn(x: float, _pos: int) -> str:
+            return _format_timestamp(offset_to_time(x))
+
+        format_xaxis = format_xaxis_fn
+
     n_plots = len(feasible_distances)
     fig, axes = plt.subplots(n_plots, 1, figsize=(14, 2.5 * n_plots), sharex=True)
 
     if n_plots == 1:
         axes = [axes]
 
-    # Color gradient from green (high similarity) to red (low similarity)
     for idx, distance in enumerate(feasible_distances):
-        ax = axes[idx]
-        positions, similarities = compute_similarities_at_distance(embeddings, offsets, distance, stride)
-
-        if not positions:
-            ax.text(0.5, 0.5, "Insufficient data", ha="center", va="center", transform=ax.transAxes)
-            ax.set_ylabel(f"{distance}w")
-            continue
-
-        # Plot as filled area
-        ax.fill_between(positions, similarities, alpha=0.3, color="steelblue")
-        ax.plot(positions, similarities, color="steelblue", linewidth=0.8)
-
-        # Add horizontal reference lines
-        ax.axhline(y=0.5, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-        ax.axhline(y=0.8, color="green", linestyle=":", linewidth=0.5, alpha=0.5)
-
-        # Actual window skip used
-        actual_skip = max(1, round(distance / stride))
-        actual_distance = actual_skip * stride
-
-        ax.set_ylabel(f"{distance}w\n(≈{actual_distance}w)", fontsize=9)
-        ax.set_ylim(0, 1)
-        ax.set_xlim(offsets[0], offsets[-1])
-
-        # Add statistics
-        mean_sim = np.mean(similarities)
-        min_sim = np.min(similarities)
-        ax.text(
-            0.98,
-            0.95,
-            f"μ={mean_sim:.2f} min={min_sim:.2f}",
-            transform=ax.transAxes,
-            ha="right",
-            va="top",
-            fontsize=8,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.7),
+        is_top_plot = idx == 0
+        _plot_single_distance(
+            axes[idx],
+            embeddings,
+            offsets,
+            distance,
+            stride,
+            boundaries,
+            threshold,
+            segment_infos,
+            is_top_plot,
         )
 
-    # Labels
-    axes[-1].set_xlabel("Word Position")
+    # Set timestamp formatter on x-axis if timestamps available
+    if format_xaxis is not None:
+        axes[-1].xaxis.set_major_formatter(FuncFormatter(format_xaxis))
+        axes[-1].set_xlabel("Time (HH:MM)")
+    else:
+        axes[-1].set_xlabel("Word Position")
+
     fig.suptitle(f"Embedding Similarity at Different Word Distances\n{title}\nModel: {model_name}", fontsize=11)
 
     plt.tight_layout()
@@ -169,21 +420,55 @@ def process_embeddings_file(json_path: Path, output_dir: Path) -> bool:
     """
     print(f"Processing: {json_path.name}")
 
-    embeddings, offsets, stride, model_name = load_embeddings(json_path)
-    print(f"  Loaded {len(embeddings)} embeddings, stride={stride}")
+    emb_data = load_embeddings(json_path)
+    print(f"  Loaded {len(emb_data.embeddings)} embeddings, stride={emb_data.stride}")
 
-    if len(embeddings) < 10:
+    if len(emb_data.embeddings) < 10:
         print("  Warning: Too few embeddings for meaningful visualization")
         return False
 
+    # Try to load segmentation JSON for boundaries and threshold
+    # File naming: input_embeddings.json -> input_segmentation.json
+    segments_path = Path(str(json_path).replace("_embeddings.json", "_segmentation.json"))
+    boundaries: list[int] | None = None
+    threshold: float | None = None
+    segment_infos: list[SegmentInfo] | None = None
+    if segments_path.exists():
+        boundaries, threshold, segment_infos = load_segments(segments_path)
+        print(f"  Loaded {len(boundaries)} boundaries, threshold={threshold}")
+
+        # Try to load topics JSON and merge into segment_infos
+        # File naming: input_embeddings.json -> input_topics.json
+        topics_path = Path(str(json_path).replace("_embeddings.json", "_topics.json"))
+        if topics_path.exists():
+            topics_list = load_topics(topics_path)
+            if len(topics_list) == len(segment_infos):
+                for seg_info, topics in zip(segment_infos, topics_list, strict=True):
+                    seg_info.specific_topics = topics
+                print(f"  Loaded topics for {len(segment_infos)} segments")
+            else:
+                print(f"  Warning: Topics count ({len(topics_list)}) doesn't match segments ({len(segment_infos)})")
+
     # Create output path
-    output_path = output_dir / json_path.with_suffix(".similarity.jpg").name
+    output_filename = json_path.name.replace("_embeddings.json", "_similarity.jpg")
+    output_path = output_dir / output_filename
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Extract title from filename
-    title = json_path.stem.replace(".embeddings", "")
+    # Extract title from filename (remove _embeddings suffix)
+    title = json_path.stem.replace("_embeddings", "")
 
-    create_visualization(embeddings, offsets, stride, model_name, title, output_path)
+    create_visualization(
+        emb_data.embeddings,
+        emb_data.offsets,
+        emb_data.stride,
+        emb_data.model_name,
+        title,
+        output_path,
+        boundaries,
+        threshold,
+        segment_infos,
+        emb_data.timestamps,
+    )
     print(f"  Saved: {output_path}")
 
     return True
@@ -224,7 +509,7 @@ def main() -> int:
             print(f"Error: Topics directory not found: {topics_dir}", file=sys.stderr)
             return 1
 
-        files = sorted(topics_dir.rglob("*.embeddings.json"))
+        files = sorted(f for f in topics_dir.rglob("*_embeddings.json") if not f.name.startswith("._"))
         default_output_dir = topics_dir
 
     output_dir = args.output_dir or default_output_dir
