@@ -85,7 +85,7 @@ all:
     @just archive-videos
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
-    @just topic-detection
+    @just topics-all
 
 # Download YouTube videos from channels in config.yaml
 download-videos:
@@ -165,11 +165,35 @@ transcripts-remove-hallucinations:
     @uv run python scripts/transcript-hallucination-removal.py
     @echo ""
 
-# Run topic detection on cleaned transcripts
-topic-detection:
+# Generate embeddings from SRT transcripts (Step 1)
+topics-embed:
     @echo ""
-    @printf "\033[0;34m=== Running Topic Detection ===\033[0m\n"
-    @uv run python scripts/topic-detection.py
+    @printf "\033[0;34m=== Generating Embeddings from Transcripts ===\033[0m\n"
+    @uv run python scripts/generate-embeddings.py
+    @echo ""
+
+# Detect topic boundaries from embeddings (Step 2)
+topics-boundaries:
+    @echo ""
+    @printf "\033[0;34m=== Detecting Topic Boundaries ===\033[0m\n"
+    @uv run python scripts/detect-boundaries.py
+    @echo ""
+
+# Extract topics from segments using LLM (Step 3)
+topics-extract:
+    @echo ""
+    @printf "\033[0;34m=== Extracting Topics from Segments ===\033[0m\n"
+    @uv run python scripts/extract-topics.py
+    @echo ""
+
+# Run complete topic detection pipeline (all 3 steps)
+topics-all:
+    @echo ""
+    @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
+    @just topics-embed
+    @just topics-boundaries
+    @just topics-extract
+    @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 
 # Show processing status of downloads
@@ -596,9 +620,9 @@ all-quiet:
     just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed transcripts-remove-hallucinations\n"
 
-    printf "🚀 Starting topic-detection...\n"
-    just topic-detection > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Topic-detection failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed topic-detection\n"
+    printf "🚀 Starting topics-all...\n"
+    just topics-all > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Topics-all failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed topics-all\n"
 
     echo ""
     printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"
