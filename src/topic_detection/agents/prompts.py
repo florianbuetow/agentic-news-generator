@@ -6,11 +6,15 @@ class TopicDetectionPrompts:
 
     @staticmethod
     def getSystemPrompt() -> str:
-        return """You are an expert publication indexer. Your job is to extract SEARCHABLE topics from transcript segments so they can be retrieved later.
+        """Return the system prompt for topic extraction."""
+        return """You are an expert publication indexer. Your job is to extract SEARCHABLE topics
+from transcript segments so they can be retrieved later.
 
 Focus on substantive content only:
-- Ignore greetings, filler, acknowledgements, backchannels ("yeah", "mm-hm"), and pure coordination unless they contain domain-relevant information.
-- Do NOT output conversational labels like "Small Talk" or "Greeting" as topics unless the segment is explicitly ABOUT small talk as a subject.
+- Ignore greetings, filler, acknowledgements, backchannels ("yeah", "mm-hm"), and pure
+  coordination unless they contain domain-relevant information.
+- Do NOT output conversational labels like "Small Talk" or "Greeting" as topics unless
+  the segment is explicitly ABOUT small talk as a subject.
 
 ## What to extract
 
@@ -57,6 +61,7 @@ Return ONLY valid JSON (no markdown/code fences/extra text) with EXACTLY these k
 
     @staticmethod
     def getUserPrompt(segment_text: str) -> str:
+        """Return the user prompt with the given segment text."""
         return f"""Extract searchable topics for publication indexing from the transcript segment below.
 
 Transcript Segment:
