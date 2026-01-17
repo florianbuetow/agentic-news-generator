@@ -20,8 +20,8 @@ class SlidingWindowTopicSegmenter:
     """Unsupervised topic segmenter using embedding-based sliding window analysis.
 
     This class orchestrates a pipeline that:
-    1. Tokenizes input text
-    2. Creates overlapping chunks of tokens
+    1. Tokenizes input text into words (word-level, not BPE)
+    2. Creates overlapping chunks of words
     3. Embeds each chunk using the injected EmbeddingGenerator
     4. Computes similarity between adjacent chunks
     5. Detects topic boundaries where similarity drops
@@ -29,32 +29,15 @@ class SlidingWindowTopicSegmenter:
 
     Args:
         embedding_generator: Generator for creating embeddings.
-        window_size: Number of tokens per chunk for embedding.
-        stride: Number of tokens to advance between chunks.
+        window_size: Number of words per chunk for embedding.
+        stride: Number of words to advance between chunks.
         threshold_method: Boundary detection method:
                          - "relative": depth scoring at local minima
                          - "absolute": fixed similarity threshold
                          - "percentile": bottom N percentile of scores
         threshold_value: Threshold parameter (meaning depends on method).
-        min_segment_tokens: Minimum tokens per segment (prevents over-segmentation).
+        min_segment_tokens: Minimum words per segment (prevents over-segmentation).
         smoothing_passes: Number of smoothing iterations on similarity curve.
-
-    Example:
-        >>> from src.topic_detection.embedding.factory import EmbeddingGeneratorFactory
-        >>> generator = EmbeddingGeneratorFactory.create(config.embedding)
-        >>> segmenter = SlidingWindowTopicSegmenter(
-        ...     embedding_generator=generator,
-        ...     window_size=50,
-        ...     stride=25,
-        ...     threshold_method="relative",
-        ...     threshold_value=0.4,
-        ...     min_segment_tokens=100,
-        ...     smoothing_passes=1,
-        ... )
-        >>> result = segmenter.segment(long_document_text)
-        >>> for seg in result.segments:
-        ...     print(f"--- Segment ({seg.token_count} tokens) ---")
-        ...     print(seg.text[:200])
     """
 
     def __init__(

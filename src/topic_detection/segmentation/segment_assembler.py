@@ -2,6 +2,9 @@
 
 Converts boundary positions back into text segments,
 enforcing minimum segment size constraints.
+
+Note: "token" in this module refers to word-level tokens (words and punctuation),
+not BPE/subword tokens.
 """
 
 from src.topic_detection.segmentation.data_types import BoundaryData, Segment

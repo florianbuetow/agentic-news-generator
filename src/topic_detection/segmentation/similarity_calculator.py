@@ -56,11 +56,8 @@ class SimilarityCalculator:
         if self.smoothing_passes > 0:
             scores = self._smooth(scores, self.smoothing_passes)
 
-        # Comparison position is the midpoint between chunk starts
-        # For chunks at positions [0, 25, 50, ...] with window_size=50,
-        # comparison i is between chunk i and chunk i+1
-        # Position is end of first chunk (or start of second chunk)
-        # This represents the "gap" between the two blocks
+        # Comparison position: for comparison i between chunk i and chunk i+1,
+        # use the start position of chunk i+1 as the comparison point
         comparison_positions = [positions[i + 1] for i in range(len(scores))]
 
         return SimilarityData(scores=scores, comparison_positions=comparison_positions)

@@ -2,6 +2,9 @@
 
 All dataclasses used to pass data between pipeline stages are defined here.
 This keeps type definitions in one place and avoids circular imports.
+
+Note: "token" in this module refers to word-level tokens from the Tokenizer
+(words and punctuation), not BPE/subword tokens.
 """
 
 from dataclasses import dataclass
