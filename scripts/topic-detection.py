@@ -18,10 +18,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from src.config import Config
+from src.config import Config, TopicDetectionConfig
 from src.topic_detection.agents.topic_extraction_agent import TopicExtractionAgent
 from src.topic_detection.embedding.factory import EmbeddingGeneratorFactory
-from src.topic_detection.segmentation.data_types import Segment
+from src.topic_detection.segmentation.data_types import ChunkData, Segment
 from src.topic_detection.segmentation.segmenter import SlidingWindowTopicSegmenter
 from src.util.srt_util import SRTEntry, SRTUtil
 
@@ -82,7 +82,7 @@ def map_to_timestamps(segments: list[Segment], entries: list[SRTEntry]) -> list[
     Returns:
         List of segments with mapped timestamps.
     """
-    result = []
+    result: list[SegmentWithTimestamps] = []
     for seg in segments:
         start_time = SRTUtil.word_position_to_timestamp(seg.start_token, entries)
         # Use end_token - 1 for inclusive end position
@@ -98,6 +98,49 @@ def map_to_timestamps(segments: list[Segment], entries: list[SRTEntry]) -> list[
             )
         )
     return result
+
+
+def create_embeddings_data(
+    chunk_data: ChunkData,
+    entries: list[SRTEntry],
+    td_config: TopicDetectionConfig,
+) -> dict[str, object]:
+    """Create embeddings data structure for JSON export.
+
+    Args:
+        chunk_data: ChunkData with embeddings and chunk positions.
+        entries: SRT entries for timestamp mapping.
+        td_config: Topic detection configuration.
+
+    Returns:
+        Dictionary with embedding model info and per-window embeddings with timestamps.
+    """
+    sw_config = td_config.sliding_window
+    windows: list[dict[str, object]] = []
+
+    for offset, embedding in zip(chunk_data.chunk_positions, chunk_data.embeddings, strict=True):
+        # Calculate end position (offset + window_size, but capped at last word)
+        end_offset = offset + sw_config.window_size
+        # Use offset for start timestamp, end_offset - 1 for end timestamp (inclusive)
+        start_time = SRTUtil.word_position_to_timestamp(offset, entries)
+        end_time = SRTUtil.word_position_to_timestamp(end_offset - 1, entries)
+
+        windows.append(
+            {
+                "offset": offset,
+                "length": sw_config.window_size,
+                "embed": embedding.tolist(),
+                "start_timestamp": format_timedelta(start_time),
+                "end_timestamp": format_timedelta(end_time),
+            }
+        )
+
+    return {
+        "embedding_model": td_config.embedding.model_name,
+        "window_size": sw_config.window_size,
+        "stride": sw_config.stride,
+        "windows": windows,
+    }
 
 
 def process_transcript(srt_path: Path, config: Config) -> TranscriptTopics:
