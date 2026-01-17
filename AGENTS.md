@@ -101,6 +101,7 @@ When modifying Jupyter notebook (.ipynb) files, validate changes using these met
 - **Never use environment variables** for configuration
 - All config parameters must be loaded through `config.py` from `config.yaml`
 - Never hardcode configuration values in source code
+- **Never mention specific config values in code comments or docstrings** - they will get out of sync with actual config and cause confusion
 - Use `config/config.yaml` for all settings (add sensitive values to `.gitignore` or use `config.yaml.local`)
 - Document configuration options in `config/config.yaml.template`
 
