@@ -84,9 +84,11 @@ class SegmentationResult:
         boundary_indices: Token indices where boundaries were placed.
         similarity_scores: The similarity curve (useful for visualization).
         num_tokens: Total number of tokens in the input text.
+        chunk_data: Optional ChunkData containing embeddings and positions.
     """
 
     segments: list[Segment]
     boundary_indices: list[int]
     similarity_scores: NDArray[np.float64]
     num_tokens: int
+    chunk_data: ChunkData | None = None

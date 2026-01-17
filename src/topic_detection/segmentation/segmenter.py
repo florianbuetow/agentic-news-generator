@@ -101,6 +101,7 @@ class SlidingWindowTopicSegmenter:
             boundary_indices=boundary_data.boundary_indices,
             similarity_scores=similarity_data.scores,
             num_tokens=num_tokens,
+            chunk_data=chunk_data,
         )
 
     def get_similarity_scores(self, text: str) -> NDArray[np.float64]:
