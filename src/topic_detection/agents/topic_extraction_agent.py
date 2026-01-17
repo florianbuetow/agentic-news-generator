@@ -1,7 +1,6 @@
 """Topic extraction agent using LLM for topic detection."""
 
 import json
-import os
 
 import litellm
 from pydantic import ValidationError
@@ -45,11 +44,6 @@ class TopicExtractionAgent:
             ValueError: If the LLM response cannot be parsed as valid JSON
                        or doesn't match the expected schema.
         """
-        # Get API key from environment (empty string for local LLM without auth)
-        api_key = os.environ.get(self._config.api_key_env)
-        if api_key is None:
-            api_key = ""
-
         # Build the messages for the completion call
         messages = [
             {"role": "system", "content": TopicDetectionPrompts.getSystemPrompt()},
@@ -61,7 +55,7 @@ class TopicExtractionAgent:
             model=self._config.model,
             messages=messages,
             api_base=self._config.api_base,
-            api_key=api_key,
+            api_key=self._config.api_key,
             max_tokens=self._config.max_tokens,
             temperature=self._config.temperature,
         )

@@ -107,7 +107,7 @@ class LLMConfig(BaseModel):
         description="litellm model string (e.g., 'openai/gpt-4', 'anthropic/claude-3-5-sonnet', 'openai/local-model' for LM Studio)",
     )
     api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
-    api_key_env: str = Field(..., description="Environment variable name for API key")
+    api_key: str = Field(..., description="API key for the LLM service")
     context_window: int = Field(..., description="Model context window size in tokens")
     max_tokens: int = Field(..., description="Maximum tokens for response/completion")
     temperature: float = Field(..., description="Sampling temperature (0.0-1.0)")
@@ -137,7 +137,7 @@ class TopicDetectionEmbeddingConfig(BaseModel):
     provider: str = Field(..., description="Embedding provider type (e.g., 'lmstudio')")
     model_name: str = Field(..., description="Model name for embedding generation")
     api_base: str | None = Field(..., description="API base URL for the embedding service")
-    api_key_env: str | None = Field(None, description="Environment variable name for API key")
+    api_key: str | None = Field(..., description="API key for the embedding service (use 'lm-studio' for local LM Studio)")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

@@ -31,10 +31,14 @@ class LMStudioEmbeddingGenerator:
         Raises:
             litellm.exceptions.APIError: If the API call fails.
         """
+        # LM Studio uses OpenAI-compatible API, so prefix with openai/
+        model = f"openai/{self._config.model_name}"
+
         response = litellm.embedding(
-            model=self._config.model_name,
+            model=model,
             input=texts,
             api_base=self._config.api_base,
+            api_key=self._config.api_key,
         )
         embeddings = [item["embedding"] for item in response.data]
         return np.array(embeddings, dtype=np.float32)

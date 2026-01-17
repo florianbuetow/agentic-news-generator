@@ -56,7 +56,7 @@ def get_valid_topic_detection_config() -> dict[str, object]:
             "provider": "lmstudio",
             "model_name": "multilingual-e5-base-mlx",
             "api_base": "http://127.0.0.1:1234/v1",
-            "api_key_env": "LMSTUDIO_API_KEY",
+            "api_key": "LMSTUDIO_API_KEY",
         },
         "sliding_window": {
             "window_size": 50,
@@ -69,7 +69,7 @@ def get_valid_topic_detection_config() -> dict[str, object]:
         "topic_detection_llm": {
             "model": "openai/test-model",
             "api_base": "http://127.0.0.1:1234/v1",
-            "api_key_env": "LMSTUDIO_API_KEY",
+            "api_key": "LMSTUDIO_API_KEY",
             "context_window": 262144,
             "max_tokens": 4096,
             "temperature": 0.3,
@@ -88,22 +88,22 @@ class TestTopicDetectionEmbeddingConfig:
             provider="lmstudio",
             model_name="multilingual-e5-base-mlx",
             api_base="http://127.0.0.1:1234/v1",
-            api_key_env="LMSTUDIO_API_KEY",
+            api_key="LMSTUDIO_API_KEY",
         )
         assert config.provider == "lmstudio"
         assert config.model_name == "multilingual-e5-base-mlx"
         assert config.api_base == "http://127.0.0.1:1234/v1"
-        assert config.api_key_env == "LMSTUDIO_API_KEY"
+        assert config.api_key == "LMSTUDIO_API_KEY"
 
-    def test_embedding_config_with_none_api_key_env(self) -> None:
-        """Test embedding config with None api_key_env."""
+    def test_embedding_config_with_none_api_key(self) -> None:
+        """Test embedding config with None api_key."""
         config = TopicDetectionEmbeddingConfig(
             provider="lmstudio",
             model_name="test-model",
             api_base="http://localhost:1234/v1",
-            api_key_env=None,
+            api_key=None,
         )
-        assert config.api_key_env is None
+        assert config.api_key is None
 
     def test_missing_provider_field(self) -> None:
         """Test embedding config with missing provider field."""
