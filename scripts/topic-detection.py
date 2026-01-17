@@ -143,7 +143,7 @@ def create_embeddings_data(
     }
 
 
-def process_transcript(srt_path: Path, config: Config) -> TranscriptTopics:
+def process_transcript(srt_path: Path, config: Config) -> tuple[TranscriptTopics, dict[str, object] | None]:
     """Process a single transcript file.
 
     Args:
@@ -151,7 +151,7 @@ def process_transcript(srt_path: Path, config: Config) -> TranscriptTopics:
         config: Configuration object.
 
     Returns:
-        TranscriptTopics with all extracted topics.
+        Tuple of (TranscriptTopics, embeddings_data or None if no chunk_data).
     """
     td_config = config.get_topic_detection_config()
 
@@ -181,13 +181,19 @@ def process_transcript(srt_path: Path, config: Config) -> TranscriptTopics:
     result = segmenter.segment(text)
     print(f"  Detected {len(result.segments)} segments")
 
-    # 4. Map segments to timestamps
+    # 4. Create embeddings data if chunk_data is available
+    embeddings_data: dict[str, object] | None = None
+    if result.chunk_data is not None:
+        embeddings_data = create_embeddings_data(result.chunk_data, entries, td_config)
+        print(f"  Created embeddings for {len(result.chunk_data.chunk_positions)} windows")
+
+    # 5. Map segments to timestamps
     segments_with_timestamps = map_to_timestamps(result.segments, entries)
 
-    # 5. Run topic detection on each segment
+    # 6. Run topic detection on each segment
     print("  Extracting topics from segments...")
     agent = TopicExtractionAgent(td_config.topic_detection_llm)
-    segment_results = []
+    segment_results: list[SegmentTopics] = []
     for i, seg in enumerate(segments_with_timestamps):
         print(f"    Processing segment {i + 1}/{len(segments_with_timestamps)}...")
         topics = agent.detect(seg.text)
@@ -203,12 +209,14 @@ def process_transcript(srt_path: Path, config: Config) -> TranscriptTopics:
             )
         )
 
-    return TranscriptTopics(
+    transcript_topics = TranscriptTopics(
         source_file=str(srt_path),
         processed_at=datetime.now().isoformat(),
         total_segments=len(segment_results),
         segments=segment_results,
     )
+
+    return transcript_topics, embeddings_data
 
 
 def main() -> int:
@@ -270,16 +278,24 @@ def main() -> int:
         relative_path = srt_file.relative_to(base_dir)
         print(f"Processing: {relative_path}")
 
-        result = process_transcript(srt_file, config)
+        topics_result, embeddings_data = process_transcript(srt_file, config)
 
-        # Write JSON output
-        output_path = output_dir / relative_path.with_suffix(".topics.json")
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write topics JSON output
+        topics_output_path = output_dir / relative_path.with_suffix(".topics.json")
+        topics_output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(result.model_dump(), f, indent=2, ensure_ascii=False)
+        with open(topics_output_path, "w", encoding="utf-8") as f:
+            json.dump(topics_result.model_dump(), f, indent=2, ensure_ascii=False)
 
-        print(f"  → {result.total_segments} segments extracted → {output_path}")
+        print(f"  → {topics_result.total_segments} segments extracted → {topics_output_path}")
+
+        # Write embeddings JSON output if available
+        if embeddings_data is not None:
+            embeddings_output_path = output_dir / relative_path.with_suffix(".embeddings.json")
+            with open(embeddings_output_path, "w", encoding="utf-8") as f:
+                json.dump(embeddings_data, f, indent=2, ensure_ascii=False)
+            print(f"  → embeddings saved → {embeddings_output_path}")
+
         success_count += 1
 
         print()
