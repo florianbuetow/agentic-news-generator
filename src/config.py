@@ -117,6 +117,8 @@ class LLMConfig(BaseModel):
         ge=0,
         le=100,
     )
+    max_retries: int = Field(..., gt=0, description="Number of retries on LLM parsing errors")
+    retry_delay: float = Field(..., gt=0, description="Delay in seconds between retries")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -145,11 +147,10 @@ class TopicDetectionEmbeddingConfig(BaseModel):
 class TopicDetectionSlidingWindowConfig(BaseModel):
     """Configuration for topic detection sliding window segmenter."""
 
-    window_size: int = Field(..., gt=0, description="Number of tokens per chunk for embedding")
-    stride: int = Field(..., gt=0, description="Number of tokens to advance between chunks")
+    window_size: int = Field(..., gt=0, description="Number of words per chunk for embedding")
+    stride: int = Field(..., gt=0, description="Number of words to advance between chunks")
     threshold_method: str = Field(..., description="Method for determining boundaries ('relative', 'absolute', 'percentile')")
     threshold_value: float = Field(..., description="Threshold value for boundary detection")
-    min_segment_tokens: int = Field(..., ge=0, description="Minimum tokens required per segment")
     smoothing_passes: int = Field(..., ge=0, description="Number of smoothing passes on similarity curve")
 
     model_config = ConfigDict(frozen=True, extra="forbid")

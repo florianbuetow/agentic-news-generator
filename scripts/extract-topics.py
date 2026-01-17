@@ -70,7 +70,12 @@ def process_segments(segmentation_path: Path, config: Config) -> TranscriptTopic
 
     # 2. Create topic extraction agent
     print("  Initializing topic extraction agent...")
-    agent = TopicExtractionAgent(td_config.topic_detection_llm)
+    llm_config = td_config.topic_detection_llm
+    agent = TopicExtractionAgent(
+        llm_config=llm_config,
+        max_retries=llm_config.max_retries,
+        retry_delay=llm_config.retry_delay,
+    )
 
     # 3. Process each segment
     segment_results: list[SegmentTopics] = []

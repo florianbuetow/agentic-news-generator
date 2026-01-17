@@ -1,6 +1,8 @@
 """Topic extraction agent using LLM for topic detection."""
 
 import json
+import re
+import time
 
 import litellm
 from pydantic import ValidationError
@@ -18,9 +20,15 @@ class TopicExtractionAgent:
 
     Args:
         llm_config: LLM configuration with model, API settings, etc.
+        max_retries: Number of retries on LLM parsing errors.
+        retry_delay: Delay in seconds between retries.
 
     Example:
-        >>> agent = TopicExtractionAgent(config.get_topic_detection_config().topic_detection_llm)
+        >>> agent = TopicExtractionAgent(
+        ...     config.get_topic_detection_config().topic_detection_llm,
+        ...     max_retries=3,
+        ...     retry_delay=2.0,
+        ... )
         >>> result = agent.detect("This segment discusses the latest advances in AI...")
         >>> print(result.topics)
         ['AI', 'Machine Learning', 'GPT-4 capabilities']
@@ -28,8 +36,15 @@ class TopicExtractionAgent:
         'Discussion of recent AI advances including GPT-4.'
     """
 
-    def __init__(self, llm_config: LLMConfig) -> None:
+    def __init__(
+        self,
+        llm_config: LLMConfig,
+        max_retries: int,
+        retry_delay: float,
+    ) -> None:
         self._config = llm_config
+        self._max_retries = max_retries
+        self._retry_delay = retry_delay
 
     def detect(self, segment_text: str) -> TopicDetectionResult:
         """Extract topics and description from a text segment.
@@ -42,7 +57,32 @@ class TopicExtractionAgent:
 
         Raises:
             ValueError: If the LLM response cannot be parsed as valid JSON
-                       or doesn't match the expected schema.
+                       or doesn't match the expected schema after all retries.
+        """
+        last_error: Exception | None = None
+
+        for attempt in range(self._max_retries):
+            try:
+                return self._call_llm(segment_text)
+            except ValueError as e:
+                last_error = e
+                if attempt < self._max_retries - 1:
+                    print(f"      Retry {attempt + 1}/{self._max_retries - 1} after error: {e}")
+                    time.sleep(self._retry_delay)
+
+        raise ValueError(f"Failed after {self._max_retries} attempts. Last error: {last_error}")
+
+    def _call_llm(self, segment_text: str) -> TopicDetectionResult:
+        """Make a single LLM call and parse the response.
+
+        Args:
+            segment_text: The transcript segment text to analyze.
+
+        Returns:
+            TopicDetectionResult with topics and description.
+
+        Raises:
+            ValueError: If the LLM response is empty or cannot be parsed.
         """
         # Build the messages for the completion call
         messages = [
@@ -62,8 +102,8 @@ class TopicExtractionAgent:
 
         # Extract the response text
         response_text = response.choices[0].message.content
-        if response_text is None:
-            raise ValueError("LLM returned empty response")
+        if response_text is None or response_text.strip() == "":
+            raise ValueError("LLM returned empty response (model may not be loaded or API unreachable)")
 
         # Parse and validate the JSON response
         return self._parse_response(response_text)
@@ -81,10 +121,15 @@ class TopicExtractionAgent:
             ValueError: If parsing or validation fails.
         """
         # Try to extract JSON from the response
-        # Handle cases where the model might wrap JSON in markdown code blocks
         cleaned = response_text.strip()
 
-        # Remove markdown code block if present
+        # Handle "thinking" models that wrap reasoning in <think> tags
+        # Extract content after </think> if present
+        think_match = re.search(r"</think>\s*(.*)$", cleaned, re.DOTALL)
+        if think_match:
+            cleaned = think_match.group(1).strip()
+
+        # Handle cases where the model might wrap JSON in markdown code blocks
         if cleaned.startswith("```json"):
             cleaned = cleaned[7:]
         elif cleaned.startswith("```"):
@@ -94,6 +139,10 @@ class TopicExtractionAgent:
             cleaned = cleaned[:-3]
 
         cleaned = cleaned.strip()
+
+        # If still empty after cleaning, the response had no usable content
+        if not cleaned:
+            raise ValueError(f"No JSON content found after cleaning response. Raw response (first 500 chars): {response_text[:500]}")
 
         try:
             data = json.loads(cleaned)
