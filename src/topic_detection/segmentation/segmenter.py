@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 from src.topic_detection.embedding.lmstudio import LMStudioEmbeddingGenerator
 from src.topic_detection.segmentation.boundary_detector import BoundaryDetector
 from src.topic_detection.segmentation.chunk_encoder import ChunkEncoder
-from src.topic_detection.segmentation.data_types import Segment, SegmentationResult
+from src.topic_detection.segmentation.data_types import ChunkData, Segment, SegmentationResult
 from src.topic_detection.segmentation.segment_assembler import SegmentAssembler
 from src.topic_detection.segmentation.similarity_calculator import SimilarityCalculator
 from src.topic_detection.segmentation.tokenizer import Tokenizer
@@ -140,6 +140,65 @@ class SlidingWindowTopicSegmenter:
         """
         result = self.segment(text)
         return [seg.text for seg in result.segments]
+
+    def generate_embeddings(self, text: str) -> tuple[list[str], ChunkData]:
+        """Generate embeddings for text without performing segmentation.
+
+        Step 1 of the decoupled pipeline: tokenize and embed only.
+
+        Args:
+            text: Input text to process.
+
+        Returns:
+            Tuple of (tokens, chunk_data) where tokens is the list of word tokens
+            and chunk_data contains the embeddings and chunk positions.
+
+        Raises:
+            ValueError: If text is empty or too short for the window size.
+        """
+        if not text or not text.strip():
+            raise ValueError("Text is empty or contains only whitespace")
+
+        tokens = self.tokenizer.tokenize(text)
+        num_tokens = len(tokens)
+
+        if num_tokens < self.window_size:
+            raise ValueError(f"Text has {num_tokens} tokens, but window_size requires at least {self.window_size}")
+
+        chunk_data = self.encoder.encode(tokens)
+        return tokens, chunk_data
+
+    def segment_from_chunk_data(self, tokens: list[str], chunk_data: ChunkData) -> SegmentationResult:
+        """Segment text using pre-computed embeddings.
+
+        Step 2 of the decoupled pipeline: boundary detection from embeddings.
+
+        Args:
+            tokens: List of word tokens (from generate_embeddings).
+            chunk_data: Pre-computed embeddings (from generate_embeddings).
+
+        Returns:
+            SegmentationResult containing segments, boundaries, and scores.
+        """
+        num_tokens = len(tokens)
+
+        # Handle text too short for meaningful segmentation
+        if num_tokens < 2 * self.window_size:
+            text = self.tokenizer.detokenize(tokens)
+            return self._single_segment_result(text, tokens)
+
+        # Run pipeline from similarity calculation onwards
+        similarity_data = self.similarity_calculator.calculate(chunk_data)
+        boundary_data = self.boundary_detector.detect(similarity_data)
+        segments = self.segment_assembler.assemble(tokens, boundary_data)
+
+        return SegmentationResult(
+            segments=segments,
+            boundary_indices=boundary_data.boundary_indices,
+            similarity_scores=similarity_data.scores,
+            num_tokens=num_tokens,
+            chunk_data=chunk_data,
+        )
 
     def _single_segment_result(self, text: str, tokens: list[str]) -> SegmentationResult:
         """Create a result with the entire text as a single segment.
