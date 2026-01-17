@@ -106,6 +106,37 @@ topic_segmentation:
   # Retry configuration
   retry_limit: 1
 
+# Topic Detection Configuration (Embedding-based segmentation + LLM topic extraction)
+topic_detection:
+  # Embedding generator configuration
+  embedding:
+    provider: lmstudio                  # Provider type (factory selector)
+    model_name: multilingual-e5-base-mlx
+    api_base: http://127.0.0.1:1234/v1
+    api_key_env: LMSTUDIO_API_KEY       # Optional, for providers that need it
+
+  # Sliding window segmenter settings
+  sliding_window:
+    window_size: 50          # Tokens per chunk for embedding
+    stride: 25               # Tokens to advance between chunks
+    threshold_method: relative
+    threshold_value: 0.4
+    min_segment_tokens: 100
+    smoothing_passes: 1
+
+  # Topic detection agent LLM
+  topic_detection_llm:
+    model: openai/nvidia/nemotron-3-nano
+    api_base: http://127.0.0.1:1234/v1
+    api_key_env: LMSTUDIO_API_KEY
+    context_window: 262144
+    max_tokens: 4096
+    temperature: 0.3
+    context_window_threshold: 90
+
+  # Output settings
+  output_dir: output/topics
+
 # Default parameter values
 defaults:
   # Token validation defaults

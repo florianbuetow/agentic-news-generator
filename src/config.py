@@ -131,6 +131,41 @@ class TopicSegmentationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class TopicDetectionEmbeddingConfig(BaseModel):
+    """Configuration for topic detection embedding generation."""
+
+    provider: str = Field(..., description="Embedding provider type (e.g., 'lmstudio')")
+    model_name: str = Field(..., description="Model name for embedding generation")
+    api_base: str | None = Field(..., description="API base URL for the embedding service")
+    api_key_env: str | None = Field(None, description="Environment variable name for API key")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionSlidingWindowConfig(BaseModel):
+    """Configuration for topic detection sliding window segmenter."""
+
+    window_size: int = Field(..., gt=0, description="Number of tokens per chunk for embedding")
+    stride: int = Field(..., gt=0, description="Number of tokens to advance between chunks")
+    threshold_method: str = Field(..., description="Method for determining boundaries ('relative', 'absolute', 'percentile')")
+    threshold_value: float = Field(..., description="Threshold value for boundary detection")
+    min_segment_tokens: int = Field(..., ge=0, description="Minimum tokens required per segment")
+    smoothing_passes: int = Field(..., ge=0, description="Number of smoothing passes on similarity curve")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionConfig(BaseModel):
+    """Complete topic detection configuration."""
+
+    embedding: TopicDetectionEmbeddingConfig = Field(..., description="Embedding generator configuration")
+    sliding_window: TopicDetectionSlidingWindowConfig = Field(..., description="Sliding window segmenter configuration")
+    topic_detection_llm: LLMConfig = Field(..., description="LLM config for topic extraction agent")
+    output_dir: str = Field(..., description="Output directory for topic detection results")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class TranscriptionConfig(BaseModel):
     """Configuration for MLX Whisper transcription."""
 
@@ -224,6 +259,10 @@ class Config:
         # Validate transcription section if present
         if "transcription" in self._data:
             self._transcription = self._validate_transcription()
+
+        # Validate topic_detection section if present
+        if "topic_detection" in self._data:
+            self._topic_detection = self._validate_topic_detection()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -362,6 +401,21 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Transcription configuration validation failed: {error_messages}") from e
 
+    def _validate_topic_detection(self) -> TopicDetectionConfig:
+        """Validate topic detection configuration.
+
+        Returns:
+            Validated TopicDetectionConfig instance.
+
+        Raises:
+            ValueError: If topic detection configuration is invalid.
+        """
+        try:
+            return TopicDetectionConfig.model_validate(self._data["topic_detection"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Topic detection configuration validation failed: {error_messages}") from e
+
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -393,6 +447,19 @@ class Config:
         if not hasattr(self, "_topic_segmentation"):
             raise KeyError("Missing required key 'topic_segmentation' in config file")
         return self._topic_segmentation
+
+    def get_topic_detection_config(self) -> TopicDetectionConfig:
+        """Get topic detection configuration.
+
+        Returns:
+            TopicDetectionConfig instance.
+
+        Raises:
+            KeyError: If topic_detection section is not configured.
+        """
+        if not hasattr(self, "_topic_detection"):
+            raise KeyError("Missing required key 'topic_detection' in config file")
+        return self._topic_detection
 
     def getEncodingName(self) -> str:
         """Get default tiktoken encoding for token counting."""
