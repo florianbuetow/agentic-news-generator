@@ -39,7 +39,6 @@ The pipeline segments continuous text (e.g., podcast transcripts) into topically
                                                    ▼
                                         ┌──────────────────────┐
                                         │  Segment Assembler   │
-                                        │  (min size enforce)  │
                                         └──────────────────────┘
                                                    │
                                                    ▼
@@ -158,16 +157,10 @@ Mark boundaries where similarity is in the bottom N percentile of all scores.
 
 ## Stage 5: Segment Assembly
 
-Detected boundaries are converted into final text segments with constraints:
+Detected boundaries are converted into final text segments:
 
-1. **Boundary validation:** Ensure boundaries are within valid token range
-2. **Minimum size enforcement:** Segments smaller than `min_segment_tokens` are merged with neighbors
-3. **Text reconstruction:** Tokens are joined back into readable text
-
-**Merging strategy for small segments:**
-- First segment too small → merge with second segment
-- Last segment too small → merge with previous segment
-- Middle segment too small → merge with whichever neighbor creates the smaller combined segment
+1. **Boundary validation:** Ensure boundaries are within valid word range
+2. **Text reconstruction:** Words are joined back into readable text
 
 ## Key Insight: Why This Works
 
@@ -212,14 +205,12 @@ Topic A                          Topic B
 | `stride` | Words between chunk starts | 10-50 |
 | `threshold_method` | Boundary detection method | "relative" |
 | `threshold_value` | Method-specific threshold | 0.1-0.5 (relative) |
-| `min_segment_tokens` | Minimum segment size | 50-200 |
 | `smoothing_passes` | Similarity curve smoothing | 0-3 |
 
 **Trade-offs:**
 - Larger `window_size` → more context, but boundaries less precise
 - Smaller `stride` → finer granularity, but more computation
 - Higher `threshold_value` → fewer boundaries (only major topic shifts)
-- Higher `min_segment_tokens` → longer segments, prevents over-segmentation
 
 ## Output
 
@@ -227,10 +218,10 @@ The pipeline produces:
 
 1. **Segments:** List of topically coherent text sections with:
    - Text content
-   - Start/end token positions
-   - Token count
+   - Start/end word positions
+   - Word count
 
-2. **Boundary indices:** Token positions where topic changes were detected
+2. **Boundary indices:** Word positions where topic changes were detected
 
 3. **Similarity scores:** The full similarity curve (useful for visualization/debugging)
 
