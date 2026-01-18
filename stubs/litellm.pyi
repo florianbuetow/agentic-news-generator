@@ -26,3 +26,22 @@ def completion(
     stream: bool | None = None,
     response_format: dict[str, object] | None = None,
 ) -> ModelResponse: ...
+
+class EmbeddingData:
+    """Individual embedding data item."""
+
+    embedding: list[float]
+
+    def __getitem__(self, key: str) -> list[float]: ...
+
+class EmbeddingResponse:
+    """Response from embedding API."""
+
+    data: list[EmbeddingData]
+
+def embedding(
+    model: str,
+    input: list[str],
+    api_base: str | None = None,
+    api_key: str | None = None,
+) -> EmbeddingResponse: ...
