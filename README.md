@@ -124,19 +124,14 @@ Channels can use either:
 
 See `config/config.yaml` for examples of pre-configured AI-focused channels in multiple languages.
 
-### 3. Environment Variables
+### 3. Configuration
 
-Create a `.env` file in the project root for local development:
+All configuration parameters are managed through `config/config.yaml`. **Never use environment variables** for configuration—all settings must be loaded through `config.py` from `config.yaml`.
 
-```bash
-# API Keys (if using cloud-based LLM services)
-# ANTHROPIC_API_KEY=your_key_here
-
-# LM Studio Configuration (for local LLM)
-# LM_STUDIO_BASE_URL=http://localhost:1234/v1
-```
-
-Required environment variables will depend on your LLM backend configuration.
+See `config/config.yaml.template` for all available configuration options including:
+- API keys and endpoints for LLM services
+- LM Studio configuration for local LLM
+- Processing parameters and thresholds
 
 ## Usage
 
@@ -758,7 +753,11 @@ The system is configured via `config/config.yaml`. The configuration defines:
 
 ### Configuration Philosophy
 
-The project follows a strict "no default parameters" principle: all configuration values must be explicitly provided at call sites. The `defaults` section in `config.yaml` serves as the single source of truth for default values, which are accessed via the `Config` class getter methods:
+The project follows strict configuration principles:
+
+1. **No environment variables**: Never use environment variables for configuration. All config parameters must be loaded through `config.py` from `config.yaml`.
+
+2. **No default parameters**: All configuration values must be explicitly provided at call sites. The `defaults` section in `config.yaml` serves as the single source of truth for default values, which are accessed via the `Config` class getter methods:
 
 ```python
 from src.config import Config

@@ -107,7 +107,7 @@ class LLMConfig(BaseModel):
         description="litellm model string (e.g., 'openai/gpt-4', 'anthropic/claude-3-5-sonnet', 'openai/local-model' for LM Studio)",
     )
     api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
-    api_key_env: str = Field(..., description="Environment variable name for API key")
+    api_key: str = Field(..., description="API key for the LLM service")
     context_window: int = Field(..., description="Model context window size in tokens")
     max_tokens: int = Field(..., description="Maximum tokens for response/completion")
     temperature: float = Field(..., description="Sampling temperature (0.0-1.0)")
@@ -117,6 +117,8 @@ class LLMConfig(BaseModel):
         ge=0,
         le=100,
     )
+    max_retries: int = Field(..., gt=0, description="Number of retries on LLM parsing errors")
+    retry_delay: float = Field(..., gt=0, description="Delay in seconds between retries")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -127,6 +129,40 @@ class TopicSegmentationConfig(BaseModel):
     agent_llm: LLMConfig = Field(..., description="LLM config for segmentation agent")
     critic_llm: LLMConfig = Field(..., description="LLM config for critic agent")
     retry_limit: int = Field(..., description="Maximum retry attempts")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionEmbeddingConfig(BaseModel):
+    """Configuration for topic detection embedding generation."""
+
+    provider: str = Field(..., description="Embedding provider type (e.g., 'lmstudio')")
+    model_name: str = Field(..., description="Model name for embedding generation")
+    api_base: str | None = Field(..., description="API base URL for the embedding service")
+    api_key: str | None = Field(..., description="API key for the embedding service (use 'lm-studio' for local LM Studio)")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionSlidingWindowConfig(BaseModel):
+    """Configuration for topic detection sliding window segmenter."""
+
+    window_size: int = Field(..., gt=0, description="Number of words per chunk for embedding")
+    stride: int = Field(..., gt=0, description="Number of words to advance between chunks")
+    threshold_method: str = Field(..., description="Method for determining boundaries ('relative', 'absolute', 'percentile')")
+    threshold_value: float = Field(..., description="Threshold value for boundary detection")
+    smoothing_passes: int = Field(..., ge=0, description="Number of smoothing passes on similarity curve")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionConfig(BaseModel):
+    """Complete topic detection configuration."""
+
+    embedding: TopicDetectionEmbeddingConfig = Field(..., description="Embedding generator configuration")
+    sliding_window: TopicDetectionSlidingWindowConfig = Field(..., description="Sliding window segmenter configuration")
+    topic_detection_llm: LLMConfig = Field(..., description="LLM config for topic extraction agent")
+    output_dir: str = Field(..., description="Output directory for topic detection results")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -224,6 +260,10 @@ class Config:
         # Validate transcription section if present
         if "transcription" in self._data:
             self._transcription = self._validate_transcription()
+
+        # Validate topic_detection section if present
+        if "topic_detection" in self._data:
+            self._topic_detection = self._validate_topic_detection()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -362,6 +402,21 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Transcription configuration validation failed: {error_messages}") from e
 
+    def _validate_topic_detection(self) -> TopicDetectionConfig:
+        """Validate topic detection configuration.
+
+        Returns:
+            Validated TopicDetectionConfig instance.
+
+        Raises:
+            ValueError: If topic detection configuration is invalid.
+        """
+        try:
+            return TopicDetectionConfig.model_validate(self._data["topic_detection"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Topic detection configuration validation failed: {error_messages}") from e
+
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -393,6 +448,19 @@ class Config:
         if not hasattr(self, "_topic_segmentation"):
             raise KeyError("Missing required key 'topic_segmentation' in config file")
         return self._topic_segmentation
+
+    def get_topic_detection_config(self) -> TopicDetectionConfig:
+        """Get topic detection configuration.
+
+        Returns:
+            TopicDetectionConfig instance.
+
+        Raises:
+            KeyError: If topic_detection section is not configured.
+        """
+        if not hasattr(self, "_topic_detection"):
+            raise KeyError("Missing required key 'topic_detection' in config file")
+        return self._topic_detection
 
     def getEncodingName(self) -> str:
         """Get default tiktoken encoding for token counting."""

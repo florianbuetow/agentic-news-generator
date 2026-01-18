@@ -5,9 +5,10 @@ from datetime import timedelta
 from typing import Protocol
 
 class _Timecode(Protocol):
-    """Protocol for timecode objects with to_timecode method."""
+    """Protocol for timecode objects (subclass of timedelta)."""
 
     def to_timecode(self) -> str: ...
+    def total_seconds(self) -> float: ...
 
 class Subtitle:
     """SRT subtitle entry."""

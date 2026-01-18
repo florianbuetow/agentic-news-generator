@@ -97,11 +97,13 @@ When modifying Jupyter notebook (.ipynb) files, validate changes using these met
 - Scripts should track and report success/failure counts
 - Exit with code 1 if any items failed, 0 if all succeeded
 
-## API Key Management
-- API keys must be loaded from environment variables
-- Never hardcode API keys in source code
-- Use `.env` file for local development (add to `.gitignore`)
-- Document required environment variables in README.md
+## Configuration Management
+- **Never use environment variables** for configuration
+- All config parameters must be loaded through `config.py` from `config.yaml`
+- Never hardcode configuration values in source code
+- **Never mention specific config values in code comments or docstrings** - they will get out of sync with actual config and cause confusion
+- Use `config/config.yaml` for all settings (add sensitive values to `.gitignore` or use `config.yaml.local`)
+- Document configuration options in `config/config.yaml.template`
 
 ## Output Organization
 - Organize output files by date or topic as appropriate
