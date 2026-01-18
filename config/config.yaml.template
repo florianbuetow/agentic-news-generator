@@ -87,24 +87,60 @@ topic_segmentation:
   agent_llm:
     model: your-model-name
     api_base: http://127.0.0.1:1234/v1
-    api_key_env: LMSTUDIO_API_KEY
+    api_key: lm-studio
     context_window: 262144
     max_tokens: 32000
     temperature: 0.7
     context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
+    max_retries: 3
+    retry_delay: 2.0
 
   # Critic Agent LLM - using same LM Studio instance
   critic_llm:
     model: your-model-name
     api_base: http://127.0.0.1:1234/v1
-    api_key_env: LMSTUDIO_API_KEY
+    api_key: lm-studio
     context_window: 262144
     max_tokens: 32000
     temperature: 0.3
     context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
+    max_retries: 3
+    retry_delay: 2.0
 
   # Retry configuration
   retry_limit: 1
+
+# Topic Detection Configuration (Embedding-based segmentation + LLM topic extraction)
+topic_detection:
+  # Embedding generator configuration
+  embedding:
+    provider: lmstudio                  # Provider type (factory selector)
+    model_name: text-embedding-bge-large-en-v1.5
+    api_base: http://127.0.0.1:1234/v1
+    api_key: lm-studio                  # For LM Studio, any non-empty value works
+
+  # Sliding window segmenter settings
+  sliding_window:
+    window_size: 100         # Words per chunk for embedding
+    stride: 5                # Words to advance between chunks (95% overlap)
+    threshold_method: relative
+    threshold_value: 0.4
+    smoothing_passes: 1
+
+  # Topic detection agent LLM
+  topic_detection_llm:
+    model: openai/nvidia/nemotron-3-nano
+    api_base: http://127.0.0.1:1234/v1
+    api_key: lm-studio
+    context_window: 262144
+    max_tokens: 4096
+    temperature: 0.3
+    context_window_threshold: 90
+    max_retries: 3
+    retry_delay: 2.0
+
+  # Output settings
+  output_dir: output/topics
 
 # Default parameter values
 defaults:
