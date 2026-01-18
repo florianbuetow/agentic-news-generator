@@ -24,6 +24,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_downloads_transcripts_dir": "./data/downloads/transcripts",
         "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
         "data_downloads_transcripts_cleaned_dir": "./data/downloads/transcripts_cleaned",
+        "data_transcripts_topics_dir": "./data/downloads/transcripts-topics",
         "data_downloads_audio_dir": "./data/downloads/audio",
         "data_downloads_metadata_dir": "./data/downloads/metadata",
         "data_output_dir": "./data/output/",
@@ -31,6 +32,8 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_temp_dir": "./data/temp",
         "data_archive_dir": "./data/archive",
         "data_archive_videos_dir": "./data/archive/videos",
+        "data_logs_dir": "./logs",
+        "data_output_articles_dir": "./data/output/articles",
         "reports_dir": "reports",
     }
 

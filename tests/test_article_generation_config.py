@@ -47,6 +47,8 @@ class TestArticleGenerationConfig:
             max_tokens=4096,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         config = ArticleGenerationConfig(
             writer_llm=writer_llm,
@@ -86,6 +88,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -109,6 +113,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -132,6 +138,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -155,6 +163,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -178,6 +188,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -202,6 +214,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -226,6 +240,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -250,6 +266,8 @@ class TestArticleGenerationConfig:
             max_tokens=4096,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
 
         # Test 0
@@ -284,6 +302,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -308,6 +328,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -332,6 +354,8 @@ class TestArticleGenerationConfig:
             "max_tokens": 4096,
             "temperature": 0.7,
             "context_window_threshold": 90,
+            "max_retries": 3,
+            "retry_delay": 2.0,
         }
         with pytest.raises(ValidationError) as exc_info:
             ArticleGenerationConfig.model_validate(
@@ -357,6 +381,8 @@ class TestArticleGenerationConfig:
             max_tokens=4096,
             temperature=0.7,
             context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
         )
         config = ArticleGenerationConfig(
             writer_llm=writer_llm,
@@ -396,6 +422,8 @@ class TestConfigWithArticleGeneration:
                     "max_tokens": 4096,
                     "temperature": 0.7,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 "max_retries": 3,
                 "timeout_seconds": 600,
@@ -508,6 +536,8 @@ class TestConfigWithArticleGeneration:
                     "max_tokens": 4096,
                     "temperature": 0.7,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 "allowed_styles": ["NATURE_NEWS"],
                 "default_style_mode": "NATURE_NEWS",
@@ -550,6 +580,8 @@ class TestConfigWithArticleGeneration:
                     "max_tokens": 4096,
                     "temperature": 0.7,
                     "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
                 },
                 "max_retries": 3,
                 "timeout_seconds": 30,

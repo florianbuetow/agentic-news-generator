@@ -8,8 +8,8 @@ from litellm import completion
 
 from src.agents.article_generation import agent_prompts
 from src.agents.article_generation.models import ArticleGenerationResult, ArticleMetadata, ArticleResponse
-from src.agents.topic_segmentation.token_validator import validate_token_usage
 from src.config import Config, LLMConfig
+from src.util.token_validator import validate_token_usage
 
 
 class ArticleWriterAgent:
