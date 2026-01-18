@@ -217,9 +217,21 @@ def main() -> int:
 
     success_count = 0
     failure_count = 0
+    skipped_count = 0
 
     for embeddings_file in embeddings_files:
         relative_path = embeddings_file.relative_to(base_dir)
+
+        # Check if segmentation file already exists
+        output_subdir = output_dir / relative_path.parent
+        output_filename = relative_path.name.replace("_embeddings.json", "_segmentation.json")
+        output_path = output_subdir / output_filename
+
+        if output_path.exists():
+            print(f"Skipping (already exists): {relative_path}")
+            skipped_count += 1
+            continue
+
         print(f"Processing: {relative_path}")
 
         try:
@@ -244,7 +256,7 @@ def main() -> int:
 
     # Summary
     print("=" * 50)
-    print(f"Completed: {success_count} succeeded, {failure_count} failed")
+    print(f"Completed: {success_count} succeeded, {skipped_count} skipped, {failure_count} failed")
 
     return 1 if failure_count > 0 else 0
 
