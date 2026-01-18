@@ -16,6 +16,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import tiktoken
 from pydantic import BaseModel, ConfigDict
 
 from src.config import Config
@@ -68,7 +69,7 @@ def process_segments(segmentation_path: Path, config: Config) -> TranscriptTopic
     segmentation_data = SegmentationOutput.model_validate(data)
     print(f"  Found {segmentation_data.total_segments} segments to process")
 
-    # 2. Create topic extraction agent
+    # 2. Create topic extraction agent and tokenizer
     print("  Initializing topic extraction agent...")
     llm_config = td_config.topic_detection_llm
     agent = TopicExtractionAgent(
@@ -77,10 +78,13 @@ def process_segments(segmentation_path: Path, config: Config) -> TranscriptTopic
         retry_delay=llm_config.retry_delay,
     )
 
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+
     # 3. Process each segment
     segment_results: list[SegmentTopics] = []
     for seg in segmentation_data.segments:
-        print(f"    Processing segment {seg.segment_id}/{segmentation_data.total_segments}...")
+        token_count = len(tokenizer.encode(seg.text))
+        print(f"    Processing segment {seg.segment_id}/{segmentation_data.total_segments} ({token_count} tokens)...")
         topics = agent.detect(seg.text)
         segment_results.append(
             SegmentTopics(
@@ -113,6 +117,11 @@ def main() -> int:
         "--file",
         type=Path,
         help="Process a single _segmentation.json file instead of all files",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force reprocessing even if _topics.json already exists",
     )
     args = parser.parse_args()
 
@@ -155,20 +164,29 @@ def main() -> int:
     print()
 
     success_count = 0
+    skipped_count = 0
 
     # Process each segmentation file - write output immediately after each file
     for segmentation_file in segmentation_files:
         relative_path = segmentation_file.relative_to(base_dir)
+
+        # Calculate output path to check if it already exists
+        output_subdir = output_dir / relative_path.parent
+        output_filename = relative_path.name.replace("_segmentation.json", "_topics.json")
+        topics_output_path = output_subdir / output_filename
+
+        # Skip if topics file already exists (unless --force)
+        if topics_output_path.exists() and not args.force:
+            print(f"Skipping: {relative_path} (topics file already exists)")
+            skipped_count += 1
+            continue
+
         print(f"Processing: {relative_path}")
 
         topics_result = process_segments(segmentation_file, config)
 
         # Write topics JSON output immediately
-        # Replace _segmentation.json with _topics.json
-        output_subdir = output_dir / relative_path.parent
         output_subdir.mkdir(parents=True, exist_ok=True)
-        output_filename = relative_path.name.replace("_segmentation.json", "_topics.json")
-        topics_output_path = output_subdir / output_filename
 
         with open(topics_output_path, "w", encoding="utf-8") as f:
             json.dump(topics_result.model_dump(), f, indent=2, ensure_ascii=False)
@@ -180,7 +198,7 @@ def main() -> int:
 
     # Summary
     print("=" * 50)
-    print(f"Completed: {success_count} succeeded")
+    print(f"Completed: {success_count} succeeded, {skipped_count} skipped")
 
     return 0
 

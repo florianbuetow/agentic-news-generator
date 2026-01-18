@@ -186,13 +186,21 @@ topics-extract:
     @uv run python scripts/extract-topics.py
     @echo ""
 
-# Run complete topic detection pipeline (all 3 steps)
+# Generate visualizations from embeddings (Step 4)
+topics-visualize:
+    @echo ""
+    @printf "\033[0;34m=== Generating Embedding Visualizations ===\033[0m\n"
+    @uv run python scripts/visualize-embeddings.py
+    @echo ""
+
+# Run complete topic detection pipeline (all 4 steps)
 topics-all:
     @echo ""
     @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
     @just topics-embed
     @just topics-boundaries
     @just topics-extract
+    @just topics-visualize
     @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 

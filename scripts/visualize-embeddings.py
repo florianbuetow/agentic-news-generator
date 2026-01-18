@@ -139,6 +139,8 @@ class SegmentInfo:
 
     start_word: int
     end_word: int
+    high_level_topics: list[str]
+    mid_level_topics: list[str]
     specific_topics: list[str]
 
 
@@ -168,6 +170,8 @@ def load_segments(json_path: Path) -> tuple[list[int], float, list[SegmentInfo]]
             SegmentInfo(
                 start_word=seg["start_word"],
                 end_word=seg["end_word"],
+                high_level_topics=[],  # Will be filled from topics JSON
+                mid_level_topics=[],  # Will be filled from topics JSON
                 specific_topics=[],  # Will be filled from topics JSON
             )
         )
@@ -177,19 +181,35 @@ def load_segments(json_path: Path) -> tuple[list[int], float, list[SegmentInfo]]
     return boundaries, threshold, segment_infos
 
 
-def load_topics(json_path: Path) -> list[list[str]]:
-    """Load topics JSON to get specific topics for each segment.
+@dataclass
+class TopicLevels:
+    """Container for all topic levels for a segment."""
+
+    high_level_topics: list[str]
+    mid_level_topics: list[str]
+    specific_topics: list[str]
+
+
+def load_topics(json_path: Path) -> list[TopicLevels]:
+    """Load topics JSON to get all topic levels for each segment.
 
     Args:
         json_path: Path to the topics JSON file.
 
     Returns:
-        List of specific_topics lists, one per segment.
+        List of TopicLevels, one per segment.
     """
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    return [seg.get("specific_topics", []) for seg in data.get("segments", [])]
+    return [
+        TopicLevels(
+            high_level_topics=seg.get("high_level_topics", []),
+            mid_level_topics=seg.get("mid_level_topics", []),
+            specific_topics=seg.get("specific_topics", []),
+        )
+        for seg in data.get("segments", [])
+    ]
 
 
 def _draw_boundary_markers(
@@ -208,14 +228,46 @@ def _draw_boundary_markers(
         )
 
 
+def _wrap_topic_text(topics: list[str], max_width: int = 20) -> str:
+    """Wrap topics into multi-line text with max_width chars per line.
+
+    Args:
+        topics: List of topic strings.
+        max_width: Maximum characters per line.
+
+    Returns:
+        Multi-line string with wrapped topics.
+    """
+    if not topics:
+        return ""
+    lines: list[str] = []
+    current_line = ""
+    for topic in topics:
+        if current_line and len(current_line) + len(topic) + 2 > max_width:
+            lines.append(current_line)
+            current_line = topic
+        else:
+            current_line = f"{current_line}, {topic}" if current_line else topic
+    if current_line:
+        lines.append(current_line)
+    return "\n".join(lines)
+
+
 def _draw_segment_backgrounds(
     ax: Axes,
     segment_infos: list[SegmentInfo],
     x_min: int,
     x_max: int,
-    is_top_plot: bool,
+    graph_index: int,
 ) -> None:
-    """Draw alternating colored backgrounds for segments and topic labels on top plot."""
+    """Draw alternating colored backgrounds for segments and topic labels.
+
+    Topic labels are distributed by graph index:
+    - graph_index 0: high_level_topics
+    - graph_index 1: mid_level_topics
+    - graph_index 2: specific_topics
+    - graph_index 3+: no labels
+    """
     colors = ["#f0f0ff", "#fff0f0"]  # Alternating light blue and light red
 
     for i, seg in enumerate(segment_infos):
@@ -229,12 +281,19 @@ def _draw_segment_backgrounds(
         # Draw background span
         ax.axvspan(seg_start, seg_end, alpha=0.3, color=colors[i % 2], zorder=0)
 
-        # Draw topic labels only on top plot
-        if is_top_plot and seg.specific_topics:
-            # Join topics with comma, truncate if too long
-            topic_text = ", ".join(seg.specific_topics)
-            if len(topic_text) > 50:
-                topic_text = topic_text[:47] + "..."
+        # Select topics based on graph_index
+        if graph_index == 0:
+            topics = seg.high_level_topics
+        elif graph_index == 1:
+            topics = seg.mid_level_topics
+        elif graph_index == 2:
+            topics = seg.specific_topics
+        else:
+            topics = []
+
+        # Draw topic labels for first 3 graphs only
+        if topics:
+            topic_text = _wrap_topic_text(topics)
 
             # Position label at segment center
             label_x = (seg_start + seg_end) / 2
@@ -245,7 +304,7 @@ def _draw_segment_backgrounds(
                 transform=ax.get_xaxis_transform(),
                 ha="center",
                 va="top",
-                fontsize=7,
+                fontsize=6,
                 color="darkblue",
                 bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8, edgecolor="none"),
                 zorder=10,
@@ -261,7 +320,7 @@ def _plot_single_distance(
     boundaries: list[int],
     threshold: float,
     segment_infos: list[SegmentInfo],
-    is_top_plot: bool,
+    graph_index: int,
 ) -> None:
     """Plot similarity curve for a single distance on given axes."""
     positions, similarities = compute_similarities_at_distance(embeddings, offsets, distance, stride)
@@ -270,7 +329,7 @@ def _plot_single_distance(
         raise ValueError(f"Insufficient data for distance {distance}")
 
     # Draw segment backgrounds first (behind everything)
-    _draw_segment_backgrounds(ax, segment_infos, offsets[0], offsets[-1], is_top_plot)
+    _draw_segment_backgrounds(ax, segment_infos, offsets[0], offsets[-1], graph_index)
 
     # Plot as filled area
     ax.fill_between(positions, similarities, alpha=0.3, color="steelblue")
@@ -328,10 +387,9 @@ def _create_offset_to_timestamp_mapper(offsets: list[int], timestamps: list[floa
 
 
 def _format_timestamp(seconds: float) -> str:
-    """Format seconds as HH:MM."""
-    hours = int(seconds // 3600)
-    minutes = int((seconds % 3600) // 60)
-    return f"{hours:02d}:{minutes:02d}"
+    """Format seconds as absolute minutes."""
+    minutes = int(seconds // 60)
+    return f"{minutes}m"
 
 
 def create_visualization(
@@ -374,7 +432,6 @@ def create_visualization(
         axes = [axes]
 
     for idx, distance in enumerate(feasible_distances):
-        is_top_plot = idx == 0
         _plot_single_distance(
             axes[idx],
             embeddings,
@@ -384,13 +441,13 @@ def create_visualization(
             boundaries,
             threshold,
             segment_infos,
-            is_top_plot,
+            graph_index=idx,
         )
 
     # Set timestamp formatter on x-axis if timestamps available
     if format_xaxis is not None:
         axes[-1].xaxis.set_major_formatter(FuncFormatter(format_xaxis))
-        axes[-1].set_xlabel("Time (HH:MM)")
+        axes[-1].set_xlabel("Time (minutes)")
     else:
         axes[-1].set_xlabel("Word Position")
 
@@ -437,7 +494,9 @@ def process_embeddings_file(json_path: Path, output_dir: Path) -> bool:
     if len(topics_list) != len(segment_infos):
         raise ValueError(f"Topics count ({len(topics_list)}) doesn't match segments ({len(segment_infos)})")
     for seg_info, topics in zip(segment_infos, topics_list, strict=True):
-        seg_info.specific_topics = topics
+        seg_info.high_level_topics = topics.high_level_topics
+        seg_info.mid_level_topics = topics.mid_level_topics
+        seg_info.specific_topics = topics.specific_topics
     print(f"  Loaded topics for {len(segment_infos)} segments")
 
     # Create output path
@@ -488,7 +547,7 @@ def main() -> int:
         files = [args.file]
         default_output_dir = args.file.parent
     else:
-        # Find all embeddings files in output/topics
+        # Find all topics files first, then derive embeddings file paths
         from src.config import Config
 
         config_path = Path(__file__).parent.parent / "config" / "config.yaml"
@@ -500,16 +559,24 @@ def main() -> int:
             print(f"Error: Topics directory not found: {topics_dir}", file=sys.stderr)
             return 1
 
-        files = sorted(f for f in topics_dir.rglob("*_embeddings.json") if not f.name.startswith("._"))
+        # Find topics files and derive corresponding embeddings file paths
+        topics_files = sorted(f for f in topics_dir.rglob("*_topics.json") if not f.name.startswith("._"))
+        files = []
+        for tf in topics_files:
+            emb_path = Path(str(tf).replace("_topics.json", "_embeddings.json"))
+            if emb_path.exists():
+                files.append(emb_path)
+            else:
+                print(f"Warning: Embeddings file not found for {tf.name}")
         default_output_dir = topics_dir
 
     output_dir = args.output_dir or default_output_dir
 
     if not files:
-        print("No embeddings files found to process.")
+        print("No files with complete topic data found to process.")
         return 0
 
-    print(f"Found {len(files)} embeddings file(s) to process")
+    print(f"Found {len(files)} file(s) with complete topic data to process")
     print(f"Output directory: {output_dir}")
     print()
 
