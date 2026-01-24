@@ -451,7 +451,7 @@ code-spell:
 code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
-    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf
+    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf --ignore-vuln GHSA-7gcm-g887-7qv7  # TODO(2026-04-24): Review protobuf GHSA-7gcm-g887-7qv7 for upstream fix
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""
