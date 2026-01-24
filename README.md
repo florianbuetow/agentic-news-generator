@@ -940,7 +940,21 @@ The following vulnerabilities are intentionally ignored in dependency audits:
   - Risk is negligible in current usage context
 - **Review Task**: Check quarterly for upstream fix from [nbconvert releases](https://github.com/jupyter/nbconvert/releases)
 - **Next Review**: 2026-04-07
-- **Configured in**: `justfile` line 211 (`--ignore-vuln GHSA-xm59-rqc7-hhvf`)
+- **Configured in**: `justfile` line 440 (`--ignore-vuln GHSA-xm59-rqc7-hhvf`)
+
+#### protobuf 5.29.5 - GHSA-7gcm-g887-7qv7
+
+- **Status**: IGNORED (no fix available)
+- **Type**: DoS via uncontrolled recursion in `json_format.ParseDict()` with nested `Any` messages
+- **Risk Level**: LOW
+- **Rationale**:
+  - Requires attacker-controlled protobuf JSON input with deeply nested `Any` messages
+  - This project does not parse untrusted protobuf JSON from external sources
+  - Transitive dependency (required by autogen-core, googleapis-common-protos, opentelemetry-proto)
+  - No patch available - all versions up to 6.33.4 are affected
+- **Review Task**: Check for upstream fix from [protobuf releases](https://github.com/protocolbuffers/protobuf/releases)
+- **Next Review**: 2026-04-24
+- **Configured in**: `justfile` line 440 (`--ignore-vuln GHSA-7gcm-g887-7qv7`)
 
 ### Video Processing Features
 
