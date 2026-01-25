@@ -87,6 +87,16 @@ all:
     @just transcripts-remove-hallucinations
     @just topics-all
 
+# Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
+all-ingestion:
+    @just ci-quiet
+    -@just download-videos
+    @just extract-audio
+    @just transcribe
+    @just archive-videos
+    @just analyze-transcripts-hallucinations
+    @just transcripts-remove-hallucinations
+
 # Download YouTube videos from channels in config.yaml
 download-videos:
     #!/usr/bin/env bash
