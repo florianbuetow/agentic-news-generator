@@ -156,6 +156,10 @@ archive-videos:
     @bash scripts/archive-videos.sh
     @echo ""
 
+# Scan for and remove empty files in data folder
+clean-empty-files:
+    @uv run python scripts/find-and-clean-empty-data-files.py
+
 # Analyze transcripts for hallucinations
 analyze-transcripts-hallucinations:
     @echo ""
