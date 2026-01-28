@@ -39,15 +39,26 @@ class FileLanguageResult:
 
     @property
     def is_english_only(self) -> bool:
-        """Check if file contains only English.
+        """Check if file is predominantly English using majority vote.
+
+        Uses a threshold-based approach: if >= 80% of chunks are detected as
+        English (or '??' for no alphabetic content), the file is considered English.
+        This handles spurious false positives from technical jargon triggering
+        incorrect language detection in isolated chunks.
 
         Returns:
-            True if all chunks are English, empty, or contain no detectable language (??).
+            True if >= 80% of chunks are English or '??', or if no chunks exist.
         """
-        unique_langs = set(self.languages)
-        # Accept English-only, empty, or combinations with '??' (no alphabetic words)
-        acceptable_langs = {"en", "??"}
-        return unique_langs.issubset(acceptable_langs) or unique_langs == set()
+        if not self.languages:
+            return True
+
+        # Count chunks detected as English or unknown (acceptable)
+        acceptable = {"en", "??"}
+        english_count = sum(1 for lang in self.languages if lang in acceptable)
+
+        # Require English in majority of chunks (80% threshold)
+        threshold = 0.8
+        return english_count / len(self.languages) >= threshold
 
 
 @dataclass
