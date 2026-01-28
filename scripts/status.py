@@ -206,9 +206,11 @@ def main() -> int:
     print()
 
     # Calculate processing progress for active content
-    if total_active_videos > 0:
-        audio_pct = (total_active_audio / total_active_videos) * 100
-        transcript_pct = (total_active_transcripts / total_active_videos) * 100
+    # Use max of videos and audio as the base count (audio files may remain from archived videos)
+    total_active_base = max(total_active_videos, total_active_audio)
+    if total_active_base > 0:
+        audio_pct = (total_active_audio / total_active_base) * 100
+        transcript_pct = (total_active_transcripts / total_active_base) * 100
         print(f"Active Audio extraction:  {audio_pct:.1f}% complete")
         print(f"Active Transcription:     {transcript_pct:.1f}% complete")
     print()
@@ -224,14 +226,17 @@ def main() -> int:
 
         for channel_name in sorted(active_channel_stats.keys()):
             stats = active_channel_stats[channel_name]
-            # Calculate completion percentage: (audio + transcripts) / (videos * 2) * 100
-            completion_pct = ((stats["audio"] + stats["transcripts"]) / (stats["videos"] * 2)) * 100 if stats["videos"] > 0 else 0.0
+            # Calculate completion percentage: (audio + transcripts) / (max(videos, audio) * 2) * 100
+            # Use max of videos and audio as base (audio files may remain from archived videos)
+            base_count = max(stats["videos"], stats["audio"])
+            completion_pct = ((stats["audio"] + stats["transcripts"]) / (base_count * 2)) * 100 if base_count > 0 else 0.0
             print(f"{channel_name:<50} {stats['videos']:>8} {stats['audio']:>8} {stats['transcripts']:>8} {completion_pct:>6.1f}%")
 
         # Add total row
         print("-" * 90)
+        total_active_base = max(total_active_videos, total_active_audio)
         total_active_completion_pct = (
-            ((total_active_audio + total_active_transcripts) / (total_active_videos * 2)) * 100 if total_active_videos > 0 else 0.0
+            ((total_active_audio + total_active_transcripts) / (total_active_base * 2)) * 100 if total_active_base > 0 else 0.0
         )
         print(
             f"{'TOTAL':<50} {total_active_videos:>8} {total_active_audio:>8} "
