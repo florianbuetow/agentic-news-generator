@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-LLM Topic Extraction Performance Benchmark
+"""LLM Topic Extraction Performance Benchmark.
 
 Queries LM Studio for available completion models, tests each on topic extraction
 using the production prompt from src/topic_detection/agents/prompts.py,
@@ -32,14 +31,24 @@ REPORTS_DIR = PROJECT_ROOT / "reports" / "llm-topic-extraction-comparison"
 # Model patterns to exclude
 EXCLUDE_PATTERNS = [
     # Embedding models
-    "embed", "bge-", "e5-", "gte-", "embedding",
-    "Embedding", "BGE", "E5", "GTE",
+    "embed",
+    "bge-",
+    "e5-",
+    "gte-",
+    "embedding",
+    "Embedding",
+    "BGE",
+    "E5",
+    "GTE",
     # Bulgarian models
-    "BgGPT", "bggpt",
+    "BgGPT",
+    "bggpt",
     # Dev/experimental models
-    "Devstral", "devstral",
+    "Devstral",
+    "devstral",
     # Translation models
-    "translate", "Translate",
+    "translate",
+    "Translate",
 ]
 
 # Sample text for benchmarking (simulating a podcast transcript segment)
@@ -118,9 +127,9 @@ def parse_llm_response(response_text: str) -> dict:
         return {"parse_error": True, "error": str(e), "raw": response_text[:500]}
 
 
-def extract_topics(model_id: str, text: str) -> tuple[dict, float]:
-    """
-    Extract topics from text using specified model and production prompts.
+def extract_topics(model_id: str, text: str) -> tuple[dict[str, object], float]:
+    """Extract topics from text using specified model and production prompts.
+
     Returns (response_data, elapsed_seconds).
     """
     messages = [
@@ -149,16 +158,16 @@ def extract_topics(model_id: str, text: str) -> tuple[dict, float]:
     return topics_data, elapsed
 
 
-def wait_for_keypress(model_name: str):
+def wait_for_keypress(model_name: str) -> None:
     """Display next model and wait for user to press Enter."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Next model to load: {model_name}")
     print("Press Enter to continue (or Ctrl+C to abort)...")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     input()
 
 
-def save_model_result(model_id: str, result: dict):
+def save_model_result(model_id: str, result: dict[str, object]) -> None:
     """Save individual model result to JSON file."""
     # Sanitize model name for filename
     safe_name = model_id.replace("/", "_").replace(":", "_")
@@ -170,10 +179,11 @@ def save_model_result(model_id: str, result: dict):
     print(f"  Saved: {filepath}")
 
 
-def save_performance_summary(results: list[dict]):
+def save_performance_summary(results: list[dict[str, object]]) -> None:
     """Save performance summary to performance.json."""
+
     # Count topics for each result
-    def count_topics(r: dict) -> int:
+    def count_topics(r: dict[str, object]) -> int:
         extracted = r.get("extracted_topics", {})
         if extracted.get("parse_error"):
             return 0
@@ -209,7 +219,8 @@ def save_performance_summary(results: list[dict]):
     print(f"\nPerformance summary saved: {filepath}")
 
 
-def main():
+def main() -> None:
+    """Run the LLM topic extraction benchmark."""
     # Ensure reports directory exists
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -217,7 +228,7 @@ def main():
     print("=" * 60)
     print(f"LM Studio API: {LM_STUDIO_BASE_URL}")
     print(f"Reports directory: {REPORTS_DIR}")
-    print(f"Using production prompts from: src/topic_detection/agents/prompts.py")
+    print("Using production prompts from: src/topic_detection/agents/prompts.py")
     print()
 
     # Get available models
@@ -238,7 +249,7 @@ def main():
     for i, model_id in enumerate(models):
         wait_for_keypress(model_id)
 
-        print(f"\n[{i+1}/{len(models)}] Testing: {model_id}")
+        print(f"\n[{i + 1}/{len(models)}] Testing: {model_id}")
         print("  Extracting topics...")
 
         try:
@@ -287,7 +298,7 @@ def main():
     print("\n" + "=" * 60)
     print("BENCHMARK COMPLETE")
     print("=" * 60)
-    print(f"\nResults by speed (fastest first):")
+    print("\nResults by speed (fastest first):")
 
     sorted_results = sorted(
         [r for r in results if r["time_seconds"] > 0],

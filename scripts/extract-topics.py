@@ -32,6 +32,37 @@ def format_duration(seconds: float) -> str:
     return f"[{hours:02d}:{minutes:02d}]"
 
 
+def calculate_eta(file_idx: int, total: int, start_time: float) -> str:
+    """Calculate ETA string based on average time per processed file."""
+    if file_idx <= 1:
+        return ""
+    elapsed = time.time() - start_time
+    avg_time_per_file = elapsed / (file_idx - 1)
+    remaining_files = total - file_idx + 1
+    eta_seconds = avg_time_per_file * remaining_files
+    return f" ETA {format_duration(eta_seconds)}"
+
+
+def discover_files(args: argparse.Namespace, output_dir: Path) -> tuple[list[Path], Path] | tuple[None, str]:
+    """Discover segmentation files to process.
+
+    Returns (files, base_dir) on success, or (None, error_message) on failure.
+    """
+    if args.file:
+        if not args.file.exists():
+            return None, f"Error: File not found: {args.file}"
+        if not args.file.name.endswith("_segmentation.json"):
+            return None, f"Error: Expected _segmentation.json file, got: {args.file}"
+        return [args.file], args.file.parent
+
+    if not output_dir.exists():
+        return None, f"Error: Output directory not found: {output_dir}"
+
+    segmentation_files = sorted(output_dir.rglob("*_segmentation.json"))
+    segmentation_files = [f for f in segmentation_files if not f.name.startswith("._")]
+    return segmentation_files, output_dir
+
+
 class SegmentTopics(BaseModel):
     """Topics extracted for a single segment."""
 
@@ -145,25 +176,11 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine files to process
-    if args.file:
-        # Single file mode
-        if not args.file.exists():
-            print(f"Error: File not found: {args.file}", file=sys.stderr)
-            return 1
-        if not args.file.name.endswith("_segmentation.json"):
-            print(f"Error: Expected _segmentation.json file, got: {args.file}", file=sys.stderr)
-            return 1
-        segmentation_files = [args.file]
-        base_dir = args.file.parent
-    else:
-        # Process all _segmentation.json files in output directory
-        if not output_dir.exists():
-            print(f"Error: Output directory not found: {output_dir}", file=sys.stderr)
-            return 1
-
-        segmentation_files = sorted(output_dir.rglob("*_segmentation.json"))
-        segmentation_files = [f for f in segmentation_files if not f.name.startswith("._")]
-        base_dir = output_dir
+    result = discover_files(args, output_dir)
+    if result[0] is None:
+        print(result[1], file=sys.stderr)
+        return 1
+    segmentation_files, base_dir = result
 
     if not segmentation_files:
         print("No _segmentation.json files found to process.")
@@ -206,16 +223,7 @@ def main() -> int:
     for file_idx, (segmentation_file, output_subdir, topics_output_path) in enumerate(files_to_process, start=1):
         relative_path = segmentation_file.relative_to(base_dir)
         progress_pct = (file_idx / total_to_process) * 100
-
-        # Calculate ETA based on average time per processed file
-        if file_idx > 1:
-            elapsed = time.time() - start_time
-            avg_time_per_file = elapsed / (file_idx - 1)
-            remaining_files = total_to_process - file_idx + 1
-            eta_seconds = avg_time_per_file * remaining_files
-            eta_str = f" ETA {format_duration(eta_seconds)}"
-        else:
-            eta_str = ""
+        eta_str = calculate_eta(file_idx, total_to_process, start_time)
 
         print(f"Processing [{file_idx}/{total_to_process}] ({progress_pct:.0f}%){eta_str}: {relative_path}")
 
