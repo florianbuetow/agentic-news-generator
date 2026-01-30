@@ -51,13 +51,13 @@ class ProgressTracker:
         self.current_index += 1
 
     def format_duration(self, seconds: float) -> str:
-        """Format seconds as [hh:mm] duration."""
+        """Format seconds as [Xh:Ym] duration with unit indicators."""
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
-        return f"[{hours:02d}:{minutes:02d}]"
+        return f"[{hours:02d}h:{minutes:02d}m]"
 
     def get_progress_prefix(self) -> str:
-        """Get progress string like '[5/23] (22%) ETA [00:45]'."""
+        """Get progress string like '[5/23] (22%) ETA [00h:45m]'."""
         if self.total_files == 0:
             return ""
 
