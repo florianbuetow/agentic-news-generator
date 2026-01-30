@@ -26,10 +26,10 @@ from src.topic_detection.segmentation.schemas import SegmentationOutput
 
 
 def format_duration(seconds: float) -> str:
-    """Format seconds as [hh:mm] duration."""
+    """Format seconds as [Xh:Ym] duration with unit indicators."""
     hours = int(seconds // 3600)
     minutes = int((seconds % 3600) // 60)
-    return f"[{hours:02d}:{minutes:02d}]"
+    return f"[{hours:02d}h:{minutes:02d}m]"
 
 
 def calculate_eta(file_idx: int, total: int, start_time: float) -> str:
