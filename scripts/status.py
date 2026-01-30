@@ -221,7 +221,7 @@ def main() -> int:
         ("", "Videos", col_width),
         ("Arch.", "Videos", col_width),
         ("", "Audio", col_width),
-        ("Trans-", "cripts", col_width),
+        ("Tran-", "scripts", col_width),
         ("Hall.", "Analysis", col_width),
         ("Cleaned", "Trans.", col_width),
         ("Topics", "Embed.", col_width),
