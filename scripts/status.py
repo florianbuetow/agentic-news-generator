@@ -11,145 +11,140 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from src.config import Config
 
 
-def count_files_by_extension(directory: Path, extensions: set[str]) -> int:
-    """Count files with specific extensions in a directory."""
+def count_files_by_suffix(directory: Path, suffix: str) -> int:
+    """Count files with a specific suffix in a directory (recursive, excludes macOS metadata)."""
     if not directory.exists():
         return 0
-    return sum(1 for f in directory.rglob("*") if f.suffix in extensions and f.is_file())
+    return sum(1 for f in directory.rglob(f"*{suffix}") if f.is_file() and not f.name.startswith("._"))
 
 
-def get_archived_video_names_per_channel(archive_dir: Path) -> dict[str, set[str]]:
-    """Get archived video basenames organized by channel.
+def count_files_by_pattern(directory: Path, pattern: str) -> int:
+    """Count files matching a glob pattern in a directory (excludes macOS metadata)."""
+    if not directory.exists():
+        return 0
+    return sum(1 for f in directory.rglob(pattern) if f.is_file() and not f.name.startswith("._"))
 
-    Returns dict mapping channel names to sets of archived video basenames
-    (without extensions).
+
+def get_channel_stats(  # noqa: C901
+    downloads_dir: Path,
+    archive_dir: Path,
+    transcripts_hallucinations_dir: Path,
+    transcripts_cleaned_dir: Path,
+    topics_dir: Path,
+) -> dict[str, dict[str, int]]:
+    """Get statistics for each channel across all pipeline stages.
+
+    Returns dict mapping channel names to stats dicts with counts for each stage.
     """
-    videos_dir = archive_dir / "videos"
-    if not videos_dir.exists():
-        return {}
+    stats: dict[str, dict[str, int]] = defaultdict(
+        lambda: {
+            "videos_active": 0,
+            "videos_archived": 0,
+            "audio": 0,
+            "transcripts": 0,
+            "hall_analysis": 0,
+            "cleaned_transcripts": 0,
+            "topics_embeddings": 0,
+            "topics_segmentations": 0,
+            "topics_extracted": 0,
+            "topics_visualizations": 0,
+        }
+    )
 
-    archived_videos = defaultdict(set)
     video_extensions = {".mp4", ".webm", ".m4a", ".mov", ".m4v", ".avi", ".mkv", ".flv"}
 
-    for channel_dir in videos_dir.iterdir():
-        if channel_dir.is_dir():
-            for f in channel_dir.iterdir():
-                if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._"):
-                    # Extract basename without extension
-                    archived_videos[channel_dir.name].add(f.stem)
-
-    return dict(archived_videos)
-
-
-def get_channel_stats(base_dir: Path, archived_videos: dict[str, set[str]] | None = None) -> dict[str, dict[str, int]]:  # noqa: C901
-    """Get statistics for each channel, excluding archived content.
-
-    Args:
-        base_dir: Base directory containing videos/audio/transcripts
-        archived_videos: Dict mapping channel names to sets of archived video basenames.
-                        If provided, transcripts for archived videos will be excluded.
-    """
-    stats = defaultdict(lambda: {"videos": 0, "audio": 0, "transcripts": 0})
-
-    # Count videos (.mp4 files only, not .info.json, and exclude macOS metadata files)
-    videos_dir = base_dir / "videos"
+    # Count active videos
+    videos_dir = downloads_dir / "videos"
     if videos_dir.exists():
         for channel_dir in videos_dir.iterdir():
             if channel_dir.is_dir():
-                video_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".mp4" and not f.name.startswith("._"))
-                stats[channel_dir.name]["videos"] = video_count
-
-    # Count audio files (.wav, exclude macOS metadata files)
-    audio_dir = base_dir / "audio"
-    if audio_dir.exists():
-        for channel_dir in audio_dir.iterdir():
-            if channel_dir.is_dir():
-                audio_count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".wav" and not f.name.startswith("._"))
-                stats[channel_dir.name]["audio"] = audio_count
-
-    # Count transcripts (.srt files as indicator, exclude macOS metadata files)
-    # EXCLUDE transcripts for archived videos
-    transcripts_dir = base_dir / "transcripts"
-    if transcripts_dir.exists():
-        for channel_dir in transcripts_dir.iterdir():
-            if channel_dir.is_dir():
-                channel_name = channel_dir.name
-
-                # Get set of archived video basenames for this channel
-                archived_basenames = set()
-                if archived_videos and channel_name in archived_videos:
-                    archived_basenames = archived_videos[channel_name]
-
-                # Count only transcripts that are NOT for archived videos
-                transcript_count = 0
-                for f in channel_dir.iterdir():
-                    if f.suffix == ".srt" and not f.name.startswith("._"):
-                        # Extract basename from transcript filename
-                        transcript_basename = f.stem
-
-                        # Only count if NOT archived
-                        if transcript_basename not in archived_basenames:
-                            transcript_count += 1
-
-                stats[channel_name]["transcripts"] = transcript_count
-
-    return dict(stats)
-
-
-def get_archived_channel_stats(archive_dir: Path, transcripts_dir: Path, archived_videos: dict[str, set[str]]) -> dict[str, dict[str, int]]:  # noqa: C901
-    """Get statistics for archived videos by channel.
-
-    Args:
-        archive_dir: Archive base directory
-        transcripts_dir: Directory containing transcript files
-        archived_videos: Dict mapping channel names to sets of archived video basenames
-
-    Returns:
-        Dict mapping channel names to stats dicts with keys:
-        - "videos": count of archived videos
-        - "audio": always 0 (archived videos have audio deleted)
-        - "transcripts": count of transcripts for archived videos
-    """
-    stats = defaultdict(lambda: {"videos": 0, "audio": 0, "transcripts": 0})
-    video_extensions = {".mp4", ".webm", ".m4a", ".mov", ".m4v", ".avi", ".mkv", ".flv"}
+                count = sum(
+                    1 for f in channel_dir.iterdir() if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._")
+                )
+                stats[channel_dir.name]["videos_active"] = count
 
     # Count archived videos
     archive_videos_dir = archive_dir / "videos"
     if archive_videos_dir.exists():
         for channel_dir in archive_videos_dir.iterdir():
             if channel_dir.is_dir():
-                channel_name = channel_dir.name
-                video_count = sum(
+                count = sum(
                     1 for f in channel_dir.iterdir() if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._")
                 )
-                stats[channel_name]["videos"] = video_count
-                stats[channel_name]["audio"] = 0  # Always 0 - audio files are deleted
+                stats[channel_dir.name]["videos_archived"] = count
 
-    # Count transcripts for archived videos
+    # Count audio files
+    audio_dir = downloads_dir / "audio"
+    if audio_dir.exists():
+        for channel_dir in audio_dir.iterdir():
+            if channel_dir.is_dir():
+                count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".wav" and not f.name.startswith("._"))
+                stats[channel_dir.name]["audio"] = count
+
+    # Count transcripts (.srt files)
+    transcripts_dir = downloads_dir / "transcripts"
     if transcripts_dir.exists():
         for channel_dir in transcripts_dir.iterdir():
             if channel_dir.is_dir():
+                count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".srt" and not f.name.startswith("._"))
+                stats[channel_dir.name]["transcripts"] = count
+
+    # Count hallucination analysis files
+    if transcripts_hallucinations_dir.exists():
+        for channel_dir in transcripts_hallucinations_dir.iterdir():
+            if channel_dir.is_dir():
+                count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".json" and not f.name.startswith("._"))
+                stats[channel_dir.name]["hall_analysis"] = count
+
+    # Count cleaned transcripts
+    if transcripts_cleaned_dir.exists():
+        for channel_dir in transcripts_cleaned_dir.iterdir():
+            if channel_dir.is_dir():
+                count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".srt" and not f.name.startswith("._"))
+                stats[channel_dir.name]["cleaned_transcripts"] = count
+
+    # Count topic detection outputs
+    if topics_dir.exists():
+        for channel_dir in topics_dir.iterdir():
+            if channel_dir.is_dir():
                 channel_name = channel_dir.name
 
-                # Get set of archived video basenames for this channel
-                if channel_name not in archived_videos:
-                    continue  # No archived videos for this channel
+                # Embeddings
+                emb_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_embeddings.json") and not f.name.startswith("._"))
+                stats[channel_name]["topics_embeddings"] = emb_count
 
-                archived_basenames = archived_videos[channel_name]
+                # Segmentations
+                seg_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_segmentation.json") and not f.name.startswith("._"))
+                stats[channel_name]["topics_segmentations"] = seg_count
 
-                # Count only transcripts that ARE for archived videos
-                transcript_count = 0
-                for f in channel_dir.iterdir():
-                    if f.suffix == ".srt" and not f.name.startswith("._"):
-                        transcript_basename = f.stem
+                # Topics extracted
+                topics_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_topics.json") and not f.name.startswith("._"))
+                stats[channel_name]["topics_extracted"] = topics_count
 
-                        # Only count if it IS archived
-                        if transcript_basename in archived_basenames:
-                            transcript_count += 1
-
-                stats[channel_name]["transcripts"] = transcript_count
+                # Visualizations
+                viz_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_similarity.jpg") and not f.name.startswith("._"))
+                stats[channel_name]["topics_visualizations"] = viz_count
 
     return dict(stats)
+
+
+def print_two_row_header(columns: list[tuple[str, str, int]]) -> tuple[str, str]:
+    """Generate two header rows from column definitions.
+
+    Args:
+        columns: List of (row1_text, row2_text, width) tuples
+
+    Returns:
+        Tuple of (header_row1, header_row2) strings
+    """
+    row1_parts: list[str] = []
+    row2_parts: list[str] = []
+
+    for row1_text, row2_text, width in columns:
+        row1_parts.append(f"{row1_text:>{width}}")
+        row2_parts.append(f"{row2_text:>{width}}")
+
+    return " ".join(row1_parts), " ".join(row2_parts)
 
 
 def main() -> int:
@@ -162,109 +157,141 @@ def main() -> int:
     # Get directories from Config
     downloads_dir = config.getDataDownloadsDir()
     archive_dir = config.getDataArchiveDir()
-    transcripts_dir = config.getDataDownloadsTranscriptsDir()
+    transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
+    transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
+
+    # Topics output directory
+    td_config = config.get_topic_detection_config()
+    topics_dir = config.getDataDir() / td_config.output_dir
 
     if not downloads_dir.exists():
         print(f"Error: Downloads directory not found: {downloads_dir}")
         return 1
 
-    # Step 1: Get mapping of archived videos
-    archived_videos = get_archived_video_names_per_channel(archive_dir)
+    # Get channel statistics
+    channel_stats = get_channel_stats(
+        downloads_dir,
+        archive_dir,
+        transcripts_hallucinations_dir,
+        transcripts_cleaned_dir,
+        topics_dir,
+    )
 
-    # Step 2: Get active channel statistics (excludes archived transcripts)
-    active_channel_stats = get_channel_stats(downloads_dir, archived_videos)
+    if not channel_stats:
+        print("No data found.")
+        return 0
 
-    # Step 3: Get archived channel statistics
-    archived_channel_stats = get_archived_channel_stats(archive_dir, transcripts_dir, archived_videos)
+    # Calculate totals
+    totals = {
+        "videos_active": sum(s["videos_active"] for s in channel_stats.values()),
+        "videos_archived": sum(s["videos_archived"] for s in channel_stats.values()),
+        "audio": sum(s["audio"] for s in channel_stats.values()),
+        "transcripts": sum(s["transcripts"] for s in channel_stats.values()),
+        "hall_analysis": sum(s["hall_analysis"] for s in channel_stats.values()),
+        "cleaned_transcripts": sum(s["cleaned_transcripts"] for s in channel_stats.values()),
+        "topics_embeddings": sum(s["topics_embeddings"] for s in channel_stats.values()),
+        "topics_segmentations": sum(s["topics_segmentations"] for s in channel_stats.values()),
+        "topics_extracted": sum(s["topics_extracted"] for s in channel_stats.values()),
+        "topics_visualizations": sum(s["topics_visualizations"] for s in channel_stats.values()),
+    }
 
-    # Calculate totals for active content
-    total_active_channels = len(active_channel_stats)
-    total_active_videos = sum(stats["videos"] for stats in active_channel_stats.values())
-    total_active_audio = sum(stats["audio"] for stats in active_channel_stats.values())
-    total_active_transcripts = sum(stats["transcripts"] for stats in active_channel_stats.values())
+    total_videos = totals["videos_active"] + totals["videos_archived"]
 
-    # Calculate totals for archived content
-    total_archived_channels = len(archived_channel_stats)
-    total_archived_videos = sum(stats["videos"] for stats in archived_channel_stats.values())
-    total_archived_transcripts = sum(stats["transcripts"] for stats in archived_channel_stats.values())
-
-    # Print overall summary
-    print("=" * 70)
+    # Print summary
+    print("=" * 120)
     print("PROCESSING STATUS")
-    print("=" * 70)
+    print("=" * 120)
     print()
-    print("ACTIVE CONTENT (In Progress):")
-    print(f"  Channels:       {total_active_channels}")
-    print(f"  Videos:         {total_active_videos}")
-    print(f"  Audio files:    {total_active_audio}")
-    print(f"  Transcripts:    {total_active_transcripts}")
-    print()
-    print("ARCHIVED CONTENT (Completed):")
-    print(f"  Channels:       {total_archived_channels}")
-    print(f"  Videos:         {total_archived_videos}")
-    print(f"  Transcripts:    {total_archived_transcripts}")
+    print(f"Total Videos: {total_videos} (Active: {totals['videos_active']}, Archived: {totals['videos_archived']})")
+    print(f"Total Channels: {len(channel_stats)}")
     print()
 
-    # Calculate processing progress for active content
-    # Use max of videos and audio as the base count (audio files may remain from archived videos)
-    total_active_base = max(total_active_videos, total_active_audio)
-    if total_active_base > 0:
-        audio_pct = (total_active_audio / total_active_base) * 100
-        transcript_pct = (total_active_transcripts / total_active_base) * 100
-        print(f"Active Audio extraction:  {audio_pct:.1f}% complete")
-        print(f"Active Transcription:     {transcript_pct:.1f}% complete")
-    print()
-
-    # TABLE 1: Active Downloads
-    if active_channel_stats:
-        print("=" * 90)
-        print("ACTIVE DOWNLOADS (Not Yet Archived)")
-        print("=" * 90)
+    # Calculate overall completion (topics extracted / total videos)
+    if total_videos > 0:
+        overall_pct = (totals["topics_extracted"] / total_videos) * 100
+        print(f"Overall Pipeline Completion: {overall_pct:.1f}%")
         print()
-        print(f"{'Channel':<50} {'Videos':>8} {'Audio':>8} {'Trans':>8} {'%':>7}")
-        print("-" * 90)
 
-        for channel_name in sorted(active_channel_stats.keys()):
-            stats = active_channel_stats[channel_name]
-            # Calculate completion percentage: (audio + transcripts) / (max(videos, audio) * 2) * 100
-            # Use max of videos and audio as base (audio files may remain from archived videos)
-            base_count = max(stats["videos"], stats["audio"])
-            completion_pct = ((stats["audio"] + stats["transcripts"]) / (base_count * 2)) * 100 if base_count > 0 else 0.0
-            print(f"{channel_name:<50} {stats['videos']:>8} {stats['audio']:>8} {stats['transcripts']:>8} {completion_pct:>6.1f}%")
+    # Define column structure: (row1, row2, width)
+    # Channel column is left-aligned, others are right-aligned
+    col_width = 8
+    channel_width = 40
 
-        # Add total row
-        print("-" * 90)
-        total_active_base = max(total_active_videos, total_active_audio)
-        total_active_completion_pct = (
-            ((total_active_audio + total_active_transcripts) / (total_active_base * 2)) * 100 if total_active_base > 0 else 0.0
-        )
+    columns = [
+        ("", "Videos", col_width),
+        ("Arch.", "Videos", col_width),
+        ("", "Audio", col_width),
+        ("Trans-", "cripts", col_width),
+        ("Hall.", "Analysis", col_width),
+        ("Cleaned", "Trans.", col_width),
+        ("Topics", "Embed.", col_width),
+        ("Topics", "Segment.", col_width),
+        ("Topics", "Extract.", col_width),
+        ("Topics", "Visual.", col_width),
+        ("", "%", col_width),
+    ]
+
+    # Calculate total line width: channel + space + (col_width + space) * num_columns
+    num_columns = len(columns)
+    line_width = channel_width + 1 + (col_width + 1) * num_columns
+
+    # Generate header rows
+    header_row1, header_row2 = print_two_row_header(columns)
+
+    # Print table
+    print("=" * line_width)
+    print("PIPELINE STATUS BY CHANNEL")
+    print("=" * line_width)
+    print()
+
+    # Print two-row header
+    print(f"{'':>{channel_width}} {header_row1}")
+    print(f"{'Channel':<{channel_width}} {header_row2}")
+    print("-" * line_width)
+
+    for channel_name in sorted(channel_stats.keys()):
+        s = channel_stats[channel_name]
+        videos_total = s["videos_active"] + s["videos_archived"]
+
+        # Calculate completion percentage: topics extracted / total videos
+        completion_pct = (s["topics_extracted"] / videos_total * 100) if videos_total > 0 else 0.0
+
+        # Truncate channel name if too long
+        display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
+
         print(
-            f"{'TOTAL':<50} {total_active_videos:>8} {total_active_audio:>8} "
-            f"{total_active_transcripts:>8} {total_active_completion_pct:>6.1f}%"
+            f"{display_name:<{channel_width}} "
+            f"{s['videos_active']:>{col_width}} "
+            f"{s['videos_archived']:>{col_width}} "
+            f"{s['audio']:>{col_width}} "
+            f"{s['transcripts']:>{col_width}} "
+            f"{s['hall_analysis']:>{col_width}} "
+            f"{s['cleaned_transcripts']:>{col_width}} "
+            f"{s['topics_embeddings']:>{col_width}} "
+            f"{s['topics_segmentations']:>{col_width}} "
+            f"{s['topics_extracted']:>{col_width}} "
+            f"{s['topics_visualizations']:>{col_width}} "
+            f"{completion_pct:>{col_width - 1}.1f}%"
         )
-        print()
 
-    # TABLE 2: Archived Videos
-    if archived_channel_stats:
-        print("=" * 90)
-        print("ARCHIVED VIDEOS (Processing Complete)")
-        print("=" * 90)
-        print()
-        print(f"{'Channel':<50} {'Videos':>8} {'Audio':>8} {'Trans':>8} {'%':>7}")
-        print("-" * 90)
+    # Print totals row
+    print("-" * line_width)
+    overall_pct = (totals["topics_extracted"] / total_videos * 100) if total_videos > 0 else 0.0
 
-        for channel_name in sorted(archived_channel_stats.keys()):
-            stats = archived_channel_stats[channel_name]
-            # Calculate completion percentage for archived videos
-            # For archived: transcripts / videos * 100 (audio is always deleted)
-            completion_pct = (stats["transcripts"] / stats["videos"]) * 100 if stats["videos"] > 0 else 0.0
-            print(f"{channel_name:<50} {stats['videos']:>8} {'-':>8} {stats['transcripts']:>8} {completion_pct:>6.1f}%")
-
-        # Add total row
-        print("-" * 90)
-        total_archived_completion_pct = (total_archived_transcripts / total_archived_videos) * 100 if total_archived_videos > 0 else 0.0
-        print(f"{'TOTAL':<50} {total_archived_videos:>8} {'-':>8} {total_archived_transcripts:>8} {total_archived_completion_pct:>6.1f}%")
-        print()
+    print(
+        f"{'TOTAL':<{channel_width}} "
+        f"{totals['videos_active']:>{col_width}} "
+        f"{totals['videos_archived']:>{col_width}} "
+        f"{totals['audio']:>{col_width}} "
+        f"{totals['transcripts']:>{col_width}} "
+        f"{totals['hall_analysis']:>{col_width}} "
+        f"{totals['cleaned_transcripts']:>{col_width}} "
+        f"{totals['topics_embeddings']:>{col_width}} "
+        f"{totals['topics_segmentations']:>{col_width}} "
+        f"{totals['topics_extracted']:>{col_width}} "
+        f"{totals['topics_visualizations']:>{col_width}} "
+        f"{overall_pct:>{col_width - 1}.1f}%"
+    )
 
     print()
     return 0
