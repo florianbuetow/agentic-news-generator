@@ -31,12 +31,12 @@ def get_channel_stats(  # noqa: C901
     transcripts_hallucinations_dir: Path,
     transcripts_cleaned_dir: Path,
     topics_dir: Path,
-) -> dict[str, dict[str, int]]:
+) -> dict[str, dict[str, int | float]]:
     """Get statistics for each channel across all pipeline stages.
 
     Returns dict mapping channel names to stats dicts with counts for each stage.
     """
-    stats: dict[str, dict[str, int]] = defaultdict(
+    stats: dict[str, dict[str, int | float]] = defaultdict(
         lambda: {
             "videos_active": 0,
             "videos_archived": 0,
@@ -48,30 +48,33 @@ def get_channel_stats(  # noqa: C901
             "topics_segmentations": 0,
             "topics_extracted": 0,
             "topics_visualizations": 0,
+            "total_size_bytes": 0,
         }
     )
 
     video_extensions = {".mp4", ".webm", ".m4a", ".mov", ".m4v", ".avi", ".mkv", ".flv"}
 
-    # Count active videos
+    # Count active videos and their sizes
     videos_dir = downloads_dir / "videos"
     if videos_dir.exists():
         for channel_dir in videos_dir.iterdir():
             if channel_dir.is_dir():
-                count = sum(
-                    1 for f in channel_dir.iterdir() if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._")
-                )
-                stats[channel_dir.name]["videos_active"] = count
+                video_files = [
+                    f for f in channel_dir.iterdir() if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._")
+                ]
+                stats[channel_dir.name]["videos_active"] = len(video_files)
+                stats[channel_dir.name]["total_size_bytes"] += sum(f.stat().st_size for f in video_files)
 
-    # Count archived videos
+    # Count archived videos and their sizes
     archive_videos_dir = archive_dir / "videos"
     if archive_videos_dir.exists():
         for channel_dir in archive_videos_dir.iterdir():
             if channel_dir.is_dir():
-                count = sum(
-                    1 for f in channel_dir.iterdir() if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._")
-                )
-                stats[channel_dir.name]["videos_archived"] = count
+                video_files = [
+                    f for f in channel_dir.iterdir() if f.is_file() and f.suffix in video_extensions and not f.name.startswith("._")
+                ]
+                stats[channel_dir.name]["videos_archived"] = len(video_files)
+                stats[channel_dir.name]["total_size_bytes"] += sum(f.stat().st_size for f in video_files)
 
     # Count audio files
     audio_dir = downloads_dir / "audio"
@@ -182,17 +185,18 @@ def main() -> int:
         return 0
 
     # Calculate totals
-    totals = {
-        "videos_active": sum(s["videos_active"] for s in channel_stats.values()),
-        "videos_archived": sum(s["videos_archived"] for s in channel_stats.values()),
-        "audio": sum(s["audio"] for s in channel_stats.values()),
-        "transcripts": sum(s["transcripts"] for s in channel_stats.values()),
-        "hall_analysis": sum(s["hall_analysis"] for s in channel_stats.values()),
-        "cleaned_transcripts": sum(s["cleaned_transcripts"] for s in channel_stats.values()),
-        "topics_embeddings": sum(s["topics_embeddings"] for s in channel_stats.values()),
-        "topics_segmentations": sum(s["topics_segmentations"] for s in channel_stats.values()),
-        "topics_extracted": sum(s["topics_extracted"] for s in channel_stats.values()),
-        "topics_visualizations": sum(s["topics_visualizations"] for s in channel_stats.values()),
+    totals: dict[str, int | float] = {
+        "videos_active": sum(int(s["videos_active"]) for s in channel_stats.values()),
+        "videos_archived": sum(int(s["videos_archived"]) for s in channel_stats.values()),
+        "audio": sum(int(s["audio"]) for s in channel_stats.values()),
+        "transcripts": sum(int(s["transcripts"]) for s in channel_stats.values()),
+        "hall_analysis": sum(int(s["hall_analysis"]) for s in channel_stats.values()),
+        "cleaned_transcripts": sum(int(s["cleaned_transcripts"]) for s in channel_stats.values()),
+        "topics_embeddings": sum(int(s["topics_embeddings"]) for s in channel_stats.values()),
+        "topics_segmentations": sum(int(s["topics_segmentations"]) for s in channel_stats.values()),
+        "topics_extracted": sum(int(s["topics_extracted"]) for s in channel_stats.values()),
+        "topics_visualizations": sum(int(s["topics_visualizations"]) for s in channel_stats.values()),
+        "total_size_bytes": sum(float(s["total_size_bytes"]) for s in channel_stats.values()),
     }
 
     total_videos = totals["videos_active"] + totals["videos_archived"]
@@ -229,6 +233,7 @@ def main() -> int:
         ("Topics", "Extract.", col_width),
         ("Topics", "Visual.", col_width),
         ("", "%", col_width),
+        ("", "GB", col_width),
     ]
 
     # Calculate total line width: channel + space + (col_width + space) * num_columns
@@ -256,6 +261,9 @@ def main() -> int:
         # Calculate completion percentage: topics extracted / total videos
         completion_pct = (s["topics_extracted"] / videos_total * 100) if videos_total > 0 else 0.0
 
+        # Calculate size in GB
+        size_gb = float(s["total_size_bytes"]) / (1024**3)
+
         # Truncate channel name if too long
         display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
 
@@ -272,11 +280,13 @@ def main() -> int:
             f"{s['topics_extracted']:>{col_width}} "
             f"{s['topics_visualizations']:>{col_width}} "
             f"{completion_pct:>{col_width - 1}.1f}%"
+            f"{size_gb:>{col_width}.1f}"
         )
 
     # Print totals row
     print("-" * line_width)
     overall_pct = (totals["topics_extracted"] / total_videos * 100) if total_videos > 0 else 0.0
+    total_size_gb = float(totals["total_size_bytes"]) / (1024**3)
 
     print(
         f"{'TOTAL':<{channel_width}} "
@@ -291,6 +301,7 @@ def main() -> int:
         f"{totals['topics_extracted']:>{col_width}} "
         f"{totals['topics_visualizations']:>{col_width}} "
         f"{overall_pct:>{col_width - 1}.1f}%"
+        f"{total_size_gb:>{col_width}.1f}"
     )
 
     print()
