@@ -21,6 +21,7 @@ import sys
 import tempfile
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 
 # Add src to path for imports
@@ -30,6 +31,48 @@ from src.config import Config  # noqa: E402
 from src.transcription.argument_helper import TranscriptionArgumentHelper  # noqa: E402
 from src.util.fs_util import FSUtil  # noqa: E402
 from src.util.whisper_languages import WhisperLanguages  # noqa: E402
+
+
+@dataclass
+class ProgressTracker:
+    """Track progress across all files being processed."""
+
+    total_files: int
+    current_index: int = 0
+    start_time: float = 0.0
+
+    def start(self) -> None:
+        """Start the progress timer."""
+        self.start_time = time.time()
+        self.current_index = 0
+
+    def next_file(self) -> None:
+        """Advance to the next file."""
+        self.current_index += 1
+
+    def format_duration(self, seconds: float) -> str:
+        """Format seconds as [Xh:Ym] duration with unit indicators."""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        return f"[{hours:02d}h:{minutes:02d}m]"
+
+    def get_progress_prefix(self) -> str:
+        """Get progress string like '[5/23] (22%) ETA [00h:45m]'."""
+        if self.total_files == 0:
+            return ""
+
+        pct = (self.current_index / self.total_files) * 100
+
+        # Calculate ETA based on average time per processed file
+        if self.current_index > 1:
+            elapsed = time.time() - self.start_time
+            avg_time = elapsed / (self.current_index - 1)
+            remaining = self.total_files - self.current_index + 1
+            eta_str = f" ETA {self.format_duration(avg_time * remaining)}"
+        else:
+            eta_str = ""
+
+        return f"[{self.current_index}/{self.total_files}] ({pct:.0f}%){eta_str}"
 
 
 def sanitize_channel_name(name: str) -> str:
@@ -114,6 +157,7 @@ def process_single_wav_file(  # noqa: C901
     compression_ratio_threshold: float,
     sleep_between_files: int,
     verbose: bool,
+    progress: ProgressTracker | None = None,
 ) -> tuple[bool, int]:
     """Process a single WAV file for transcription.
 
@@ -128,7 +172,9 @@ def process_single_wav_file(  # noqa: C901
             print(f"    ⏭️  Skipping: {base_name}.wav (transcript already exists)")
         return (True, 0)
 
-    print(f"    🎙️  Transcribing: {base_name}.wav")
+    # Build progress prefix if tracker provided
+    progress_str = f" {progress.get_progress_prefix()}" if progress else ""
+    print(f"    🎙️ {progress_str} Transcribing: {base_name}.wav")
 
     # Build initial prompt from metadata
     initial_prompt = ""
@@ -255,6 +301,30 @@ def main() -> int:  # noqa: C901
             }
         )
 
+    # Pre-scan all files to count those needing transcription
+    files_to_transcribe: list[tuple[Path, str, Path]] = []  # (wav_file, channel_name, transcripts_dir)
+    for lang in groups:
+        for channel_info in groups[lang]:
+            channel_name = channel_info["sanitized_name"]
+            channel_audio_dir = audio_dir / channel_name
+            channel_transcripts_dir = transcripts_dir / channel_name
+
+            if not channel_audio_dir.exists():
+                continue
+
+            wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
+            wav_files = [f for f in wav_files if not f.name.startswith("._")]
+
+            # Add files that need transcription (no existing transcript)
+            files_to_transcribe.extend(
+                (wav_file, channel_name, channel_transcripts_dir)
+                for wav_file in wav_files
+                if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+            )
+
+    # Create progress tracker
+    progress = ProgressTracker(total_files=len(files_to_transcribe))
+
     # Print header
     print("Starting batch transcription with language grouping")
     print(f"English model: {config.getTranscriptionModelEnName()} ({model_en_repo})")
@@ -262,8 +332,12 @@ def main() -> int:  # noqa: C901
     print(f"Hallucination silence threshold: {hallucination_silence_threshold}s")
     print(f"Compression ratio threshold: {compression_ratio_threshold}")
     print(f"Use YouTube metadata: {use_youtube_metadata}")
+    print(f"Files to transcribe: {len(files_to_transcribe)}")
     print("=" * 56)
     print()
+
+    # Start progress tracking
+    progress.start()
 
     # Counters for final summary
     total_processed = 0
@@ -315,6 +389,11 @@ def main() -> int:  # noqa: C901
             wav_files = [f for f in wav_files if not f.name.startswith("._")]
 
             for wav_file in wav_files:
+                # Check if this file needs transcription (for progress tracking)
+                needs_transcription = not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+                if needs_transcription:
+                    progress.next_file()
+
                 success, moved_count = process_single_wav_file(
                     wav_file,
                     channel_name,
@@ -331,6 +410,7 @@ def main() -> int:  # noqa: C901
                     compression_ratio_threshold,
                     sleep_between_files,
                     verbose,
+                    progress=progress if needs_transcription else None,
                 )
 
                 if moved_count == 0 and success:
@@ -349,13 +429,15 @@ def main() -> int:  # noqa: C901
 
             print()
 
-    # Final summary
+    # Final summary with elapsed time
+    total_elapsed = time.time() - progress.start_time
     print()
     print("=" * 56)
     print("  Transcription Complete")
     print("=" * 56)
     print(f"  Processed: {total_processed}")
     print(f"  Failed: {total_failed}")
+    print(f"  Elapsed: {progress.format_duration(total_elapsed)}")
     print()
 
     return 1 if total_failed > 0 else 0

@@ -87,6 +87,16 @@ all:
     @just transcripts-remove-hallucinations
     @just topics-all
 
+# Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
+all-ingestion:
+    @just ci-quiet
+    -@just download-videos
+    @just extract-audio
+    @just transcribe
+    @just archive-videos
+    @just analyze-transcripts-hallucinations
+    @just transcripts-remove-hallucinations
+
 # Download YouTube videos from channels in config.yaml
 download-videos:
     #!/usr/bin/env bash
@@ -145,6 +155,10 @@ archive-videos:
     @printf "\033[0;34m=== Archiving Processed Videos ===\033[0m\n"
     @bash scripts/archive-videos.sh
     @echo ""
+
+# Scan for and remove empty files in data folder
+clean-empty-files:
+    @uv run python scripts/find-and-clean-empty-data-files.py
 
 # Analyze transcripts for hallucinations
 analyze-transcripts-hallucinations:

@@ -13,6 +13,7 @@ dependencies = [
     "pandas>=2.0.0",
     "pydantic>=2.0.0",
     "python-frontmatter>=1.0.0",
+    "python-multipart>=0.0.22",
     "pyyaml>=6.0",
     "scikit-learn>=1.3.0",
     "seaborn>=0.13.0",
@@ -205,6 +206,7 @@ extend_exclude = [
     "tools/fake_test_detector",
     "tools/shellscript_env_var_args_detector",
     "tools/shellscript_analyzer",
+    "tools/llm-topic-performance",
 ]
 
 # Ignore Jupyter notebooks (not part of production code)
@@ -229,7 +231,7 @@ json_output = "reports/deptry/deptry.json"
 
 [tool.deptry.per_rule_ignores]
 # Add specific package ignores with comments explaining why
-DEP002 = ["seaborn"]  # Used in Jupyter notebooks (notebooks/ directory)
+DEP002 = ["seaborn", "python-multipart"]  # seaborn: Jupyter notebooks; python-multipart: security pin for transitive dep
 
 [tool.codespell]
 # Paths to check

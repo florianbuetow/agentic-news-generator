@@ -13,6 +13,7 @@ Usage:
 import argparse
 import json
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +23,44 @@ from pydantic import BaseModel, ConfigDict
 from src.config import Config
 from src.topic_detection.agents.topic_extraction_agent import TopicExtractionAgent
 from src.topic_detection.segmentation.schemas import SegmentationOutput
+
+
+def format_duration(seconds: float) -> str:
+    """Format seconds as [Xh:Ym] duration with unit indicators."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    return f"[{hours:02d}h:{minutes:02d}m]"
+
+
+def calculate_eta(file_idx: int, total: int, start_time: float) -> str:
+    """Calculate ETA string based on average time per processed file."""
+    if file_idx <= 1:
+        return ""
+    elapsed = time.time() - start_time
+    avg_time_per_file = elapsed / (file_idx - 1)
+    remaining_files = total - file_idx + 1
+    eta_seconds = avg_time_per_file * remaining_files
+    return f" ETA {format_duration(eta_seconds)}"
+
+
+def discover_files(args: argparse.Namespace, output_dir: Path) -> tuple[list[Path], Path] | tuple[None, str]:
+    """Discover segmentation files to process.
+
+    Returns (files, base_dir) on success, or (None, error_message) on failure.
+    """
+    if args.file:
+        if not args.file.exists():
+            return None, f"Error: File not found: {args.file}"
+        if not args.file.name.endswith("_segmentation.json"):
+            return None, f"Error: Expected _segmentation.json file, got: {args.file}"
+        return [args.file], args.file.parent
+
+    if not output_dir.exists():
+        return None, f"Error: Output directory not found: {output_dir}"
+
+    segmentation_files = sorted(output_dir.rglob("*_segmentation.json"))
+    segmentation_files = [f for f in segmentation_files if not f.name.startswith("._")]
+    return segmentation_files, output_dir
 
 
 class SegmentTopics(BaseModel):
@@ -43,6 +82,7 @@ class TranscriptTopics(BaseModel):
 
     source_file: str
     processed_at: str
+    extraction_model: str
     total_segments: int
     segments: list[SegmentTopics]
 
@@ -101,6 +141,7 @@ def process_segments(segmentation_path: Path, config: Config) -> TranscriptTopic
     return TranscriptTopics(
         source_file=segmentation_data.source_file,
         processed_at=datetime.now().isoformat(),
+        extraction_model=llm_config.model,
         total_segments=len(segment_results),
         segments=segment_results,
     )
@@ -135,53 +176,56 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Determine files to process
-    if args.file:
-        # Single file mode
-        if not args.file.exists():
-            print(f"Error: File not found: {args.file}", file=sys.stderr)
-            return 1
-        if not args.file.name.endswith("_segmentation.json"):
-            print(f"Error: Expected _segmentation.json file, got: {args.file}", file=sys.stderr)
-            return 1
-        segmentation_files = [args.file]
-        base_dir = args.file.parent
-    else:
-        # Process all _segmentation.json files in output directory
-        if not output_dir.exists():
-            print(f"Error: Output directory not found: {output_dir}", file=sys.stderr)
-            return 1
-
-        segmentation_files = sorted(output_dir.rglob("*_segmentation.json"))
-        segmentation_files = [f for f in segmentation_files if not f.name.startswith("._")]
-        base_dir = output_dir
+    result = discover_files(args, output_dir)
+    if result[0] is None:
+        print(result[1], file=sys.stderr)
+        return 1
+    segmentation_files, base_dir = result
 
     if not segmentation_files:
         print("No _segmentation.json files found to process.")
         return 0
 
-    print(f"Found {len(segmentation_files)} _segmentation.json file(s) to process")
+    print(f"Found {len(segmentation_files)} _segmentation.json file(s)")
     print(f"Output directory: {output_dir}")
-    print()
 
-    success_count = 0
+    # Pre-scan to separate files that need processing from those to skip
+    files_to_process: list[tuple[Path, Path, Path]] = []  # (input, output_subdir, output_path)
     skipped_count = 0
 
-    # Process each segmentation file - write output immediately after each file
     for segmentation_file in segmentation_files:
         relative_path = segmentation_file.relative_to(base_dir)
-
-        # Calculate output path to check if it already exists
         output_subdir = output_dir / relative_path.parent
         output_filename = relative_path.name.replace("_segmentation.json", "_topics.json")
         topics_output_path = output_subdir / output_filename
 
-        # Skip if topics file already exists (unless --force)
         if topics_output_path.exists() and not args.force:
             print(f"Skipping: {relative_path} (topics file already exists)")
             skipped_count += 1
-            continue
+        else:
+            files_to_process.append((segmentation_file, output_subdir, topics_output_path))
 
-        print(f"Processing: {relative_path}")
+    if not files_to_process:
+        print()
+        print("=" * 50)
+        print(f"Completed: 0 succeeded, {skipped_count} skipped")
+        return 0
+
+    print()
+    print(f"Processing {len(files_to_process)} file(s), {skipped_count} already processed")
+    print()
+
+    success_count = 0
+    total_to_process = len(files_to_process)
+    start_time = time.time()
+
+    # Process each file with ETA tracking
+    for file_idx, (segmentation_file, output_subdir, topics_output_path) in enumerate(files_to_process, start=1):
+        relative_path = segmentation_file.relative_to(base_dir)
+        progress_pct = (file_idx / total_to_process) * 100
+        eta_str = calculate_eta(file_idx, total_to_process, start_time)
+
+        print(f"Processing [{file_idx}/{total_to_process}] ({progress_pct:.0f}%){eta_str}: {relative_path}")
 
         topics_result = process_segments(segmentation_file, config)
 
@@ -196,9 +240,10 @@ def main() -> int:
         success_count += 1
         print()
 
-    # Summary
+    # Summary with total elapsed time
+    total_elapsed = time.time() - start_time
     print("=" * 50)
-    print(f"Completed: {success_count} succeeded, {skipped_count} skipped")
+    print(f"Completed: {success_count} succeeded, {skipped_count} skipped (elapsed: {format_duration(total_elapsed)})")
 
     return 0
 
