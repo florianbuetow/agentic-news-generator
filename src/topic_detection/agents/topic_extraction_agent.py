@@ -5,6 +5,7 @@ import re
 import time
 
 import litellm
+from litellm.exceptions import BadRequestError
 from pydantic import ValidationError
 
 from src.config import LLMConfig
@@ -91,14 +92,25 @@ class TopicExtractionAgent:
         ]
 
         # Call the LLM
-        response = litellm.completion(
-            model=self._config.model,
-            messages=messages,
-            api_base=self._config.api_base,
-            api_key=self._config.api_key,
-            max_tokens=self._config.max_tokens,
-            temperature=self._config.temperature,
-        )
+        try:
+            response = litellm.completion(
+                model=self._config.model,
+                messages=messages,
+                api_base=self._config.api_base,
+                api_key=self._config.api_key,
+                max_tokens=self._config.max_tokens,
+                temperature=self._config.temperature,
+            )
+        except BadRequestError as e:
+            error_msg = str(e)
+            if "No models loaded" in error_msg:
+                raise BadRequestError(
+                    message=f"No models loaded in LM Studio. Expected model: {self._config.model}. "
+                    f"Load it with: lms load {self._config.model.split('/')[-1]}",
+                    model=self._config.model,
+                    llm_provider="openai",
+                ) from e
+            raise
 
         # Extract the response text
         response_text = response.choices[0].message.content
