@@ -69,11 +69,11 @@ check:
     @printf "\033[0;32m✓ All required tools and prerequisites are available\033[0m\n"
     @echo ""
 
-# Run the main application
+# Run the complete pipeline
 run:
     @echo ""
-    @printf "\033[0;34m=== Running Application ===\033[0m\n"
-    @uv run src/main.py
+    @printf "\033[0;34m=== Running Complete Pipeline ===\033[0m\n"
+    @just all
     @echo ""
 
 # Run the complete pipeline
@@ -86,6 +86,7 @@ all:
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
     @just topics-all
+    @just generate-articles
 
 # Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
 all-ingestion:
@@ -659,6 +660,10 @@ all-quiet:
     printf "🚀 Starting topics-all...\n"
     just topics-all > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Topics-all failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed topics-all\n"
+
+    printf "🚀 Starting generate-articles...\n"
+    just generate-articles > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Generate-articles failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed generate-articles\n"
 
     echo ""
     printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"

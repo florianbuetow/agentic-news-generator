@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
+from src.processing.srt_converter import srt_to_simplified_format
 from src.util.fs_util import FSUtil
 
 # Whitespace normalization pattern (same as RepetitionDetector)
@@ -94,10 +95,6 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    print(f"Found transcripts directory: {transcripts_dir}")
-    print(f"Found hallucinations directory: {hallucinations_dir}")
-    print(f"Output directory: {output_dir}\n")
-
     return config, data_dir, transcripts_dir, hallucinations_dir, output_dir, detector
 
 
@@ -112,7 +109,7 @@ def process_single_file(
 
     Returns:
         Tuple of (file_type, success, error_message) where:
-        - file_type: "cleaned" or "copied"
+        - file_type: "cleaned", "copied", or "skipped"
         - success: True if successful
         - error_message: Error message if failed, None otherwise
     """
@@ -123,17 +120,27 @@ def process_single_file(
     output_channel_dir = output_dir / channel_name
     output_file = output_channel_dir / srt_file.name
 
+    # Skip empty SRT files
+    if srt_file.stat().st_size == 0:
+        print(f"  ⚠ Skipping empty file: {srt_file.name}")
+        return "skipped", True, None
+
+    # Skip if output already exists and is up-to-date
+    if output_file.exists() and output_file.stat().st_mtime >= srt_file.stat().st_mtime:
+        return "skipped", True, None
+
     if lookup_key in hallucinations_lookup:
-        print(f"Processing: {relative_path}")
+        print(f"  Cleaning: {srt_file.name}")
         hallucinations = hallucinations_lookup[lookup_key]
         success = process_srt_with_hallucinations(srt_file, output_file, hallucinations, detector)
         if success:
-            print(f"  ✓ Cleaned {len(hallucinations)} hallucination(s)\n")
+            print(f"    ✓ Cleaned {len(hallucinations)} hallucination(s)")
             return "cleaned", True, None
         else:
-            print("  ✗ Failed to clean hallucinations\n")
+            print("    ✗ Failed to clean hallucinations")
             return "cleaned", False, "Failed to clean hallucinations"
     else:
+        print(f"  Copying: {srt_file.name}")
         copy_srt_unchanged(srt_file, output_file)
         return "copied", True, None
 
@@ -142,15 +149,17 @@ def print_summary(
     total_files: int,
     cleaned_files: int,
     copied_files: int,
+    skipped_files: int,
     failed_files: list[tuple[str, str]],
 ) -> None:
     """Print processing summary."""
     print("\n" + "=" * 50)
     print("Summary")
     print("=" * 50)
-    print(f"Total files processed: {total_files}")
-    print(f"Files cleaned: {cleaned_files}")
-    print(f"Files copied unchanged: {copied_files}")
+    print(f"Total files: {total_files}")
+    print(f"Cleaned: {cleaned_files}")
+    print(f"Copied: {copied_files}")
+    print(f"Skipped (up-to-date): {skipped_files}")
 
     if failed_files:
         print(f"\nFailed files ({len(failed_files)}):")
@@ -173,12 +182,7 @@ def main() -> int:
     # Phase 1: Build hallucinations lookup
     hallucinations_lookup = build_hallucinations_lookup(hallucinations_dir, data_dir)
 
-    print(f"Phase 1: Found {len(hallucinations_lookup)} file(s) with hallucinations")
-    if hallucinations_lookup:
-        print("Files with hallucinations:")
-        for key in sorted(hallucinations_lookup.keys()):
-            print(f"  - {key} ({len(hallucinations_lookup[key])} hallucination(s))")
-    print()
+    print(f"Phase 1: Found {len(hallucinations_lookup)} file(s) with hallucinations\n")
 
     # Phase 2: Process transcripts
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
@@ -193,6 +197,7 @@ def main() -> int:
     failed_files = []
     cleaned_files = 0
     copied_files = 0
+    skipped_files = 0
 
     for srt_file in srt_files:
         try:
@@ -201,8 +206,10 @@ def main() -> int:
             if success:
                 if file_type == "cleaned":
                     cleaned_files += 1
-                else:
+                elif file_type == "copied":
                     copied_files += 1
+                elif file_type == "skipped":
+                    skipped_files += 1
             else:
                 relative_path = srt_file.relative_to(data_dir)
                 failed_files.append((str(relative_path), error or "Unknown error"))
@@ -212,7 +219,16 @@ def main() -> int:
             failed_files.append((str(relative_path), str(e)))
             print(f"  ✗ Error: {e}\n")
 
-    print_summary(len(srt_files), cleaned_files, copied_files, failed_files)
+    print_summary(len(srt_files), cleaned_files, copied_files, skipped_files, failed_files)
+
+    # Phase 3: Convert cleaned SRT files to simplified text format
+    print("\nPhase 3: SRT → TXT conversion\n")
+    txt_converted, txt_skipped, txt_failed = convert_srt_to_txt(output_dir)
+    print(f"\n  Converted: {txt_converted}")
+    print(f"  Skipped (up-to-date): {txt_skipped}")
+    if txt_failed:
+        print(f"  Failed: {txt_failed}")
+
     return 1 if failed_files else 0
 
 
@@ -358,6 +374,48 @@ def process_srt_with_hallucinations(
     FSUtil.write_text_file(output_file, cleaned_srt_content, create_parents=True)
 
     return True
+
+
+def convert_srt_to_txt(output_dir: Path) -> tuple[int, int, int]:
+    """Convert all cleaned SRT files in output_dir to simplified text format.
+
+    Skips SRT files whose .txt is already up-to-date (newer than the .srt).
+
+    Args:
+        output_dir: Directory containing cleaned SRT files.
+
+    Returns:
+        Tuple of (converted_count, skipped_count, failed_count).
+    """
+    srt_files = FSUtil.find_files_by_extension(output_dir, ".srt", recursive=True)
+    srt_files = [f for f in srt_files if not f.name.startswith("._")]
+
+    converted = 0
+    skipped = 0
+    failed = 0
+
+    for srt_file in srt_files:
+        txt_file = srt_file.with_suffix(".txt")
+        if txt_file.exists() and txt_file.stat().st_mtime >= srt_file.stat().st_mtime:
+            skipped += 1
+            continue
+
+        if srt_file.stat().st_size == 0:
+            print(f"  ⚠ Skipping empty file: {srt_file.name}")
+            failed += 1
+            continue
+
+        try:
+            srt_content = FSUtil.read_text_file(srt_file)
+            txt_content = srt_to_simplified_format(srt_content)
+            FSUtil.write_text_file(txt_file, txt_content, create_parents=True)
+            print(f"  ✓ {srt_file.name} → .txt")
+            converted += 1
+        except Exception as e:
+            print(f"  ✗ {srt_file.name}: {e}", file=sys.stderr)
+            failed += 1
+
+    return converted, skipped, failed
 
 
 def copy_srt_unchanged(srt_file: Path, output_file: Path) -> None:

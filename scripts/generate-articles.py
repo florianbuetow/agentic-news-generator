@@ -1,179 +1,164 @@
 #!/usr/bin/env python3
-"""Generate science journalism articles from topic-segmented transcripts."""
+"""Generate reviewed articles from article input bundles."""
 
-import json
+import logging
 import sys
+import time
 from pathlib import Path
 
-from src.agents.article_generation.agent import ArticleWriterAgent
-from src.config import ArticleGenerationConfig, Config
+from src.agents.article_generation.agent import build_chief_editor_orchestrator
+from src.agents.article_generation.bundle_loader import bundle_to_source_metadata, load_bundle
+from src.agents.article_generation.chief_editor.orchestrator import ChiefEditorOrchestrator
+from src.agents.article_generation.llm_client import LiteLLMClient
+from src.config import Config
+
+logger = logging.getLogger(__name__)
 
 
-def process_topic_file(
-    topic_file: Path,
-    agent: ArticleWriterAgent,
-    article_config: ArticleGenerationConfig,
+def process_bundle(
+    *,
+    bundle_dir: Path,
+    orchestrator: ChiefEditorOrchestrator,
     config: Config,
-    output_dir: Path,
 ) -> bool:
-    """Process a single topic file and generate an article.
-
-    Args:
-        topic_file: Path to the topic JSON file.
-        agent: Initialized ArticleWriterAgent instance.
-        article_config: Article generation configuration.
-        config: Main configuration object for accessing allowed styles.
-        output_dir: Base output directory for generated articles.
-
-    Returns:
-        True if successful, False otherwise.
-    """
-    channel_name = topic_file.parent.name
-    topic_slug = topic_file.stem
+    """Process a single article input bundle."""
+    slug = bundle_dir.name
 
     try:
-        # Read topic file
-        with open(topic_file, encoding="utf-8") as f:
-            topic_data = json.load(f)
+        started_at = time.perf_counter()
+        logger.info("Loading bundle: %s", bundle_dir)
+        bundle = load_bundle(bundle_dir)
+        source_metadata = bundle_to_source_metadata(bundle)
 
-        # Extract required fields
-        source_text = topic_data.get("source_text")
-        if not source_text:
-            print("    ✗ Missing 'source_text' field, skipping")
-            return False
+        article_config = config.get_article_generation_config()
+        style_mode = article_config.default_style_mode
 
-        # Build source metadata
-        source_metadata = topic_data.get("source_metadata", {})
-        source_metadata["topic_slug"] = topic_data.get("topic_slug", topic_slug)
-        source_metadata["topic_title"] = topic_data.get("topic_title", "Unknown Topic")
-
-        # Get style mode and target length (from topic file or defaults)
-        style_mode = topic_data.get("style_mode", article_config.default_style_mode)
-        target_length_words = topic_data.get(
-            "target_length_words",
-            article_config.default_target_length_words,
-        )
-
-        # Validate style_mode against allowed styles from config
         allowed_styles = config.get_allowed_article_styles()
         if style_mode not in allowed_styles:
-            print(f"    ✗ Invalid style_mode '{style_mode}'. Allowed styles: {allowed_styles}, skipping")
-            return False
+            raise ValueError(f"Invalid style_mode '{style_mode}'. Allowed styles: {allowed_styles}")
 
-        # Generate article
-        result = agent.generate_article(
-            source_text=source_text,
-            source_metadata=source_metadata,
-            style_mode=style_mode,
-            target_length_words=target_length_words,
+        logger.info(
+            "Contract: slug=%s style_mode=%s source_chars=%d",
+            slug,
+            style_mode,
+            len(bundle.source_text),
         )
 
+        result = orchestrator.generate_article(
+            source_text=bundle.source_text,
+            source_metadata=source_metadata,
+            style_mode=style_mode,
+            reader_preference="",
+        )
+
+        elapsed_seconds = time.perf_counter() - started_at
         if result.success:
-            # Save output
-            output_channel_dir = output_dir / channel_name
-            output_channel_dir.mkdir(parents=True, exist_ok=True)
-            output_file = output_channel_dir / f"{topic_slug}.json"
-
-            # Convert to dict for JSON serialization
-            output_data = {
-                "success": result.success,
-                "article": result.article.model_dump() if result.article else None,
-                "metadata": result.metadata.model_dump() if result.metadata else None,
-                "error": result.error,
-            }
-
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(output_data, f, indent=2, ensure_ascii=False)
-
-            print(f"    ✓ Article generated: {output_file}")
+            logger.info("Article generated: %s (%.1fs)", slug, elapsed_seconds)
             return True
 
-        print(f"    ✗ Generation failed: {result.error}")
+        logger.error("Generation failed: %s — %s (%.1fs)", slug, result.error, elapsed_seconds)
         return False
 
-    except Exception as e:
-        print(f"    ✗ Unexpected error: {e}")
+    except Exception as exc:
+        logger.exception("Unexpected error processing bundle %s: %s", slug, exc)
         return False
+
+
+def _run_preflight_check(*, config: Config) -> None:
+    """Verify LLM API connectivity before starting the pipeline.
+
+    Raises:
+        ConnectionError: If the LLM API endpoint is unreachable.
+        ValueError: If no api_base is configured.
+    """
+    article_config = config.get_article_generation_config()
+    api_base = article_config.agents.writer_llm.api_base
+    if api_base is None:
+        raise ValueError("Writer LLM api_base is not configured — cannot run pre-flight check")
+    llm_client = LiteLLMClient()
+    llm_client.check_connectivity(api_base=api_base, timeout_seconds=10)
 
 
 def main() -> int:
-    """Main pipeline function.
+    """Run article generation pipeline."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
-    Returns:
-        0 if all articles generated successfully, 1 if any failed.
-    """
-    print("=== Article Generation Pipeline ===\n")
+    logger.info("=== Article Generation Pipeline ===")
 
-    # Load configuration
     config_path = Path("config/config.yaml")
-    print(f"Loading configuration from {config_path}")
+    logger.info("Loading configuration from %s", config_path)
     try:
         config = Config(config_path)
         article_config = config.get_article_generation_config()
-    except Exception as e:
-        print(f"✗ Failed to load configuration: {e}")
+    except Exception as exc:
+        logger.error("Failed to load configuration: %s", exc)
         return 1
 
-    print("✓ Configuration loaded")
-    print(f"  Writer LLM: {article_config.writer_llm.model}")
-    print(f"  Max retries: {article_config.max_retries}")
-    print(f"  Default style: {article_config.default_style_mode}")
-    print()
+    logger.info(
+        "Configuration loaded: writer_model=%s editor_max_rounds=%d default_style=%s",
+        article_config.agents.writer_llm.model,
+        article_config.editor.editor_max_rounds,
+        article_config.default_style_mode,
+    )
 
-    # Initialize agent
-    print("Initializing Article Writer Agent...")
+    logger.info("Running pre-flight connectivity check...")
     try:
-        agent = ArticleWriterAgent(
-            llm_config=article_config.writer_llm,
-            config=config,
-        )
-    except Exception as e:
-        print(f"✗ Failed to initialize agent: {e}")
+        _run_preflight_check(config=config)
+    except ConnectionError as exc:
+        logger.error("Pre-flight check FAILED: %s", exc)
         return 1
-    print("✓ Agent initialized\n")
+    logger.info("Pre-flight check passed")
 
-    # Scan for topic files
-    topics_dir = config.getDataTranscriptsTopicsDir()
-    print(f"Scanning for topic files in {topics_dir}...")
+    logger.info("Initializing Chief Editor Orchestrator...")
+    try:
+        orchestrator = build_chief_editor_orchestrator(config=config)
+    except Exception as exc:
+        logger.error("Failed to initialize orchestrator: %s", exc)
+        return 1
+    logger.info("Orchestrator initialized")
 
-    topic_files: list[Path] = [
-        topic_file for channel_dir in topics_dir.iterdir() if channel_dir.is_dir() for topic_file in channel_dir.glob("*.json")
-    ]
+    articles_input_dir = config.getDataArticlesInputDir()
+    logger.info("Scanning for article bundles in %s", articles_input_dir)
 
-    if not topic_files:
-        print(f"✗ No topic files found in {topics_dir}")
+    if not articles_input_dir.exists():
+        logger.error("Articles input directory does not exist: %s", articles_input_dir)
         return 1
 
-    print(f"✓ Found {len(topic_files)} topic files\n")
+    bundle_dirs = sorted(
+        bundle_dir for bundle_dir in articles_input_dir.iterdir() if bundle_dir.is_dir() and not bundle_dir.name.startswith(".")
+    )
 
-    # Setup output directory
-    output_dir = config.getDataOutputArticlesDir()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Output directory: {output_dir}\n")
+    if len(bundle_dirs) == 0:
+        logger.error("No article bundles found in %s", articles_input_dir)
+        return 1
 
-    # Process each topic file
+    logger.info("Found %d article bundles", len(bundle_dirs))
+
     success_count = 0
     failure_count = 0
 
-    for idx, topic_file in enumerate(topic_files, 1):
-        channel_name = topic_file.parent.name
-        topic_slug = topic_file.stem
-
-        print(f"[{idx}/{len(topic_files)}] Processing: {channel_name}/{topic_slug}")
-
-        success = process_topic_file(topic_file, agent, article_config, config, output_dir)
+    for idx, bundle_dir in enumerate(bundle_dirs, start=1):
+        logger.info("[%d/%d] Processing bundle: %s", idx, len(bundle_dirs), bundle_dir.name)
+        success = process_bundle(
+            bundle_dir=bundle_dir,
+            orchestrator=orchestrator,
+            config=config,
+        )
         if success:
             success_count += 1
         else:
             failure_count += 1
 
-        print()
-
-    # Summary
-    print("=== Generation Complete ===")
-    print(f"Success: {success_count}")
-    print(f"Failures: {failure_count}")
-    print(f"Total: {len(topic_files)}")
+    logger.info(
+        "=== Generation Complete === success=%d failures=%d total=%d",
+        success_count,
+        failure_count,
+        len(bundle_dirs),
+    )
 
     return 1 if failure_count > 0 else 0
 
