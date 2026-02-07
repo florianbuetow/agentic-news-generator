@@ -7,8 +7,8 @@
 
 ```mermaid
 flowchart LR
-  %% Input contract (topic JSON)
-  TOPIC[("TOPIC JSON\n- SOURCE_TEXT\n- SOURCE_METADATA\n- STYLE_MODE\n- TARGET_LENGTH_WORDS\n- OPTIONAL_ANGLE (optional)")] --> W
+  %% Input contract (article input bundle)
+  TOPIC[("ARTICLE INPUT BUNDLE\n- SOURCE_TEXT\n- SOURCE_METADATA\n- STYLE_MODE\n- READER_PREFERENCE (optional)")] --> W
 
   %% Writer
   subgraph A["Writer Agent (Journalist)"]
@@ -77,8 +77,8 @@ flowchart LR
   %% Outputs
   OUT["Output Handler\n- canonical output JSON\n- run artifacts directory"]:::box
   E --> OUT
-  OUT --> CANON[("Canonical Output\n data/output/articles/<channel>/<topic_slug>.json")]
-  OUT --> ART[("Run Artifacts\n data/output/article_editor_runs/<channel>/<topic_slug>/<run_id>/")]
+  OUT --> CANON[("Canonical Output\n data/output/articles/<channel>/<slug>.json")]
+  OUT --> ART[("Run Artifacts\n data/output/article_editor_runs/<channel>/<slug>/<run_id>/")]
 
   %% Termination
   E --> FINAL[("FINAL_ARTICLE JSON (in canonical output)")]
@@ -103,9 +103,9 @@ sequenceDiagram
   participant PX as Perplexity (OpenAI-compatible)
   participant O as Output Handler
 
-  P->>E: TOPIC JSON (text + metadata + style settings + optional_angle?)
+  P->>E: ARTICLE INPUT BUNDLE (text + metadata + style settings + reader_preference?)
   E->>O: Init run artifacts dir (run_id)
-  E->>W: Writer prompt (STYLE_MODE + TARGET_LENGTH_WORDS + OPTIONAL_ANGLE + SOURCE_TEXT + OPTIONAL_METADATA)
+  E->>W: Writer prompt (STYLE_MODE + READER_PREFERENCE + SOURCE_TEXT + OPTIONAL_METADATA)
   W->>E: GENERATED_ARTICLE (Draft JSON)
 
   loop Up to editor_max_rounds
@@ -377,7 +377,7 @@ This taxonomy is not a hard-coded mapping; it’s the conceptual vocabulary the 
 1. **Input to Editor:** TOPIC JSON fields + GENERATED_ARTICLE.
    - SOURCE_TEXT
    - SOURCE_METADATA
-   - STYLE_MODE + TARGET_LENGTH_WORDS + OPTIONAL_ANGLE (optional)
+   - STYLE_MODE + READER_PREFERENCE (optional)
    - STYLE_REQUIREMENTS
 2. **Run Article-Review Agent** → returns a markdown bullet list of “additions not backed by source.”
 3. **Parse bullets deterministically** into individual structured concerns (one bullet = one `Concern`).
@@ -934,8 +934,7 @@ You must follow <rules/> and <steps/> and output ONLY the required valid JSON ma
 
 ```text
 STYLE_MODE: <NATURE_NEWS|SCIAM_MAGAZINE>
-TARGET_LENGTH_WORDS: <e.g., 900-1200>
-OPTIONAL_ANGLE: <e.g., "focus on methods", "focus on uncertainty", "focus on implications for X">
+READER_PREFERENCE: <e.g., "focus on methods", "focus on uncertainty", "focus on implications for X">
 
 SOURCE_TEXT:
 <PASTE YOUR LARGE SOURCE TEXT HERE>

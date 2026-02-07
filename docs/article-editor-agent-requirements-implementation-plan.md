@@ -15,10 +15,10 @@
 
 ### 0.2 Explicit resolutions (decision-complete)
 
-- **Assignment Agent:** Not implemented. The system uses the existing writer prompt contract’s `OPTIONAL_ANGLE` field (string) when provided.
+- **Assignment Agent:** Not implemented. The system uses the `READER_PREFERENCE` field (formerly `OPTIONAL_ANGLE`) when provided.
 - **Concern mapping:** Exactly one specialist per concern (no `secondary_agent`).
 - **Article-Review output format:** Markdown bullet list (verbatim requirements). The orchestrator parses bullets into structured `Concern` objects.
-- **Canonical output contract:** Exactly one JSON output per topic at `data/output/articles/<channel>/<topic_slug>.json`. Intermediate artifacts (iterations, raw agent outputs, editor report, etc.) are stored in a separate run artifacts directory.
+- **Canonical output contract:** Exactly one JSON output per article at `data/output/articles/<channel>/<slug>.json`. Intermediate artifacts (iterations, raw agent outputs, editor report, etc.) are stored in a separate run artifacts directory.
 - **Error handling:** Fail-fast per topic (article); batch pipeline continues processing remaining topics and exits non-zero if any topics failed.
 - **Retries (two separate concepts):**
   - `editor_max_rounds` controls editor→writer feedback rounds.
@@ -50,7 +50,7 @@ The **Article Generator** is a multi-agent editorial system that produces high-q
 ### 1.2 High-Level Flow
 
 ```
-Source Text + Source Metadata + Style Settings (+ OPTIONAL_ANGLE if provided)
+Source Text + Source Metadata + Style Settings (+ READER_PREFERENCE if provided)
             │
             ▼
     ┌───────────────────┐
@@ -340,32 +340,31 @@ article_generation:
     - "NATURE_NEWS"
     - "SCIAM_MAGAZINE"
   default_style_mode: "SCIAM_MAGAZINE"
-  default_target_length_words: "900-1200"
 ```
 
-### 3.1 Input Contract (Topic JSON)
+### 3.1 Input Contract (Article Input Bundle)
 
-The pipeline processes topic JSON files (one per topic) and must provide explicit inputs to the orchestrator.
+The pipeline processes article input bundles (one directory per video) from the configured `data_articles_input_dir` path.
 
-Required fields in each topic JSON:
+Each bundle directory must contain:
 
-- `source_text`: string (non-empty)
-- `source_metadata`: object with these required keys (all non-empty strings unless noted):
-  - `source_file`
-  - `channel_name`
-  - `video_id`
-  - `video_title`
-  - `publish_date` (string; may be `null` only if explicitly present as null)
-  - `topic_slug`
-  - `topic_title`
+- `manifest.json` — required fields:
+  - `article_title`: string (non-empty)
+  - `slug`: string (non-empty)
+  - `publish_date`: string or `null`
+  - `source_text_file`: string (filename of the transcript file within the bundle)
+  - `topics_file`: string (filename of the topics JSON within the bundle)
+  - `references`: list of objects, each with `title` (string) and `url` (string)
+- `transcript.txt` — the source text (filename must match `source_text_file` in the manifest)
+- `topics.json` — topic metadata (filename must match `topics_file` in the manifest)
 
-Optional fields in each topic JSON:
+Additional orchestrator inputs derived from config and pipeline logic:
 
-- `style_mode`: `"NATURE_NEWS"` or `"SCIAM_MAGAZINE"` (if missing, the pipeline must use `article_generation.default_style_mode`)
-- `target_length_words`: string (if missing, the pipeline must use `article_generation.default_target_length_words`)
-- `optional_angle`: string or `null` (if missing, treated as `null`)
+- `style_mode` comes from config (`article_generation.default_style_mode`)
+- `reader_preference` is passed as `""` (stub for future Reader Preference Agent)
+- `target_length_words` is NOT a runtime parameter — it is literal text in the writer prompt template (`prompts/article_editor/writer.md`)
 
-If any required field/key is missing, the topic must fail-fast with a clear error message.
+If any required manifest field is missing or a referenced file does not exist, the bundle must fail-fast with a clear error message.
 
 ## 4. Data Models
 
@@ -390,15 +389,14 @@ class ArticleResponse(BaseModel):
 
 class ArticleMetadata(BaseModel):
     """Article source and generation metadata."""
-    source_file: str  # Path to topic JSON input file (string)
+    source_file: str
     channel_name: str
     video_id: str
-    video_title: str
-    publish_date: str | None = None
-    topic_slug: str
-    topic_title: str
+    article_title: str
+    slug: str
+    publish_date: str | None
+    references: list[dict[str, str]]
     style_mode: Literal["NATURE_NEWS", "SCIAM_MAGAZINE"]
-    target_length_words: str
     generated_at: str  # ISO 8601 UTC timestamp
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -655,7 +653,7 @@ class BaseSpecialistAgent(BaseAgent):
 
 ## 6. Chief Editor Orchestrator
 
-The orchestrator is the single entry point for multi-agent article generation + editorial review. It preserves the existing writer prompt contract (`STYLE_MODE`, `TARGET_LENGTH_WORDS`, `OPTIONAL_ANGLE`, `SOURCE_TEXT`, `OPTIONAL_METADATA`) and adds a downstream editorial loop.
+The orchestrator is the single entry point for multi-agent article generation + editorial review. It preserves the existing writer prompt contract (`STYLE_MODE`, `READER_PREFERENCE`, `SOURCE_TEXT`, `OPTIONAL_METADATA`); target article length is fixed in the prompt template. The orchestrator adds a downstream editorial loop.
 
 ```python
 class ChiefEditorOrchestrator:
@@ -685,8 +683,7 @@ class ChiefEditorOrchestrator:
         source_text: str,
         source_metadata: dict[str, str | None],
         style_mode: str,
-        target_length_words: str,
-        optional_angle: str | None,
+        reader_preference: str,
     ) -> ArticleGenerationResult:
         """Main entry point for article generation."""
         ...
@@ -695,14 +692,14 @@ class ChiefEditorOrchestrator:
 ### 6.1 Orchestration Flow
 
 ```
-generate_article(source_text, metadata, style_mode, target_length_words, optional_angle?)
+generate_article(source_text, metadata, style_mode, reader_preference)
 │
 ├─► [0] Setup run artifacts directory
-│   └─► run_id = <UTC timestamp YYYYMMDDTHHMMSSZ> + "_" + <8 hex of sha256(source_file + topic_slug + style_mode + target_length_words)>
-│   └─► artifacts_dir = <run_artifacts_dir>/<channel>/<topic_slug>/<run_id>/
+│   └─► run_id = <UTC timestamp YYYYMMDDTHHMMSSZ> + "_" + <8 hex of sha256(source_file + slug + style_mode)>
+│   └─► artifacts_dir = <run_artifacts_dir>/<channel>/<slug>/<run_id>/
 │
 ├─► [1] Initial Draft (Writer)
-│   └─► WriterAgent.generate(source_text, metadata, style_mode, target_length_words, optional_angle?)
+│   └─► WriterAgent.generate(source_text, metadata, style_mode, reader_preference)
 │       └─► Returns: ArticleResponse
 │   └─► Save: iter1_writer_draft.json + iter1_writer_draft.md
 │
@@ -747,7 +744,7 @@ generate_article(source_text, metadata, style_mode, target_length_words, optiona
     │   └─► Save: iter{n}_feedback.json
     │
     └─► [2i] Writer Revision
-        └─► WriterAgent.revise(article, feedback, source_text, metadata, style_mode, target_length_words, optional_angle?)
+        └─► WriterAgent.revise(article, feedback, source_text, metadata, style_mode, reader_preference)
             └─► Returns: ArticleResponse (revised)
         └─► Save: iter{n+1}_writer_draft.json + iter{n+1}_writer_draft.md
         └─► Continue loop...
@@ -794,9 +791,9 @@ Writer feedback is compiled without additional LLM calls:
 
 ### 7.1 Canonical Output (Downstream Contract)
 
-Exactly one JSON file per topic is written to:
+Exactly one JSON file per article is written to:
 
-`data/output/articles/<channel>/<topic_slug>.json`
+`data/output/articles/<channel>/<slug>.json`
 
 This file is the canonical contract for downstream systems. It contains the final article, metadata, and editor report; intermediate files are never required for consumption.
 
@@ -808,7 +805,7 @@ Canonical JSON shape:
   "article": { "headline": "...", "alternative_headline": "...", "article_body": "...", "description": "..." },
   "metadata": { "...": "..." },
   "editor_report": { "...": "..." },
-  "artifacts_dir": "data/output/article_editor_runs/<channel>/<topic_slug>/<run_id>",
+  "artifacts_dir": "data/output/article_editor_runs/<channel>/<slug>/<run_id>",
   "error": null
 }
 ```
@@ -819,12 +816,12 @@ On failure, the same file is still written with `success=false`, `error` populat
 
 All intermediate outputs are written under a per-run directory:
 
-`data/output/article_editor_runs/<channel>/<topic_slug>/<run_id>/`
+`data/output/article_editor_runs/<channel>/<slug>/<run_id>/`
 
 Required artifacts:
 
 ```
-data/output/article_editor_runs/<channel>/<topic_slug>/<run_id>/
+data/output/article_editor_runs/<channel>/<slug>/<run_id>/
 ├── iter1_writer_draft.json
 ├── iter1_writer_draft.md
 ├── iter1_article_review_raw.md
@@ -1052,7 +1049,7 @@ tests/
 ### Phase 7: Pipeline Integration
 **Deliverables:**
 - Update `scripts/generate-articles.py` to use ChiefEditorOrchestrator
-- Preserve canonical output path contract (`data/output/articles/<channel>/<topic_slug>.json`)
+- Preserve canonical output path contract (`data/output/articles/<channel>/<slug>.json`)
 - Extend canonical output JSON to include `editor_report` + `artifacts_dir` (breaking schema change; no compatibility)
 - E2E tests
 
@@ -1064,8 +1061,8 @@ tests/
 
 ### 12.1 Functional Requirements
 
-- [ ] System processes topic JSON inputs (source_text + source_metadata) from the existing pipeline
-- [ ] Writer receives `OPTIONAL_ANGLE` when provided (no Assignment Agent)
+- [ ] System processes article input bundles (manifest.json + transcript + topics) from the configured input directory
+- [ ] Writer receives `READER_PREFERENCE` when provided (no Assignment Agent)
 - [ ] Writer Agent generates articles matching specified style
 - [ ] Article-Review Agent outputs markdown bullet list of unsupported additions (verbatim requirements)
 - [ ] Bullet parser deterministically converts bullets into `Concern` objects
