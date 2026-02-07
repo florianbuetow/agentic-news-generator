@@ -34,6 +34,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./logs",
         "data_output_articles_dir": "./data/output/articles",
+        "data_articles_input_dir": "./data/articles/input",
         "reports_dir": "reports",
     }
 
@@ -78,6 +79,7 @@ def get_valid_topic_detection_config() -> dict[str, object]:
             "context_window_threshold": 90,
             "max_retries": 3,
             "retry_delay": 2.0,
+            "timeout_seconds": 30,
         },
         "output_dir": "output/topics",
     }

@@ -117,8 +117,9 @@ class LLMConfig(BaseModel):
         ge=0,
         le=100,
     )
-    max_retries: int = Field(..., gt=0, description="Number of retries on LLM parsing errors")
+    max_retries: int = Field(..., ge=0, description="Number of retries after an LLM request failure")
     retry_delay: float = Field(..., gt=0, description="Delay in seconds between retries")
+    timeout_seconds: int = Field(..., gt=0, description="Request timeout in seconds")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -133,15 +134,118 @@ class TopicSegmentationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class ArticleGenerationConfig(BaseModel):
-    """Configuration for article generation agent system."""
+class ArticleGenerationOutputConfig(BaseModel):
+    """Output paths for canonical and run artifacts."""
 
-    writer_llm: LLMConfig = Field(..., description="LLM config for article writer")
-    max_retries: int = Field(..., description="Maximum retry attempts for malformed JSON", ge=0, le=10)
-    timeout_seconds: int = Field(..., description="API timeout in seconds", gt=0)
-    allowed_styles: list[str] = Field(..., description="List of allowed article writing styles", min_length=1)
-    default_style_mode: str = Field(..., description="Default writing style if not specified in topic file")
-    default_target_length_words: str = Field(..., description="Default target word count if not specified in topic file")
+    final_articles_dir: str = Field(..., min_length=1, description="Canonical output root directory")
+    run_artifacts_dir: str = Field(..., min_length=1, description="Run artifacts root directory")
+    save_intermediate_results: bool = Field(..., description="Whether to persist iteration artifacts")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationPromptConfig(BaseModel):
+    """Prompt file configuration for editor system."""
+
+    root_dir: str = Field(..., min_length=1, description="Prompt templates root directory")
+    writer_prompt_file: str = Field(..., min_length=1, description="Writer prompt filename")
+    revision_prompt_file: str = Field(..., min_length=1, description="Revision prompt filename")
+    article_review_prompt_file: str = Field(..., min_length=1, description="Article-review prompt filename")
+    concern_mapping_prompt_file: str = Field(..., min_length=1, description="Concern-mapping prompt filename")
+    specialists_dir: str = Field(..., min_length=1, description="Specialists prompt subdirectory")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationEditorConfig(BaseModel):
+    """Chief editor settings."""
+
+    editor_max_rounds: int = Field(..., gt=0, description="Maximum editor feedback rounds")
+    output: ArticleGenerationOutputConfig = Field(..., description="Output handling configuration")
+    prompts: ArticleGenerationPromptConfig = Field(..., description="Prompt file configuration")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationSpecialistLLMConfig(BaseModel):
+    """Specialist LLM configurations."""
+
+    fact_check_llm: LLMConfig = Field(..., description="Fact-check specialist LLM")
+    evidence_finding_llm: LLMConfig = Field(..., description="Evidence-finding specialist LLM")
+    opinion_llm: LLMConfig = Field(..., description="Opinion specialist LLM")
+    attribution_llm: LLMConfig = Field(..., description="Attribution specialist LLM")
+    style_review_llm: LLMConfig = Field(..., description="Style-review specialist LLM")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationAgentsConfig(BaseModel):
+    """LLM configuration for all article-generation agents."""
+
+    writer_llm: LLMConfig = Field(..., description="Writer agent LLM")
+    article_review_llm: LLMConfig = Field(..., description="Article-review agent LLM")
+    concern_mapping_llm: LLMConfig = Field(..., description="Concern-mapping agent LLM")
+    specialists: ArticleGenerationSpecialistLLMConfig = Field(..., description="Specialist agent LLM settings")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class KnowledgeBaseEmbeddingConfig(BaseModel):
+    """Embedding config for knowledge base indexing."""
+
+    provider: str = Field(..., min_length=1, description="Embedding provider")
+    model_name: str = Field(..., min_length=1, description="Embedding model name")
+    api_base: str | None = Field(..., description="Embedding API base URL")
+    api_key: str = Field(..., min_length=1, description="Embedding API key")
+    timeout_seconds: int = Field(..., gt=0, description="Embedding timeout in seconds")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class KnowledgeBaseConfig(BaseModel):
+    """Knowledge base indexing and retrieval settings."""
+
+    data_dir: str = Field(..., min_length=1, description="Knowledge base source docs directory")
+    index_dir: str = Field(..., min_length=1, description="Persisted index directory")
+    chunk_size_tokens: int = Field(..., gt=0, description="Chunk size in tokens")
+    chunk_overlap_tokens: int = Field(..., ge=0, description="Chunk overlap in tokens")
+    timeout_seconds: int = Field(..., gt=0, description="Knowledge base search timeout in seconds")
+    embedding: KnowledgeBaseEmbeddingConfig = Field(..., description="Embedding settings")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class PerplexityConfig(BaseModel):
+    """Perplexity API settings."""
+
+    api_base: str = Field(..., min_length=1, description="Perplexity API base URL")
+    api_key: str = Field(..., min_length=1, description="Perplexity API key")
+    model: str = Field(..., min_length=1, description="Perplexity model name")
+    timeout_seconds: int = Field(..., gt=0, description="Perplexity timeout in seconds")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class InstitutionalMemoryConfig(BaseModel):
+    """Institutional memory storage settings."""
+
+    data_dir: str = Field(..., min_length=1, description="Institutional memory root directory")
+    fact_checking_subdir: str = Field(..., min_length=1, description="Fact-check cache subdirectory")
+    evidence_finding_subdir: str = Field(..., min_length=1, description="Evidence-finding cache subdirectory")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationConfig(BaseModel):
+    """Configuration for the multi-agent article-generation system."""
+
+    editor: ArticleGenerationEditorConfig = Field(..., description="Chief editor settings")
+    agents: ArticleGenerationAgentsConfig = Field(..., description="Agent LLM settings")
+    knowledge_base: KnowledgeBaseConfig = Field(..., description="Knowledge base settings")
+    perplexity: PerplexityConfig = Field(..., description="Perplexity API settings")
+    institutional_memory: InstitutionalMemoryConfig = Field(..., description="Institutional memory settings")
+    allowed_styles: list[str] = Field(..., min_length=1, description="Allowed article style values")
+    default_style_mode: str = Field(..., min_length=1, description="Default style mode")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -243,6 +347,7 @@ class PathsConfig(BaseModel):
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
     data_logs_dir: str = Field(..., description="Logs directory path", min_length=1)
     data_output_articles_dir: str = Field(..., description="Generated articles directory path", min_length=1)
+    data_articles_input_dir: str = Field(..., description="Article generation input bundles directory path", min_length=1)
     reports_dir: str = Field(..., description="Model benchmark reports directory path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -511,7 +616,7 @@ class Config:
         return self._article_generation.allowed_styles
 
     def get_article_timeout_seconds(self) -> int:
-        """Get API timeout for article generation in seconds.
+        """Get writer-agent timeout for article generation in seconds.
 
         Returns:
             Timeout in seconds.
@@ -521,7 +626,13 @@ class Config:
         """
         if not hasattr(self, "_article_generation"):
             raise KeyError("Missing required key 'article_generation' in config file")
-        return self._article_generation.timeout_seconds
+        return self._article_generation.agents.writer_llm.timeout_seconds
+
+    def get_article_editor_max_rounds(self) -> int:
+        """Get max editor review rounds for article generation."""
+        if not hasattr(self, "_article_generation"):
+            raise KeyError("Missing required key 'article_generation' in config file")
+        return self._article_generation.editor.editor_max_rounds
 
     def get_topic_detection_config(self) -> TopicDetectionConfig:
         """Get topic detection configuration.
@@ -704,6 +815,10 @@ class Config:
             Path object pointing to the data/output/articles directory.
         """
         return Path(self._paths.data_output_articles_dir)
+
+    def getDataArticlesInputDir(self) -> Path:
+        """Get the article generation input bundles directory path."""
+        return Path(self._paths.data_articles_input_dir)
 
     def getReportsDir(self) -> Path:
         """Get the reports directory path.

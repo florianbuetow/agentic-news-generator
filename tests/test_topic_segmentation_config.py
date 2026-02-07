@@ -30,6 +30,7 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./logs",
         "data_output_articles_dir": "./data/output/articles",
+        "data_articles_input_dir": "./data/articles/input",
         "reports_dir": "reports",
     }
 
@@ -49,6 +50,7 @@ class TestLLMConfig:
             context_window_threshold=90,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         assert config.model == "qwen3-30b-a3b-thinking-2507-mlx@8bit"
         assert config.api_base == "http://127.0.0.1:1234/v1"
@@ -72,6 +74,7 @@ class TestLLMConfig:
             context_window_threshold=85,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         assert config.model == "anthropic/claude-3-5-sonnet-20241022"
         assert config.api_base is None
@@ -245,6 +248,7 @@ class TestLLMConfig:
             context_window_threshold=90,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         with pytest.raises(ValidationError):
             config.temperature = 0.5
@@ -312,6 +316,7 @@ class TestLLMConfig:
             context_window_threshold=0,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         assert config_0.context_window_threshold == 0
 
@@ -326,6 +331,7 @@ class TestLLMConfig:
             context_window_threshold=100,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         assert config_100.context_window_threshold == 100
 
@@ -345,6 +351,7 @@ class TestTopicSegmentationConfig:
             context_window_threshold=90,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         critic_llm = LLMConfig(
             model="test-critic-model",
@@ -356,6 +363,7 @@ class TestTopicSegmentationConfig:
             context_window_threshold=90,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         config = TopicSegmentationConfig(
             agent_llm=agent_llm,
@@ -494,6 +502,7 @@ class TestTopicSegmentationConfig:
             context_window_threshold=90,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         critic_llm = LLMConfig(
             model="test-critic-model",
@@ -505,6 +514,7 @@ class TestTopicSegmentationConfig:
             context_window_threshold=90,
             max_retries=3,
             retry_delay=2.0,
+            timeout_seconds=30,
         )
         config = TopicSegmentationConfig(
             agent_llm=agent_llm,
@@ -543,6 +553,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window_threshold": 90,
                     "max_retries": 3,
                     "retry_delay": 2.0,
+                    "timeout_seconds": 30,
                 },
                 "critic_llm": {
                     "model": "test-model",
@@ -554,6 +565,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window_threshold": 90,
                     "max_retries": 3,
                     "retry_delay": 2.0,
+                    "timeout_seconds": 30,
                 },
                 "retry_limit": 3,
             },
@@ -662,6 +674,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window_threshold": 90,
                     "max_retries": 3,
                     "retry_delay": 2.0,
+                    "timeout_seconds": 30,
                 },
                 "critic_llm": {
                     "model": "test-model",
@@ -673,6 +686,7 @@ class TestConfigWithTopicSegmentation:
                     "context_window_threshold": 90,
                     "max_retries": 3,
                     "retry_delay": 2.0,
+                    "timeout_seconds": 30,
                 },
                 # Missing retry_limit
             },

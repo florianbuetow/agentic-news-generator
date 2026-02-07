@@ -17,6 +17,7 @@ paths:
   data_archive_videos_dir: ./data/archive/videos
   data_logs_dir: ./logs
   data_output_articles_dir: ./data/output/articles
+  data_articles_input_dir: ./data/articles/input
 
   # Model benchmark and visualization paths
   reports_dir: reports
@@ -88,7 +89,7 @@ transcription:
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio
   agent_llm:
-    model: your-model-name
+    model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -97,10 +98,11 @@ topic_segmentation:
     context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
     max_retries: 3
     retry_delay: 2.0
+    timeout_seconds: 120
 
   # Critic Agent LLM - using same LM Studio instance
   critic_llm:
-    model: your-model-name
+    model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -109,38 +111,156 @@ topic_segmentation:
     context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
     max_retries: 3
     retry_delay: 2.0
+    timeout_seconds: 120
 
   # Retry configuration
   retry_limit: 1
 
 # Article Generation Agent Configuration
 article_generation:
-  # Writer Agent LLM - using LM Studio
-  writer_llm:
-    model: your-model-name
-    api_base: http://127.0.0.1:1234/v1
-    api_key: lm-studio
-    context_window: 32768
-    max_tokens: 4096
-    temperature: 0.7
-    context_window_threshold: 90  # Raise error if token usage exceeds 90%
-    max_retries: 3
-    retry_delay: 2.0
+  editor:
+    editor_max_rounds: 3
 
-  # Retry configuration for malformed JSON (handled by LiteLLM)
-  max_retries: 3
+    output:
+      final_articles_dir: ./data/output/articles
+      run_artifacts_dir: ./data/output/article_editor_runs
+      save_intermediate_results: true
 
-  # API timeout in seconds
-  timeout_seconds: 30
+    prompts:
+      root_dir: ./prompts/article_editor
+      writer_prompt_file: writer.md
+      revision_prompt_file: revision.md
+      article_review_prompt_file: article_review.md
+      concern_mapping_prompt_file: concern_mapping.md
+      specialists_dir: specialists
 
-  # Allowed article writing styles
+  agents:
+    writer_llm:
+      model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+      api_base: http://127.0.0.1:1234/v1
+      api_key: lm-studio
+      context_window: 262144
+      max_tokens: 4096
+      temperature: 0.7
+      context_window_threshold: 90
+      max_retries: 3
+      retry_delay: 2.0
+      timeout_seconds: 180
+
+    article_review_llm:
+      model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+      api_base: http://127.0.0.1:1234/v1
+      api_key: lm-studio
+      context_window: 262144
+      max_tokens: 2048
+      temperature: 0.3
+      context_window_threshold: 90
+      max_retries: 3
+      retry_delay: 2.0
+      timeout_seconds: 90
+
+    concern_mapping_llm:
+      model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+      api_base: http://127.0.0.1:1234/v1
+      api_key: lm-studio
+      context_window: 262144
+      max_tokens: 2048
+      temperature: 0.3
+      context_window_threshold: 90
+      max_retries: 3
+      retry_delay: 2.0
+      timeout_seconds: 60
+
+    specialists:
+      fact_check_llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.2
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 60
+
+      evidence_finding_llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.2
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 60
+
+      opinion_llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.3
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 60
+
+      attribution_llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.2
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 60
+
+      style_review_llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.3
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 60
+
+  knowledge_base:
+    data_dir: ./data/knowledgebase
+    index_dir: ./data/knowledgebase_index
+    chunk_size_tokens: 512
+    chunk_overlap_tokens: 50
+    timeout_seconds: 30
+    embedding:
+      provider: lmstudio
+      model_name: text-embedding-bge-large-en-v1.5
+      api_base: http://127.0.0.1:1234/v1
+      api_key: lm-studio
+      timeout_seconds: 30
+
+  perplexity:
+    api_base: https://api.perplexity.ai
+    api_key: "<REQUIRED_NON_EMPTY_STRING>"
+    model: sonar
+    timeout_seconds: 45
+
+  institutional_memory:
+    data_dir: ./data/institutional_memory
+    fact_checking_subdir: fact_checking
+    evidence_finding_subdir: evidence_finding
+
   allowed_styles:
     - "NATURE_NEWS"
     - "SCIAM_MAGAZINE"
 
-  # Default values if not specified in topic file
   default_style_mode: "SCIAM_MAGAZINE"
-  default_target_length_words: "900-1200"
 
 # Topic Detection Configuration (Embedding-based segmentation + LLM topic extraction)
 topic_detection:
@@ -161,7 +281,7 @@ topic_detection:
 
   # Topic detection agent LLM
   topic_detection_llm:
-    model: openai/nvidia/nemotron-3-nano
+    model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -170,6 +290,7 @@ topic_detection:
     context_window_threshold: 90
     max_retries: 3
     retry_delay: 2.0
+    timeout_seconds: 120
 
   # Output settings
   output_dir: output/topics
