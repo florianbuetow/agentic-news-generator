@@ -1,220 +1,163 @@
-"""Article generation agent using litellm with automatic JSON validation."""
+"""Factory utilities for building the article-generation orchestrator."""
 
-import json
-from datetime import UTC, datetime
-from typing import Literal, cast
+from pathlib import Path
 
-from litellm import completion
+from src.agents.article_generation.article_review.agent import ArticleReviewAgent
+from src.agents.article_generation.chief_editor.bullet_parser import ArticleReviewBulletParser
+from src.agents.article_generation.chief_editor.institutional_memory import InstitutionalMemoryStore
+from src.agents.article_generation.chief_editor.orchestrator import ChiefEditorOrchestrator
+from src.agents.article_generation.chief_editor.output_handler import OutputHandler
+from src.agents.article_generation.concern_mapping.agent import ConcernMappingAgent
+from src.agents.article_generation.knowledge_base.indexer import KnowledgeBaseIndexer
+from src.agents.article_generation.knowledge_base.retriever import HaystackKnowledgeBaseRetriever
+from src.agents.article_generation.llm_client import LiteLLMClient
+from src.agents.article_generation.perplexity_client import PerplexityHTTPClient
+from src.agents.article_generation.prompts.loader import PromptLoader
+from src.agents.article_generation.specialists.attribution.agent import AttributionAgent
+from src.agents.article_generation.specialists.evidence_finding.agent import EvidenceFindingAgent
+from src.agents.article_generation.specialists.fact_check.agent import FactCheckAgent
+from src.agents.article_generation.specialists.opinion.agent import OpinionAgent
+from src.agents.article_generation.specialists.style_review.agent import StyleReviewAgent
+from src.agents.article_generation.writer.agent import WriterAgent
+from src.config import Config
 
-from src.agents.article_generation import agent_prompts
-from src.agents.article_generation.models import ArticleGenerationResult, ArticleMetadata, ArticleResponse
-from src.config import Config, LLMConfig
-from src.util.token_validator import validate_token_usage
 
+def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrator:
+    """Build a fully wired chief editor orchestrator from configuration."""
+    article_generation_config = config.get_article_generation_config()
 
-class ArticleWriterAgent:
-    """Agent that generates science journalism articles from topic transcripts."""
+    prompt_root_dir = Path(article_generation_config.editor.prompts.root_dir)
+    prompt_loader = PromptLoader(root_dir=prompt_root_dir)
+    llm_client = LiteLLMClient()
 
-    # Class-level prompt templates (avoids module-level constants)
-    _SYSTEM_PROMPT_TEMPLATE = agent_prompts.SYSTEM_PROMPT
-    _USER_PROMPT_TEMPLATE = agent_prompts.USER_PROMPT_TEMPLATE
+    institutional_memory = InstitutionalMemoryStore(
+        data_dir=Path(article_generation_config.institutional_memory.data_dir),
+        fact_checking_subdir=article_generation_config.institutional_memory.fact_checking_subdir,
+        evidence_finding_subdir=article_generation_config.institutional_memory.evidence_finding_subdir,
+    )
 
-    def __init__(self, llm_config: LLMConfig, config: Config) -> None:
-        """Initialize the article generation agent.
+    output_handler = OutputHandler(
+        final_articles_dir=Path(article_generation_config.editor.output.final_articles_dir),
+        run_artifacts_dir=Path(article_generation_config.editor.output.run_artifacts_dir),
+        save_intermediate_results=article_generation_config.editor.output.save_intermediate_results,
+    )
 
-        Args:
-            llm_config: LLM configuration for this agent.
-            config: Full application configuration.
+    writer_agent = WriterAgent(
+        llm_config=article_generation_config.agents.writer_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        writer_prompt_file=article_generation_config.editor.prompts.writer_prompt_file,
+        revision_prompt_file=article_generation_config.editor.prompts.revision_prompt_file,
+    )
 
-        Raises:
-            KeyError: If required environment variables are missing.
-        """
-        self._llm_config = llm_config
-        self._config = config
-        self._api_key = llm_config.api_key
+    article_review_agent = ArticleReviewAgent(
+        llm_config=article_generation_config.agents.article_review_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        prompt_file=article_generation_config.editor.prompts.article_review_prompt_file,
+    )
 
-    def _build_metadata(self, source_metadata: dict[str, str | None], style_mode: str, target_length_words: str) -> ArticleMetadata:
-        """Build article metadata.
+    concern_mapping_agent = ConcernMappingAgent(
+        llm_config=article_generation_config.agents.concern_mapping_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        prompt_file=article_generation_config.editor.prompts.concern_mapping_prompt_file,
+    )
 
-        Args:
-            source_metadata: Source metadata dictionary.
-            style_mode: Writing style mode.
-            target_length_words: Target word count.
+    kb_config = article_generation_config.knowledge_base
+    kb_indexer = KnowledgeBaseIndexer(
+        data_dir=Path(kb_config.data_dir),
+        index_dir=Path(kb_config.index_dir),
+        chunk_size_tokens=kb_config.chunk_size_tokens,
+        chunk_overlap_tokens=kb_config.chunk_overlap_tokens,
+        embedding_provider=kb_config.embedding.provider,
+        embedding_model_name=kb_config.embedding.model_name,
+        embedding_api_base=kb_config.embedding.api_base,
+        embedding_api_key=kb_config.embedding.api_key,
+        embedding_timeout_seconds=kb_config.embedding.timeout_seconds,
+        encoding_name=config.getEncodingName(),
+    )
+    kb_index_version = kb_indexer.ensure_index()
+    kb_retriever = HaystackKnowledgeBaseRetriever(
+        index_dir=Path(kb_config.index_dir),
+        embedding_provider=kb_config.embedding.provider,
+        embedding_model_name=kb_config.embedding.model_name,
+        embedding_api_base=kb_config.embedding.api_base,
+        embedding_api_key=kb_config.embedding.api_key,
+        embedding_timeout_seconds=kb_config.embedding.timeout_seconds,
+    )
 
-        Returns:
-            ArticleMetadata instance.
+    perplexity_client = PerplexityHTTPClient(
+        api_base=article_generation_config.perplexity.api_base,
+        api_key=article_generation_config.perplexity.api_key,
+    )
 
-        Raises:
-            ValueError: If required metadata fields are missing.
-        """
-        topic_slug_value = source_metadata.get("topic_slug")
-        if topic_slug_value is None:
-            raise ValueError("Required metadata field 'topic_slug' is missing")
+    fact_check_agent = FactCheckAgent(
+        llm_config=article_generation_config.agents.specialists.fact_check_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+        prompt_file="fact_check.md",
+        knowledge_base_retriever=kb_retriever,
+        institutional_memory=institutional_memory,
+        kb_index_version=kb_index_version,
+        kb_timeout_seconds=kb_config.timeout_seconds,
+    )
 
-        topic_title_value = source_metadata.get("topic_title")
-        if topic_title_value is None:
-            raise ValueError("Required metadata field 'topic_title' is missing")
+    evidence_finding_agent = EvidenceFindingAgent(
+        llm_config=article_generation_config.agents.specialists.evidence_finding_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+        prompt_file="evidence_finding.md",
+        perplexity_client=perplexity_client,
+        perplexity_model=article_generation_config.perplexity.model,
+        institutional_memory=institutional_memory,
+    )
 
-        channel_name_value = source_metadata.get("channel_name")
-        if channel_name_value is None:
-            raise ValueError("Required metadata field 'channel_name' is missing")
+    opinion_agent = OpinionAgent(
+        llm_config=article_generation_config.agents.specialists.opinion_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+        prompt_file="opinion.md",
+    )
 
-        video_id_value = source_metadata.get("video_id")
-        if video_id_value is None:
-            raise ValueError("Required metadata field 'video_id' is missing")
+    attribution_agent = AttributionAgent(
+        llm_config=article_generation_config.agents.specialists.attribution_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+        prompt_file="attribution.md",
+    )
 
-        video_title_value = source_metadata.get("video_title")
-        if video_title_value is None:
-            raise ValueError("Required metadata field 'video_title' is missing")
+    style_review_agent = StyleReviewAgent(
+        llm_config=article_generation_config.agents.specialists.style_review_llm,
+        config=config,
+        llm_client=llm_client,
+        prompt_loader=prompt_loader,
+        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+        prompt_file="style_review.md",
+    )
 
-        source_file_value = source_metadata.get("source_file")
-        if source_file_value is None:
-            raise ValueError("Required metadata field 'source_file' is missing")
-
-        return ArticleMetadata(
-            topic_slug=topic_slug_value,
-            topic_title=topic_title_value,
-            style_mode=cast(Literal["NATURE_NEWS", "SCIAM_MAGAZINE"], style_mode),
-            target_length_words=target_length_words,
-            source_channel=channel_name_value,
-            source_video_id=video_id_value,
-            source_video_title=video_title_value,
-            source_publish_date=source_metadata.get("publish_date"),
-            source_file=source_file_value,
-            generated_at=datetime.now(UTC).isoformat(),
-        )
-
-    def generate_article(
-        self,
-        source_text: str,
-        source_metadata: dict[str, str | None],
-        style_mode: str,
-        target_length_words: str,
-    ) -> ArticleGenerationResult:
-        """Generate an article from source transcript.
-
-        Args:
-            source_text: Aggregated transcript text.
-            source_metadata: Video metadata (channel_name, video_id, video_title, publish_date).
-            style_mode: Writing style ("NATURE_NEWS" or "SCIAM_MAGAZINE").
-            target_length_words: Target word count (e.g., "900-1200").
-
-        Returns:
-            ArticleGenerationResult with success/failure and article data.
-        """
-        # Validate style_mode against allowed styles
-        allowed_styles = self._config.get_allowed_article_styles()
-        if style_mode not in allowed_styles:
-            return ArticleGenerationResult(
-                success=False,
-                article=None,
-                metadata=None,
-                error=f"Invalid style_mode '{style_mode}'. Allowed styles: {allowed_styles}",
-            )
-
-        try:
-            # Build prompts
-            system_prompt = self._SYSTEM_PROMPT_TEMPLATE.format(
-                style_mode=style_mode,
-                target_length_words=target_length_words,
-            )
-
-            # Extract metadata values
-            channel_name_value = source_metadata.get("channel_name")
-            if channel_name_value is None:
-                raise ValueError("Required metadata field 'channel_name' is missing")
-
-            video_title_value = source_metadata.get("video_title")
-            if video_title_value is None:
-                raise ValueError("Required metadata field 'video_title' is missing")
-
-            video_id_value = source_metadata.get("video_id")
-            if video_id_value is None:
-                raise ValueError("Required metadata field 'video_id' is missing")
-
-            publish_date_value = source_metadata.get("publish_date")
-            if publish_date_value is None:
-                raise ValueError("Required metadata field 'publish_date' is missing")
-
-            user_prompt = self._USER_PROMPT_TEMPLATE.format(
-                style_mode=style_mode,
-                target_length_words=target_length_words,
-                source_text=source_text,
-                channel_name=channel_name_value,
-                video_title=video_title_value,
-                video_id=video_id_value,
-                publish_date=publish_date_value,
-            )
-
-            # Validate token usage before calling LLM
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ]
-
-            token_count = validate_token_usage(
-                messages=messages,
-                context_window=self._llm_config.context_window,
-                threshold=self._llm_config.context_window_threshold,
-                encoding_name=self._config.getEncodingName(),
-            )
-            print(
-                f"        [Agent] Token count: {token_count:,} tokens "
-                f"({token_count / self._llm_config.context_window * 100:.1f}% of context window)"
-            )
-
-            # Call litellm (model will follow prompt instructions for JSON output)
-            print("        [Agent] Calling LLM API...")
-
-            response = completion(
-                model=self._llm_config.model,
-                api_base=self._llm_config.api_base,
-                api_key=self._api_key,
-                messages=messages,
-                temperature=self._llm_config.temperature,
-                max_tokens=self._llm_config.max_tokens,
-                timeout=self._config.get_article_timeout_seconds(),
-                stream=False,
-            )
-
-            print("        [Agent] Received LLM response, extracting content...")
-            response_text = response.choices[0].message.content
-            if response_text is None:
-                raise ValueError("Agent produced empty response")
-
-            print(f"        [Agent] Response length: {len(response_text)} chars")
-
-            # Strip markdown code fences if present
-            response_text = response_text.strip()
-            if (response_text.startswith("```json") or response_text.startswith("```")) and response_text.endswith("```"):
-                # Remove opening fence
-                response_text = response_text[7:] if response_text.startswith("```json") else response_text[3:]
-                # Remove closing fence
-                response_text = response_text[:-3].strip()
-                print("        [Agent] Stripped markdown code fences from response")
-
-            # Parse and validate
-            print("        [Agent] Parsing JSON...")
-            response_data = json.loads(response_text)
-            print("        [Agent] Validating with Pydantic...")
-            validated_article = ArticleResponse.model_validate(response_data)
-            print("        [Agent] ✓ Validation successful")
-
-            # Build metadata
-            metadata = self._build_metadata(source_metadata, style_mode, target_length_words)
-
-            return ArticleGenerationResult(
-                success=True,
-                article=validated_article,
-                metadata=metadata,
-                error=None,
-            )
-
-        except Exception as e:
-            print(f"        [Agent] ✗ Unexpected error: {e}")
-            return ArticleGenerationResult(
-                success=False,
-                article=None,
-                metadata=None,
-                error=f"Unexpected error: {e}",
-            )
+    return ChiefEditorOrchestrator(
+        config=config,
+        writer_agent=writer_agent,
+        article_review_agent=article_review_agent,
+        concern_mapping_agent=concern_mapping_agent,
+        fact_check_agent=fact_check_agent,
+        evidence_finding_agent=evidence_finding_agent,
+        opinion_agent=opinion_agent,
+        attribution_agent=attribution_agent,
+        style_review_agent=style_review_agent,
+        bullet_parser=ArticleReviewBulletParser(),
+        institutional_memory=institutional_memory,
+        output_handler=output_handler,
+    )
