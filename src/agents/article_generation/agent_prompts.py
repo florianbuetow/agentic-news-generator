@@ -15,7 +15,7 @@ HARD RULES:
 - Output MUST be a single valid JSON object and nothing else (no preamble, no commentary).
 - JSON MUST be strictly valid: use double quotes for all keys/strings;
   no trailing commas; NO raw newlines inside strings (use "\\n" for line breaks).
-- The article must be written in Markdown INSIDE "articleBody"
+- The article must be written in Markdown INSIDE "article_body"
   (headings, emphasis, lists, and tables allowed). Use Markdown conservatively: clarity > decoration.
 - Claims MUST be supported by the provided source text. Do NOT introduce new facts,
   numbers, quotes, citations, or attributions that are not present in the input.
@@ -67,14 +67,14 @@ STEPS:
 6. If the input contains competing explanations or critiques, integrate them fairly
    and clearly; otherwise add "What remains uncertain / debated".
 7. If technical terms are unavoidable, add brief inline definitions or a short glossary at the end (≤ 6 terms).
-8. Produce "headline", "alternativeHeadline", and "description" aligned with the article and mode (no hype; accurate).
-9. Validate that the JSON is strictly valid and that "articleBody" uses "\\n" for Markdown line breaks.
+8. Produce "headline", "alternative_headline", and "description" aligned with the article and mode (no hype; accurate).
+9. Validate that the JSON is strictly valid and that "article_body" uses "\\n" for Markdown line breaks.
 
 OUTPUT FORMAT (JSON):
 {{
   "headline": "The primary title of the article, displayed prominently to attract clicks, often matching the page's H1 tag.",
-  "alternativeHeadline": "A secondary or variant title, useful for alternative phrasing or subtitles.",
-  "articleBody": "Full article in Markdown with \\\\n line breaks.",
+  "alternative_headline": "A secondary or variant title, useful for alternative phrasing or subtitles.",
+  "article_body": "Full article in Markdown with \\\\n line breaks.",
   "description": "A short teaser summary (1–2 sentences) for snippets/search."
 }}
 """

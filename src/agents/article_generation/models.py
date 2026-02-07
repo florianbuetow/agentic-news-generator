@@ -1,65 +1,191 @@
-"""Pydantic models for article generation agent system."""
+"""Pydantic models for the multi-agent article generation system."""
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class ArticleResponse(BaseModel):
-    """Response from the article writer agent (JSON output from LLM)."""
+    """Generated article content."""
 
-    headline: str = Field(
-        ...,
-        description="Primary title displayed prominently, matching page's H1 tag",
-        min_length=10,
-        max_length=200,
-    )
-    alternative_headline: str = Field(
-        ...,
-        alias="alternativeHeadline",
-        description="Secondary or variant title for alternative phrasing or subtitles",
-        min_length=10,
-        max_length=200,
-    )
-    article_body: str = Field(
-        ...,
-        alias="articleBody",
-        description="Full article in Markdown format with \\n line breaks",
-        min_length=100,
-    )
-    description: str = Field(
-        ...,
-        description="Short teaser summary (1-2 sentences) for snippets/search",
-        min_length=20,
-        max_length=500,
-    )
+    headline: str
+    alternative_headline: str
+    article_body: str
+    description: str
 
-    model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class ArticleMetadata(BaseModel):
-    """Metadata about the generated article."""
+    """Article source and generation metadata."""
 
-    topic_slug: str = Field(..., description="Normalized topic identifier from source")
-    topic_title: str = Field(..., description="Human-readable topic title from source")
-    style_mode: Literal["NATURE_NEWS", "SCIAM_MAGAZINE"] = Field(..., description="Writing style used")
-    target_length_words: str = Field(..., description="Target word count range (e.g., '900-1200')")
-    source_channel: str = Field(..., description="YouTube channel name")
-    source_video_id: str = Field(..., description="YouTube video ID")
-    source_video_title: str = Field(..., description="Original video title")
-    source_publish_date: str | None = Field(None, description="Video publish date if available")
-    source_file: str = Field(..., description="Source topic file path (channel/filename)")
-    generated_at: str = Field(..., description="ISO 8601 timestamp of article generation")
+    source_file: str
+    channel_name: str
+    video_id: str
+    article_title: str
+    slug: str
+    publish_date: str | None
+    references: list[dict[str, str]]
+    style_mode: Literal["NATURE_NEWS", "SCIAM_MAGAZINE"]
+    generated_at: str
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleReviewRaw(BaseModel):
+    """Raw output from the article-review agent."""
+
+    markdown_bullets: str
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+ConcernType = Literal[
+    "unsupported_fact",
+    "inferred_fact",
+    "scope_expansion",
+    "editorializing",
+    "structured_addition",
+    "attribution_gap",
+    "certainty_inflation",
+    "truncation_completion",
+]
+
+
+class Concern(BaseModel):
+    """A single concern identified in the article."""
+
+    concern_id: int
+    excerpt: str
+    review_note: str
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleReviewResult(BaseModel):
+    """Structured concerns parsed from article-review output."""
+
+    concerns: list[Concern]
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ConcernMapping(BaseModel):
+    """Mapping from concern to specialist agent."""
+
+    concern_id: int
+    concern_type: ConcernType
+    selected_agent: Literal["fact_check", "evidence_finding", "opinion", "attribution", "style_review"]
+    confidence: Literal["high", "medium", "low"]
+    reason: str
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ConcernMappingResult(BaseModel):
+    """Output from concern-mapping agent."""
+
+    mappings: list[ConcernMapping]
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class Verdict(BaseModel):
+    """Verdict returned by a specialist agent."""
+
+    concern_id: int
+    misleading: bool
+    status: Literal["KEEP", "REWRITE", "REMOVE"]
+    rationale: str
+    suggested_fix: str | None
+    evidence: str | None
+    citations: list[str] | None
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class FactCheckRecord(BaseModel):
+    """Persisted fact-check record for institutional memory."""
+
+    timestamp: str
+    article_id: str
+    concern_id: int
+    prompt: str
+    query: str
+    normalized_query: str
+    model_name: str
+    kb_index_version: str
+    cache_key_hash: str
+    kb_response: str
+    verdict: Verdict
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class EvidenceRecord(BaseModel):
+    """Persisted evidence-finding record for institutional memory."""
+
+    timestamp: str
+    article_id: str
+    concern_id: int
+    prompt: str
+    query: str
+    normalized_query: str
+    model_name: str
+    cache_key_hash: str
+    perplexity_response: str
+    citations: list[str]
+    verdict: Verdict
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class WriterFeedback(BaseModel):
+    """Compiled feedback sent to the writer in a revision round."""
+
+    iteration: int
+    rating: int
+    passed: bool
+    reasoning: str
+    improvement_suggestions: list[str]
+    todo_list: list[str]
+    verdicts: list[Verdict]
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class IterationReport(BaseModel):
+    """One complete editorial iteration."""
+
+    iteration_number: int
+    concerns: list[Concern]
+    mappings: list[ConcernMapping]
+    verdicts: list[Verdict]
+    feedback_to_writer: WriterFeedback | None
+    article_draft: ArticleResponse
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class EditorReport(BaseModel):
+    """Complete multi-iteration editor report."""
+
+    iterations: list[IterationReport]
+    total_iterations: int
+    final_status: Literal["SUCCESS", "FAILED"]
+    blocking_concerns: list[Concern] | None
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class ArticleGenerationResult(BaseModel):
-    """Final result of the article generation process."""
+    """Complete article generation result."""
 
-    success: bool = Field(..., description="Whether article generation succeeded")
-    article: ArticleResponse | None = Field(..., description="Generated article (None if failed)")
-    metadata: ArticleMetadata | None = Field(..., description="Article metadata (None if failed)")
-    error: str | None = Field(..., description="Error message if generation failed")
+    success: bool
+    article: ArticleResponse | None
+    metadata: ArticleMetadata | None
+    editor_report: EditorReport | None
+    artifacts_dir: str | None
+    error: str | None
 
     model_config = ConfigDict(frozen=True, extra="forbid")
