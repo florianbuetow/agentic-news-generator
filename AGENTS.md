@@ -104,6 +104,7 @@ When modifying Jupyter notebook (.ipynb) files, validate changes using these met
 - **Never mention specific config values in code comments or docstrings** - they will get out of sync with actual config and cause confusion
 - Use `config/config.yaml` for all settings (add sensitive values to `.gitignore` or use `config.yaml.local`)
 - Document configuration options in `config/config.yaml.template`
+- The location of data directories may differ depending on configuration — check `config/config.yaml` for the actual paths
 
 ## Output Organization
 - Organize output files by date or topic as appropriate

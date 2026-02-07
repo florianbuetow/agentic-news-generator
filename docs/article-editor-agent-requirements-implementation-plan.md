@@ -381,8 +381,8 @@ from pydantic import BaseModel, ConfigDict
 class ArticleResponse(BaseModel):
     """Generated article content."""
     headline: str
-    alternativeHeadline: str
-    articleBody: str  # Markdown formatted
+    alternative_headline: str
+    article_body: str  # Markdown formatted
     description: str
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -784,7 +784,7 @@ Writer feedback is compiled without additional LLM calls:
 
 ### 6.2 Footnotes & External Evidence Rules
 
-- Footnotes are written in Markdown using `[^n]` references in `articleBody` and a terminal `## Footnotes` section.
+- Footnotes are written in Markdown using `[^n]` references in `article_body` and a terminal `## Footnotes` section.
 - Only citations returned by the pipeline (specialist verdict `citations`) may appear in footnotes. Writers must not invent URLs/DOIs/papers.
 - Evidence-Finding may support:
   - **Contradiction:** Main text must be rewritten/removed to avoid misleading claims. A footnote may summarize the contradiction and provide citations.
@@ -805,7 +805,7 @@ Canonical JSON shape:
 ```json
 {
   "success": true,
-  "article": { "headline": "...", "alternativeHeadline": "...", "articleBody": "...", "description": "..." },
+  "article": { "headline": "...", "alternative_headline": "...", "article_body": "...", "description": "..." },
   "metadata": { "...": "..." },
   "editor_report": { "...": "..." },
   "artifacts_dir": "data/output/article_editor_runs/<channel>/<topic_slug>/<run_id>",

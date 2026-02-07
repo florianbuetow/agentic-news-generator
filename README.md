@@ -135,7 +135,7 @@ See `config/config.yaml.template` for all available configuration options includ
 
 ## Usage
 
-### Run the Main Application
+### Run the Complete Pipeline
 
 ```bash
 just run
@@ -164,7 +164,7 @@ just help
 
 #### Development
 - `just init` - Initialize development environment
-- `just run` - Run the main application
+- `just run` - Run the complete pipeline (download → transcription → topic detection → article generation)
 - `just newspaper-generate` - Generate static newspaper website from articles data
 - `just newspaper-serve` - Run newspaper development server at http://localhost:3000
 - `just test` - Run unit tests

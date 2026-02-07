@@ -212,8 +212,8 @@ stateDiagram-v2
   ```json
   {
     "headline": "...",
-    "alternativeHeadline": "...",
-    "articleBody": "...",
+    "alternative_headline": "...",
+    "article_body": "...",
     "description": "..."
   }
   ```
@@ -234,8 +234,8 @@ erDiagram
 
     ARTICLE_JSON {
         string headline
-        string alternativeHeadline
-        string articleBody "markdown formatted"
+        string alternative_headline
+        string article_body "markdown formatted"
         string description "1-2 sentence teaser"
     }
 
