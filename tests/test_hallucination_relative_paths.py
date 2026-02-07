@@ -249,6 +249,7 @@ paths:
   data_archive_videos_dir: {data_dir / "archive" / "videos"}
   data_logs_dir: {data_dir / "logs"}
   data_output_articles_dir: {data_dir / "output" / "articles"}
+  data_articles_input_dir: {data_dir / "articles" / "input"}
   reports_dir: reports
 
 channels: []
