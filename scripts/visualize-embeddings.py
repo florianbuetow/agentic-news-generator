@@ -12,6 +12,7 @@ Usage:
 import argparse
 import json
 import sys
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -505,7 +506,8 @@ def process_embeddings_file(json_path: Path, output_dir: Path) -> bool:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Extract title from filename (remove _embeddings suffix)
-    title = json_path.stem.replace("_embeddings", "")
+    # Normalize fullwidth Unicode characters (e.g. ： → :) to prevent missing glyph warnings
+    title = unicodedata.normalize("NFKC", json_path.stem.replace("_embeddings", ""))
 
     create_visualization(
         emb_data.embeddings,
