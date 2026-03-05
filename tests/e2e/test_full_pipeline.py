@@ -6,8 +6,6 @@ KB (fact-check) and Perplexity (evidence-finding) to avoid external deps.
 Run with: uv run pytest tests/e2e/ -v -s -m e2e
 """
 
-import json
-import shutil
 from pathlib import Path
 
 import pytest
