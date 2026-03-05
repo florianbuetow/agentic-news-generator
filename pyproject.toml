@@ -118,6 +118,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "e2e: end-to-end tests requiring LM Studio",
+]
 # pytest-timeout: prevent tests from hanging indefinitely
 timeout = 30
 timeout_method = "thread"

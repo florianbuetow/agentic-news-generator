@@ -1,0 +1,17 @@
+{
+    "article_title": "New Advances in Large Language Model Efficiency",
+    "slug": "llm-efficiency-advances",
+    "publish_date": "2026-03-01",
+    "source_text_file": "transcript.txt",
+    "topics_file": "topics.json",
+    "references": [
+        {
+            "type": "video",
+            "title": "LLM Efficiency Breakthrough",
+            "url": "https://www.youtube.com/watch?v=test123",
+            "author": "Test Author",
+            "channel": "Test Channel",
+            "date": "2026-03-01"
+        }
+    ]
+}
