@@ -635,7 +635,7 @@ class Config:
         """
         if not hasattr(self, "_article_generation"):
             raise KeyError("Missing required key 'article_generation' in config file")
-        return self._article_generation.agents.writer_llm.timeout_seconds
+        return self._article_generation.agents.writer.llm.timeout_seconds
 
     def get_article_editor_max_rounds(self) -> int:
         """Get max editor review rounds for article generation."""
