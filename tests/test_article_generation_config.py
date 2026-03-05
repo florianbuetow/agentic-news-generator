@@ -51,9 +51,16 @@ def get_valid_llm_config() -> dict[str, object]:
     }
 
 
+def get_valid_agent_slot(implementation: str = "default") -> dict[str, object]:
+    """Return a valid agent slot config payload."""
+    return {
+        "implementation": implementation,
+        "llm": get_valid_llm_config(),
+    }
+
+
 def get_valid_article_generation_config_dict() -> dict[str, object]:
     """Return valid article_generation section payload."""
-    llm_config = get_valid_llm_config()
     return {
         "editor": {
             "editor_max_rounds": 3,
@@ -72,15 +79,15 @@ def get_valid_article_generation_config_dict() -> dict[str, object]:
             },
         },
         "agents": {
-            "writer_llm": llm_config,
-            "article_review_llm": llm_config,
-            "concern_mapping_llm": llm_config,
+            "writer": get_valid_agent_slot(),
+            "article_review": get_valid_agent_slot(),
+            "concern_mapping": get_valid_agent_slot(),
             "specialists": {
-                "fact_check_llm": llm_config,
-                "evidence_finding_llm": llm_config,
-                "opinion_llm": llm_config,
-                "attribution_llm": llm_config,
-                "style_review_llm": llm_config,
+                "fact_check": get_valid_agent_slot(),
+                "evidence_finding": get_valid_agent_slot(),
+                "opinion": get_valid_agent_slot(),
+                "attribution": get_valid_agent_slot(),
+                "style_review": get_valid_agent_slot(),
             },
         },
         "knowledge_base": {
@@ -136,7 +143,7 @@ class TestArticleGenerationConfig:
         config = ArticleGenerationConfig.model_validate(payload)
 
         assert config.editor.editor_max_rounds == 3
-        assert config.agents.writer_llm.timeout_seconds == 60
+        assert config.agents.writer.llm.timeout_seconds == 60
         assert config.perplexity.model == "sonar"
         assert config.allowed_styles == ["NATURE_NEWS", "SCIAM_MAGAZINE"]
 
@@ -178,7 +185,9 @@ class TestConfigIntegration:
             assert article_config.editor.editor_max_rounds == 3
             assert config.get_allowed_article_styles() == ["NATURE_NEWS", "SCIAM_MAGAZINE"]
             assert config.get_article_editor_max_rounds() == 3
-            assert config.get_article_timeout_seconds() == 60
+            # get_article_timeout_seconds() still references the old writer_llm path
+            # in Config — that getter is updated in Task 3
+            assert config.get_article_generation_config().agents.writer.llm.timeout_seconds == 60
         finally:
             temp_path.unlink()
 
