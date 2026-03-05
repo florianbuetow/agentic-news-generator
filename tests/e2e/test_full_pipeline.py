@@ -1,7 +1,6 @@
 """End-to-end test for the full article generation pipeline.
 
-Requires a running LM Studio instance. Mock specialists are used for
-KB (fact-check) and Perplexity (evidence-finding) to avoid external deps.
+All agents use mock implementations so no LLM is required.
 
 Run with: uv run pytest tests/e2e/ -v -s -m e2e
 """
@@ -21,7 +20,7 @@ pytestmark = pytest.mark.e2e
 
 
 def _build_e2e_config(tmp_path: Path) -> Config:
-    """Build a Config pointing at tmp_path for outputs, real LLM, mock specialists."""
+    """Build a Config pointing at tmp_path for outputs, all mock agents."""
     # Create required directories
     for subdir in [
         "knowledgebase",
@@ -99,15 +98,15 @@ def _build_e2e_config(tmp_path: Path) -> Config:
                 },
             },
             "agents": {
-                "writer": agent_slot(),
-                "article_review": agent_slot(use_llm=specialist_llm),
-                "concern_mapping": agent_slot(use_llm=specialist_llm),
+                "writer": agent_slot("mock"),
+                "article_review": agent_slot("mock", specialist_llm),
+                "concern_mapping": agent_slot("mock", specialist_llm),
                 "specialists": {
                     "fact_check": agent_slot("mock", specialist_llm),
                     "evidence_finding": agent_slot("mock", specialist_llm),
-                    "opinion": agent_slot(use_llm=specialist_llm),
-                    "attribution": agent_slot(use_llm=specialist_llm),
-                    "style_review": agent_slot(use_llm=specialist_llm),
+                    "opinion": agent_slot("mock", specialist_llm),
+                    "attribution": agent_slot("mock", specialist_llm),
+                    "style_review": agent_slot("mock", specialist_llm),
                 },
             },
             "knowledge_base": {

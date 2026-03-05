@@ -3,24 +3,30 @@
 from pathlib import Path
 
 from src.agents.article_generation.article_review.agent import ArticleReviewAgent
+from src.agents.article_generation.article_review.mock_agent import MockArticleReviewAgent
 from src.agents.article_generation.chief_editor.bullet_parser import ArticleReviewBulletParser
 from src.agents.article_generation.chief_editor.institutional_memory import InstitutionalMemoryStore
 from src.agents.article_generation.chief_editor.orchestrator import ChiefEditorOrchestrator
 from src.agents.article_generation.chief_editor.output_handler import OutputHandler
 from src.agents.article_generation.concern_mapping.agent import ConcernMappingAgent
+from src.agents.article_generation.concern_mapping.mock_agent import MockConcernMappingAgent
 from src.agents.article_generation.knowledge_base.indexer import KnowledgeBaseIndexer
 from src.agents.article_generation.knowledge_base.retriever import HaystackKnowledgeBaseRetriever
 from src.agents.article_generation.llm_client import LiteLLMClient
 from src.agents.article_generation.perplexity_client import PerplexityHTTPClient
 from src.agents.article_generation.prompts.loader import PromptLoader
 from src.agents.article_generation.specialists.attribution.agent import AttributionAgent
+from src.agents.article_generation.specialists.attribution.mock_agent import MockAttributionAgent
 from src.agents.article_generation.specialists.evidence_finding.agent import EvidenceFindingAgent
 from src.agents.article_generation.specialists.evidence_finding.mock_agent import MockEvidenceFindingAgent
 from src.agents.article_generation.specialists.fact_check.agent import FactCheckAgent
 from src.agents.article_generation.specialists.fact_check.mock_agent import MockFactCheckAgent
 from src.agents.article_generation.specialists.opinion.agent import OpinionAgent
+from src.agents.article_generation.specialists.opinion.mock_agent import MockOpinionAgent
 from src.agents.article_generation.specialists.style_review.agent import StyleReviewAgent
+from src.agents.article_generation.specialists.style_review.mock_agent import MockStyleReviewAgent
 from src.agents.article_generation.writer.agent import WriterAgent
+from src.agents.article_generation.writer.mock_agent import MockWriterAgent
 from src.config import Config
 
 
@@ -47,42 +53,51 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
     agents_config = article_generation_config.agents
     specialists_config = agents_config.specialists
 
-    # --- Writer (default only) ---
+    # --- Writer (default or mock) ---
     writer_impl = agents_config.writer.implementation
-    if writer_impl != "default":
+    if writer_impl == "mock":
+        writer_agent = MockWriterAgent()
+    elif writer_impl == "default":
+        writer_agent = WriterAgent(
+            llm_config=agents_config.writer.llm,
+            config=config,
+            llm_client=llm_client,
+            prompt_loader=prompt_loader,
+            writer_prompt_file=article_generation_config.editor.prompts.writer_prompt_file,
+            revision_prompt_file=article_generation_config.editor.prompts.revision_prompt_file,
+        )
+    else:
         raise ValueError(f"Unknown writer implementation: '{writer_impl}'")
-    writer_agent = WriterAgent(
-        llm_config=agents_config.writer.llm,
-        config=config,
-        llm_client=llm_client,
-        prompt_loader=prompt_loader,
-        writer_prompt_file=article_generation_config.editor.prompts.writer_prompt_file,
-        revision_prompt_file=article_generation_config.editor.prompts.revision_prompt_file,
-    )
 
-    # --- Article review (default only) ---
+    # --- Article review (default or mock) ---
     article_review_impl = agents_config.article_review.implementation
-    if article_review_impl != "default":
+    if article_review_impl == "mock":
+        article_review_agent = MockArticleReviewAgent()
+    elif article_review_impl == "default":
+        article_review_agent = ArticleReviewAgent(
+            llm_config=agents_config.article_review.llm,
+            config=config,
+            llm_client=llm_client,
+            prompt_loader=prompt_loader,
+            prompt_file=article_generation_config.editor.prompts.article_review_prompt_file,
+        )
+    else:
         raise ValueError(f"Unknown article_review implementation: '{article_review_impl}'")
-    article_review_agent = ArticleReviewAgent(
-        llm_config=agents_config.article_review.llm,
-        config=config,
-        llm_client=llm_client,
-        prompt_loader=prompt_loader,
-        prompt_file=article_generation_config.editor.prompts.article_review_prompt_file,
-    )
 
-    # --- Concern mapping (default only) ---
+    # --- Concern mapping (default or mock) ---
     concern_mapping_impl = agents_config.concern_mapping.implementation
-    if concern_mapping_impl != "default":
+    if concern_mapping_impl == "mock":
+        concern_mapping_agent = MockConcernMappingAgent()
+    elif concern_mapping_impl == "default":
+        concern_mapping_agent = ConcernMappingAgent(
+            llm_config=agents_config.concern_mapping.llm,
+            config=config,
+            llm_client=llm_client,
+            prompt_loader=prompt_loader,
+            prompt_file=article_generation_config.editor.prompts.concern_mapping_prompt_file,
+        )
+    else:
         raise ValueError(f"Unknown concern_mapping implementation: '{concern_mapping_impl}'")
-    concern_mapping_agent = ConcernMappingAgent(
-        llm_config=agents_config.concern_mapping.llm,
-        config=config,
-        llm_client=llm_client,
-        prompt_loader=prompt_loader,
-        prompt_file=article_generation_config.editor.prompts.concern_mapping_prompt_file,
-    )
 
     # --- Fact check (default or mock) ---
     fact_check_impl = specialists_config.fact_check.implementation
@@ -149,44 +164,53 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
     else:
         raise ValueError(f"Unknown evidence_finding implementation: '{evidence_finding_impl}'")
 
-    # --- Opinion (default only) ---
+    # --- Opinion (default or mock) ---
     opinion_impl = specialists_config.opinion.implementation
-    if opinion_impl != "default":
+    if opinion_impl == "mock":
+        opinion_agent = MockOpinionAgent()
+    elif opinion_impl == "default":
+        opinion_agent = OpinionAgent(
+            llm_config=specialists_config.opinion.llm,
+            config=config,
+            llm_client=llm_client,
+            prompt_loader=prompt_loader,
+            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+            prompt_file="opinion.md",
+        )
+    else:
         raise ValueError(f"Unknown opinion implementation: '{opinion_impl}'")
-    opinion_agent = OpinionAgent(
-        llm_config=specialists_config.opinion.llm,
-        config=config,
-        llm_client=llm_client,
-        prompt_loader=prompt_loader,
-        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-        prompt_file="opinion.md",
-    )
 
-    # --- Attribution (default only) ---
+    # --- Attribution (default or mock) ---
     attribution_impl = specialists_config.attribution.implementation
-    if attribution_impl != "default":
+    if attribution_impl == "mock":
+        attribution_agent = MockAttributionAgent()
+    elif attribution_impl == "default":
+        attribution_agent = AttributionAgent(
+            llm_config=specialists_config.attribution.llm,
+            config=config,
+            llm_client=llm_client,
+            prompt_loader=prompt_loader,
+            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+            prompt_file="attribution.md",
+        )
+    else:
         raise ValueError(f"Unknown attribution implementation: '{attribution_impl}'")
-    attribution_agent = AttributionAgent(
-        llm_config=specialists_config.attribution.llm,
-        config=config,
-        llm_client=llm_client,
-        prompt_loader=prompt_loader,
-        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-        prompt_file="attribution.md",
-    )
 
-    # --- Style review (default only) ---
+    # --- Style review (default or mock) ---
     style_review_impl = specialists_config.style_review.implementation
-    if style_review_impl != "default":
+    if style_review_impl == "mock":
+        style_review_agent = MockStyleReviewAgent()
+    elif style_review_impl == "default":
+        style_review_agent = StyleReviewAgent(
+            llm_config=specialists_config.style_review.llm,
+            config=config,
+            llm_client=llm_client,
+            prompt_loader=prompt_loader,
+            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
+            prompt_file="style_review.md",
+        )
+    else:
         raise ValueError(f"Unknown style_review implementation: '{style_review_impl}'")
-    style_review_agent = StyleReviewAgent(
-        llm_config=specialists_config.style_review.llm,
-        config=config,
-        llm_client=llm_client,
-        prompt_loader=prompt_loader,
-        specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-        prompt_file="style_review.md",
-    )
 
     return ChiefEditorOrchestrator(
         config=config,
