@@ -72,7 +72,7 @@ def _run_preflight_check(*, config: Config) -> None:
         ValueError: If no api_base is configured.
     """
     article_config = config.get_article_generation_config()
-    api_base = article_config.agents.writer_llm.api_base
+    api_base = article_config.agents.writer.llm.api_base
     if api_base is None:
         raise ValueError("Writer LLM api_base is not configured — cannot run pre-flight check")
     llm_client = LiteLLMClient()
@@ -100,7 +100,7 @@ def main() -> int:
 
     logger.info(
         "Configuration loaded: writer_model=%s editor_max_rounds=%d default_style=%s",
-        article_config.agents.writer_llm.model,
+        article_config.agents.writer.llm.model,
         article_config.editor.editor_max_rounds,
         article_config.default_style_mode,
     )
