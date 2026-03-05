@@ -207,3 +207,27 @@ class TestConfigIntegration:
                 config.get_article_editor_max_rounds()
         finally:
             temp_path.unlink()
+
+
+class TestAgentConfigWithImplementation:
+    """Tests for agent config with implementation field."""
+
+    def test_agent_config_accepts_implementation_field(self) -> None:
+        """Agent config block must accept implementation + llm sub-key."""
+        from src.config import AgentSlotConfig
+
+        payload = {
+            "implementation": "default",
+            "llm": get_valid_llm_config(),
+        }
+        slot = AgentSlotConfig.model_validate(payload)
+        assert slot.implementation == "default"
+        assert slot.llm.model == "test-model"
+
+    def test_agent_config_implementation_required(self) -> None:
+        """Missing implementation field must fail."""
+        from src.config import AgentSlotConfig
+
+        payload = {"llm": get_valid_llm_config()}
+        with pytest.raises(ValidationError):
+            AgentSlotConfig.model_validate(payload)

@@ -167,25 +167,34 @@ class ArticleGenerationEditorConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class ArticleGenerationSpecialistLLMConfig(BaseModel):
-    """Specialist LLM configurations."""
+class AgentSlotConfig(BaseModel):
+    """Configuration for a single agent slot with swappable implementation."""
 
-    fact_check_llm: LLMConfig = Field(..., description="Fact-check specialist LLM")
-    evidence_finding_llm: LLMConfig = Field(..., description="Evidence-finding specialist LLM")
-    opinion_llm: LLMConfig = Field(..., description="Opinion specialist LLM")
-    attribution_llm: LLMConfig = Field(..., description="Attribution specialist LLM")
-    style_review_llm: LLMConfig = Field(..., description="Style-review specialist LLM")
+    implementation: str = Field(..., min_length=1, description="Agent implementation name (e.g., 'default', 'mock')")
+    llm: LLMConfig = Field(..., description="LLM configuration for this agent")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class ArticleGenerationSpecialistAgentsConfig(BaseModel):
+    """Specialist agent configurations."""
+
+    fact_check: AgentSlotConfig = Field(..., description="Fact-check specialist")
+    evidence_finding: AgentSlotConfig = Field(..., description="Evidence-finding specialist")
+    opinion: AgentSlotConfig = Field(..., description="Opinion specialist")
+    attribution: AgentSlotConfig = Field(..., description="Attribution specialist")
+    style_review: AgentSlotConfig = Field(..., description="Style-review specialist")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
 class ArticleGenerationAgentsConfig(BaseModel):
-    """LLM configuration for all article-generation agents."""
+    """Agent configurations for article generation."""
 
-    writer_llm: LLMConfig = Field(..., description="Writer agent LLM")
-    article_review_llm: LLMConfig = Field(..., description="Article-review agent LLM")
-    concern_mapping_llm: LLMConfig = Field(..., description="Concern-mapping agent LLM")
-    specialists: ArticleGenerationSpecialistLLMConfig = Field(..., description="Specialist agent LLM settings")
+    writer: AgentSlotConfig = Field(..., description="Writer agent")
+    article_review: AgentSlotConfig = Field(..., description="Article-review agent")
+    concern_mapping: AgentSlotConfig = Field(..., description="Concern-mapping agent")
+    specialists: ArticleGenerationSpecialistAgentsConfig = Field(..., description="Specialist agents")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
