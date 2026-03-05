@@ -135,102 +135,118 @@ article_generation:
       specialists_dir: specialists
 
   agents:
-    writer_llm:
-      model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-      api_base: http://127.0.0.1:1234/v1
-      api_key: lm-studio
-      context_window: 262144
-      max_tokens: 4096
-      temperature: 0.7
-      context_window_threshold: 90
-      max_retries: 3
-      retry_delay: 2.0
-      timeout_seconds: 180
+    writer:
+      implementation: default
+      llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 4096
+        temperature: 0.7
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 180
 
-    article_review_llm:
-      model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-      api_base: http://127.0.0.1:1234/v1
-      api_key: lm-studio
-      context_window: 262144
-      max_tokens: 2048
-      temperature: 0.3
-      context_window_threshold: 90
-      max_retries: 3
-      retry_delay: 2.0
-      timeout_seconds: 90
+    article_review:
+      implementation: default
+      llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.3
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 90
 
-    concern_mapping_llm:
-      model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-      api_base: http://127.0.0.1:1234/v1
-      api_key: lm-studio
-      context_window: 262144
-      max_tokens: 2048
-      temperature: 0.3
-      context_window_threshold: 90
-      max_retries: 3
-      retry_delay: 2.0
-      timeout_seconds: 60
+    concern_mapping:
+      implementation: default
+      llm:
+        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        api_base: http://127.0.0.1:1234/v1
+        api_key: lm-studio
+        context_window: 262144
+        max_tokens: 2048
+        temperature: 0.3
+        context_window_threshold: 90
+        max_retries: 3
+        retry_delay: 2.0
+        timeout_seconds: 60
 
     specialists:
-      fact_check_llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-        api_base: http://127.0.0.1:1234/v1
-        api_key: lm-studio
-        context_window: 262144
-        max_tokens: 2048
-        temperature: 0.2
-        context_window_threshold: 90
-        max_retries: 3
-        retry_delay: 2.0
-        timeout_seconds: 60
+      fact_check:
+        implementation: default
+        llm:
+          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          api_base: http://127.0.0.1:1234/v1
+          api_key: lm-studio
+          context_window: 262144
+          max_tokens: 2048
+          temperature: 0.2
+          context_window_threshold: 90
+          max_retries: 3
+          retry_delay: 2.0
+          timeout_seconds: 60
 
-      evidence_finding_llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-        api_base: http://127.0.0.1:1234/v1
-        api_key: lm-studio
-        context_window: 262144
-        max_tokens: 2048
-        temperature: 0.2
-        context_window_threshold: 90
-        max_retries: 3
-        retry_delay: 2.0
-        timeout_seconds: 60
+      evidence_finding:
+        implementation: default
+        llm:
+          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          api_base: http://127.0.0.1:1234/v1
+          api_key: lm-studio
+          context_window: 262144
+          max_tokens: 2048
+          temperature: 0.2
+          context_window_threshold: 90
+          max_retries: 3
+          retry_delay: 2.0
+          timeout_seconds: 60
 
-      opinion_llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-        api_base: http://127.0.0.1:1234/v1
-        api_key: lm-studio
-        context_window: 262144
-        max_tokens: 2048
-        temperature: 0.3
-        context_window_threshold: 90
-        max_retries: 3
-        retry_delay: 2.0
-        timeout_seconds: 60
+      opinion:
+        implementation: default
+        llm:
+          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          api_base: http://127.0.0.1:1234/v1
+          api_key: lm-studio
+          context_window: 262144
+          max_tokens: 2048
+          temperature: 0.3
+          context_window_threshold: 90
+          max_retries: 3
+          retry_delay: 2.0
+          timeout_seconds: 60
 
-      attribution_llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-        api_base: http://127.0.0.1:1234/v1
-        api_key: lm-studio
-        context_window: 262144
-        max_tokens: 2048
-        temperature: 0.2
-        context_window_threshold: 90
-        max_retries: 3
-        retry_delay: 2.0
-        timeout_seconds: 60
+      attribution:
+        implementation: default
+        llm:
+          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          api_base: http://127.0.0.1:1234/v1
+          api_key: lm-studio
+          context_window: 262144
+          max_tokens: 2048
+          temperature: 0.2
+          context_window_threshold: 90
+          max_retries: 3
+          retry_delay: 2.0
+          timeout_seconds: 60
 
-      style_review_llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
-        api_base: http://127.0.0.1:1234/v1
-        api_key: lm-studio
-        context_window: 262144
-        max_tokens: 2048
-        temperature: 0.3
-        context_window_threshold: 90
-        max_retries: 3
-        retry_delay: 2.0
-        timeout_seconds: 60
+      style_review:
+        implementation: default
+        llm:
+          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          api_base: http://127.0.0.1:1234/v1
+          api_key: lm-studio
+          context_window: 262144
+          max_tokens: 2048
+          temperature: 0.3
+          context_window_threshold: 90
+          max_retries: 3
+          retry_delay: 2.0
+          timeout_seconds: 60
 
   knowledge_base:
     data_dir: ./data/knowledgebase
