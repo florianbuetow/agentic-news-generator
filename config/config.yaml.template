@@ -78,6 +78,9 @@ transcription:
   # Metadata subdirectory names
   metadata_video_subdir: "video"  # Subdirectory for video metadata (.info.json)
 
+  # Duration filter
+  min_duration: 60  # Minimum video duration in seconds (shorter videos are skipped)
+
   # Output verbosity
   verbose: false  # Set to true for detailed output
 
@@ -138,6 +141,67 @@ topic_detection:
     context_window_threshold: 90
     max_retries: 3
     retry_delay: 2.0
+
+  # Hierarchical segmentation (TreeSeg-style) settings
+  hierarchical_segmentation:
+    enabled: true
+    method: treeseg_divisive_sse
+    context_window_entries: 8
+    max_depth: 4
+    min_leaf_entries: 12
+    min_leaf_seconds: 45.0
+    min_gain: 0.02
+
+  # Deterministic taxonomy mapping settings
+  taxonomy:
+    enabled: true
+    taxonomy_name: acm_ccs_2012
+    acm_ccs_2012_xml_path: input/taxonomies/acm_ccs2012.xml
+    cache_dir: input/taxonomies/cache
+    top_k_per_node: 3
+    min_similarity: 0.30
+
+  # Keyphrase extraction settings
+  keyphrases:
+    tfidf:
+      enabled: true
+      top_k_per_node: 12
+      ngram_range_min: 1
+      ngram_range_max: 3
+      min_df: 2
+      max_df: 0.9
+      stop_words: english
+      max_features: 20000
+      lowercase: true
+    yake:
+      enabled: true
+      top_k_per_node: 12
+      max_ngram_size: 3
+      deduplication_threshold: 0.9
+      deduplication_algo: seqm
+      window_size: 1
+    keybert:
+      enabled: true
+      top_k_per_node: 12
+      keyphrase_ngram_range_min: 1
+      keyphrase_ngram_range_max: 3
+      use_mmr: true
+      mmr_diversity: 0.5
+      stop_words: english
+
+  # LLM topic labeling settings
+  llm_label:
+    enabled: true
+    llm:
+      model: google/gemma-3-1b
+      api_base: http://127.0.0.1:1234/v1
+      api_key: lm-studio
+      context_window: 32768
+      max_tokens: 32768
+      temperature: 0.3
+      context_window_threshold: 90
+      max_retries: 3
+      retry_delay: 2.0
 
   # Output settings
   output_dir: output/topics
