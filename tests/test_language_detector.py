@@ -97,7 +97,7 @@ class TestLanguageDetectorWithModel:
         model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
 
         if not model_path.exists():
-            pytest.skip("FastText model not downloaded. Run 'just init' first.")
+            pytest.fail("FastText model not downloaded. Run 'just init' first.")
 
         return LanguageDetector(model_path=model_path)
 

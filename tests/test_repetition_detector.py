@@ -5,8 +5,8 @@ from pathlib import Path
 from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 
-# Load config for tests
-CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
+# Load config for tests (use template; config.yaml is gitignored)
+CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.yaml.template"
 CONFIG = Config(CONFIG_PATH)
 
 
