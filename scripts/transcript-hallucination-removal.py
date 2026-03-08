@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
+from src.processing.srt_converter import srt_to_plain_text
 from src.util.fs_util import FSUtil
 
 # Whitespace normalization pattern (same as RepetitionDetector)
@@ -357,11 +358,16 @@ def process_srt_with_hallucinations(
     cleaned_srt_content = srt.compose(subtitles)
     FSUtil.write_text_file(output_file, cleaned_srt_content, create_parents=True)
 
+    # Write plain text version (no timestamps)
+    txt_output_file = output_file.with_suffix(".txt")
+    plain_text = srt_to_plain_text(cleaned_srt_content)
+    FSUtil.write_text_file(txt_output_file, plain_text, create_parents=True)
+
     return True
 
 
 def copy_srt_unchanged(srt_file: Path, output_file: Path) -> None:
-    """Copy SRT file unchanged to output directory.
+    """Copy SRT file unchanged to output directory and generate plain text version.
 
     Args:
         srt_file: Input SRT file path.
@@ -369,6 +375,11 @@ def copy_srt_unchanged(srt_file: Path, output_file: Path) -> None:
     """
     content = FSUtil.read_text_file(srt_file)
     FSUtil.write_text_file(output_file, content, create_parents=True)
+
+    # Write plain text version (no timestamps)
+    txt_output_file = output_file.with_suffix(".txt")
+    plain_text = srt_to_plain_text(content)
+    FSUtil.write_text_file(txt_output_file, plain_text, create_parents=True)
 
 
 if __name__ == "__main__":
