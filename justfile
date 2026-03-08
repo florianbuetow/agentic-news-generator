@@ -1,9 +1,44 @@
+# =============================================================================
+# Justfile Rules (follow these when editing justfile):
+#
+# 1. Use printf (not echo) to print colors — some terminals won't render
+#    colors with echo.
+#
+# 2. Always add an empty `@echo ""` line before and after each target's
+#    command block.
+#
+# 3. Always add new targets to the help section and update it when targets
+#    are added, modified or removed.
+#
+# 4. Target ordering in help (and in this file) matters:
+#    - Setup targets first (init, setup, install, etc.)
+#    - Start/stop/run targets next
+#    - Code generation / data tooling targets next
+#    - Checks, linting, and tests next (ordered fastest to slowest)
+#    Group related targets together and separate groups with an empty
+#    `@echo ""` line in the help output.
+#
+# 5. Composite targets (e.g. ci) that call multiple sub-targets must fail
+#    fast: exit 1 on the first error. Never skip over errors or warnings.
+#    Use `set -e` or `&&` chaining to ensure immediate abort with the
+#    appropriate error message.
+#
+# 6. Every target must end with a clear short status message:
+#    - On success: green (\033[32m) message confirming completion.
+#      E.g. printf "\033[32m✓ init completed successfully\033[0m\n"
+#    - On failure: red (\033[31m) message indicating what failed, then exit 1.
+#      E.g. printf "\033[31m✗ ci failed: tests exited with errors\033[0m\n"
+# 7. Targets must be shown in groups separated by empty newlines in the help section.
+#    - init/destory/clean/help on top, ci and other tests on the bottom, between other groups
+# =============================================================================
+
+
 # Load environment variables from .env file
 set dotenv-load := true
 
 # Default recipe: show available commands
 _default:
-    @just --list
+    @just help
 
 # Show help information
 help:
@@ -12,7 +47,6 @@ help:
     @echo ""
     @printf "\033[0;34m=== agentic-news-generator ===\033[0m\n"
     @echo ""
-    @echo "Available commands:"
     @just --list
     @echo ""
 
@@ -200,6 +234,13 @@ topics-extract:
     @uv run python scripts/extract-topics.py
     @echo ""
 
+# Build deterministic hierarchical topic trees (TreeSeg-style)
+topics-tree:
+    @echo ""
+    @printf "\033[0;34m=== Building Hierarchical Topic Trees ===\033[0m\n"
+    @uv run python scripts/topic-tree.py
+    @echo ""
+
 # Generate visualizations from embeddings (Step 4)
 topics-visualize:
     @echo ""
@@ -207,19 +248,29 @@ topics-visualize:
     @uv run python scripts/visualize-embeddings.py
     @echo ""
 
+# Export topic segments to mini-rag format (.txt + .json pairs). Requires: --export-dir <path> [--file <path>] [--force]
+export-to-minirag *ARGS:
+    @echo ""
+    @printf "\033[0;34m=== Exporting Topics to Mini-RAG Format ===\033[0m\n"
+    @uv run python scripts/export-to-minirag.py {{ ARGS }}
+    @echo ""
+
 # Run complete topic detection pipeline (all 4 steps)
 topics-all:
     @echo ""
     @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
-    @just topics-embed
-    @just topics-boundaries
-    @just topics-extract
-    @just topics-visualize
+    @just topics-tree
     @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 
-# Show processing status of downloads
+# Check if LM Studio is running and required models are loaded
 status:
+    @echo ""
+    @uv run scripts/lmstudio_status.py
+    @echo ""
+
+# Show processing status of downloads
+stats:
     @echo ""
     @uv run scripts/status.py
     @echo ""
