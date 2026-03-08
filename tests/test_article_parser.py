@@ -12,7 +12,7 @@ from src.processing.article_parser import ArticleParser
 @pytest.fixture
 def article_parser() -> ArticleParser:
     """Create ArticleParser instance with test configuration."""
-    config_path = Path("config/config.yaml")
+    config_path = Path("config/config.yaml.template")
     config = Config(config_path)
     compiler_config = config.get_article_compiler_config()
     return ArticleParser(compiler_config)
