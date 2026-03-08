@@ -1,17 +1,65 @@
 # Topic Detection Pipeline
 
-This document explains the embedding-based topic segmentation approach used to automatically detect topic boundaries in transcripts.
+This document explains how this repo segments transcripts into topic sections.
 
 ## Overview
 
-The pipeline segments continuous text (e.g., podcast transcripts) into topically coherent sections without requiring any labeled training data. It works by:
+### Recommended: deterministic hierarchical topic trees
 
-1. Sliding a window across the text
-2. Embedding each window into a semantic vector
-3. Measuring similarity between adjacent windows
-4. Detecting boundaries where similarity drops significantly
+The recommended pipeline builds a **deterministic, per-transcript topic tree** (coarse → fine) and avoids non-deterministic LLM topic strings:
 
-## Pipeline Architecture
+- **Atomic unit:** SRT entries (timestamps stay stable)
+- **Hierarchical segmentation:** TreeSeg-style divisive splitting on an embedding sequence (binary tree)
+- **Deterministic labeling:** taxonomy multi-labels (**ACM CCS 2012**) + TF‑IDF keyphrases (both with scores)
+
+Outputs per transcript:
+- `*_topic_tree.json` under `data/output/topics/...`
+- (Optional) mini-rag export of **leaf nodes** as `.txt + .json` pairs
+
+### Legacy: flat boundary detection + LLM topic strings
+
+The older pipeline segments continuous text into flat sections and then uses an LLM to generate topic strings. It is kept for comparison and may be removed.
+
+## Prerequisites (ACM CCS 2012 taxonomy)
+
+If taxonomy labeling is enabled in `config/config.yaml`, you must download the ACM CCS 2012 SKOS XML and place it at:
+
+- `data/input/taxonomies/acm_ccs2012.xml` (gitignored)
+
+Official source:
+- <https://dl.acm.org/pb-assets/dl_ccs/acm_ccs2012-1626988337597.xml>
+
+The pipeline will also create an embedding cache (gitignored) at:
+- `data/input/taxonomies/cache/acm_ccs_2012.<embedding_model>.json`
+
+## Running the Pipeline
+
+### Hierarchical topic trees (recommended)
+
+| Target | Script | Behavior |
+|--------|--------|----------|
+| `just topics-tree` | `scripts/topic-tree.py` | Builds `*_topic_tree.json` deterministically. Skips existing files unless `--force`. |
+| `just topics-all` | Runs `topics-tree` | Current “default” topic detection pipeline. |
+
+### Export to mini-rag (leaf nodes)
+
+This exports **leaf nodes** from `*_topic_tree.json` files into `.txt + .json` pairs:
+
+```bash
+just export-to-minirag -- --export-dir /path/to/mini-rag/data/input/knowledgebase/txt
+```
+
+### Legacy pipeline (flat segmentation + LLM topics)
+
+| Target | Script | Behavior |
+|--------|--------|----------|
+| `just topics-embed` | `scripts/generate-embeddings.py` | Creates `_embeddings.json` files. Skips existing files (incremental). |
+| `just topics-boundaries` | `scripts/detect-boundaries.py` | Creates `_segmentation.json` files. Overwrites existing files (fast operation). |
+| `just topics-extract` | `scripts/extract-topics.py` | Extracts topics from segments using an LLM. |
+
+## Legacy Pipeline Architecture (flat segmentation)
+
+> Note: The remainder of this document section describes the legacy flat segmentation pipeline. The recommended pipeline is `just topics-tree`.
 
 ```
 ┌─────────────┐    ┌───────────────┐    ┌──────────────────────┐
@@ -46,22 +94,6 @@ The pipeline segments continuous text (e.g., podcast transcripts) into topically
                                         │   Final Segments     │
                                         └──────────────────────┘
 ```
-
-## Running the Pipeline
-
-The pipeline is executed in three steps via justfile targets:
-
-| Target | Script | Behavior |
-|--------|--------|----------|
-| `just topics-embed` | `scripts/generate-embeddings.py` | Creates `_embeddings.json` files. **Skips existing files** (incremental). |
-| `just topics-boundaries` | `scripts/detect-boundaries.py` | Creates `_segmentation.json` files. **Overwrites existing files** (fast operation). |
-| `just topics-extract` | `scripts/extract-topics.py` | Extracts topics from segments using LLM. |
-| `just topics-all` | Runs all three steps | Complete pipeline execution. |
-
-**Incremental Processing:**
-- `topics-embed` is the slowest step (requires embedding model inference). It skips files that already exist, so you can safely re-run it to process only new transcripts.
-- `topics-boundaries` is fast (pure computation on pre-computed embeddings). It always regenerates all segmentation files, allowing you to experiment with different threshold parameters without re-computing embeddings.
-- `topics-extract` uses LLM inference to extract topic titles and summaries from each segment.
 
 ## Stage 1: Tokenization
 
