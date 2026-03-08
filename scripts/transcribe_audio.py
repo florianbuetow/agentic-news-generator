@@ -156,6 +156,7 @@ def process_single_wav_file(  # noqa: C901
     hallucination_silence_threshold: float,
     compression_ratio_threshold: float,
     sleep_between_files: int,
+    min_duration: int,
     verbose: bool,
     progress: ProgressTracker | None = None,
 ) -> tuple[bool, int]:
@@ -188,6 +189,11 @@ def process_single_wav_file(  # noqa: C901
             try:
                 with open(metadata_file, encoding="utf-8") as f:
                     metadata = json.load(f)
+
+                duration = metadata.get("duration")
+                if duration is not None and duration < min_duration:
+                    print(f"    ⏭️  Skipping: {base_name}.wav (duration {duration}s < {min_duration}s minimum)")
+                    return (True, 0)
 
                 title = metadata.get("title", "")
                 description = metadata.get("description", "")[:description_max_length]
@@ -283,6 +289,7 @@ def main() -> int:  # noqa: C901
     use_youtube_metadata = config.getTranscriptionUseYoutubeMetadata()
     description_max_length = config.getTranscriptionDescriptionMaxLength()
     sleep_between_files = config.getTranscriptionSleepBetweenFiles()
+    min_duration = config.getTranscriptionMinDuration()
     metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
     verbose = config.getTranscriptionVerbose()
 
@@ -409,6 +416,7 @@ def main() -> int:  # noqa: C901
                     hallucination_silence_threshold,
                     compression_ratio_threshold,
                     sleep_between_files,
+                    min_duration,
                     verbose,
                     progress=progress if needs_transcription else None,
                 )
