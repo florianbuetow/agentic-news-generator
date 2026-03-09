@@ -3,6 +3,7 @@
 from src.agents.article_generation.article_review.mock_agent import MockArticleReviewAgent
 from src.agents.article_generation.concern_mapping.mock_agent import MockConcernMappingAgent
 from src.agents.article_generation.models import (
+    AgentResult,
     ArticleResponse,
     Concern,
     Verdict,
@@ -41,13 +42,16 @@ class TestMockFactCheckAgent:
         agent = MockFactCheckAgent()
         concern = Concern(concern_id=1, excerpt="some claim", review_note="review note")
         article = _sample_article()
-        verdict = agent.evaluate(
+        agent_result = agent.evaluate(
             concern=concern,
             article=article,
             source_text="source",
             source_metadata={"source_file": "f", "topic_slug": "s"},
             style_requirements="SCIAM_MAGAZINE",
         )
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        verdict = agent_result.output
         assert isinstance(verdict, Verdict)
         assert verdict.concern_id == 1
         assert verdict.misleading is False
@@ -58,12 +62,12 @@ class TestMockFactCheckAgent:
         agent = MockFactCheckAgent()
         concern = Concern(concern_id=42, excerpt="claim", review_note="note")
         article = _sample_article()
-        verdict = agent.evaluate(
+        agent_result = agent.evaluate(
             concern=concern, article=article, source_text="s",
             source_metadata={"source_file": "f", "topic_slug": "s"},
             style_requirements="SCIAM_MAGAZINE",
         )
-        assert verdict.concern_id == 42
+        assert agent_result.output.concern_id == 42
 
 
 class TestMockEvidenceFindingAgent:
@@ -74,13 +78,16 @@ class TestMockEvidenceFindingAgent:
         agent = MockEvidenceFindingAgent()
         concern = Concern(concern_id=3, excerpt="some claim", review_note="review note")
         article = _sample_article()
-        verdict = agent.evaluate(
+        agent_result = agent.evaluate(
             concern=concern,
             article=article,
             source_text="source",
             source_metadata={"source_file": "f", "topic_slug": "s"},
             style_requirements="SCIAM_MAGAZINE",
         )
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        verdict = agent_result.output
         assert isinstance(verdict, Verdict)
         assert verdict.concern_id == 3
         assert verdict.misleading is False
@@ -92,12 +99,15 @@ class TestMockWriterAgent:
 
     def test_generate_returns_article_response(self) -> None:
         agent = MockWriterAgent()
-        result = agent.generate(
+        agent_result = agent.generate(
             source_text="source",
             source_metadata={"key": "value"},
             style_mode="SCIAM_MAGAZINE",
             reader_preference="",
         )
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        result = agent_result.output
         assert isinstance(result, ArticleResponse)
         assert result.headline != ""
         assert result.article_body != ""
@@ -113,7 +123,10 @@ class TestMockWriterAgent:
             todo_list=[],
             verdicts=[],
         )
-        result = agent.revise(context="some context", feedback=feedback)
+        agent_result = agent.revise(context="some context", feedback=feedback)
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        result = agent_result.output
         assert isinstance(result, ArticleResponse)
         assert result.headline != ""
 
@@ -123,12 +136,14 @@ class TestMockArticleReviewAgent:
 
     def test_review_returns_empty_bullets(self) -> None:
         agent = MockArticleReviewAgent()
-        result = agent.review(
+        agent_result = agent.review(
             article=_sample_article(),
             source_text="source",
             source_metadata={"key": "value"},
         )
-        assert result.markdown_bullets == ""
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        assert agent_result.output.markdown_bullets == ""
 
 
 class TestMockConcernMappingAgent:
@@ -136,13 +151,15 @@ class TestMockConcernMappingAgent:
 
     def test_map_concerns_returns_empty_mappings(self) -> None:
         agent = MockConcernMappingAgent()
-        result = agent.map_concerns(
+        agent_result = agent.map_concerns(
             style_requirements="SCIAM_MAGAZINE",
             source_text="source",
             generated_article_json="{}",
             concerns=[_sample_concern()],
         )
-        assert result.mappings == []
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        assert agent_result.output.mappings == []
 
 
 class TestMockOpinionAgent:
@@ -151,16 +168,18 @@ class TestMockOpinionAgent:
     def test_evaluate_returns_keep_verdict(self) -> None:
         agent = MockOpinionAgent()
         concern = _sample_concern(concern_id=7)
-        result = agent.evaluate(
+        agent_result = agent.evaluate(
             concern=concern,
             article=_sample_article(),
             source_text="source",
             source_metadata={},
             style_requirements="SCIAM_MAGAZINE",
         )
-        assert result.concern_id == 7
-        assert result.status == "KEEP"
-        assert result.misleading is False
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        assert agent_result.output.concern_id == 7
+        assert agent_result.output.status == "KEEP"
+        assert agent_result.output.misleading is False
 
 
 class TestMockAttributionAgent:
@@ -169,16 +188,18 @@ class TestMockAttributionAgent:
     def test_evaluate_returns_keep_verdict(self) -> None:
         agent = MockAttributionAgent()
         concern = _sample_concern(concern_id=3)
-        result = agent.evaluate(
+        agent_result = agent.evaluate(
             concern=concern,
             article=_sample_article(),
             source_text="source",
             source_metadata={},
             style_requirements="SCIAM_MAGAZINE",
         )
-        assert result.concern_id == 3
-        assert result.status == "KEEP"
-        assert result.misleading is False
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        assert agent_result.output.concern_id == 3
+        assert agent_result.output.status == "KEEP"
+        assert agent_result.output.misleading is False
 
 
 class TestMockStyleReviewAgent:
@@ -187,13 +208,15 @@ class TestMockStyleReviewAgent:
     def test_evaluate_returns_keep_verdict(self) -> None:
         agent = MockStyleReviewAgent()
         concern = _sample_concern(concern_id=5)
-        result = agent.evaluate(
+        agent_result = agent.evaluate(
             concern=concern,
             article=_sample_article(),
             source_text="source",
             source_metadata={},
             style_requirements="SCIAM_MAGAZINE",
         )
-        assert result.concern_id == 5
-        assert result.status == "KEEP"
-        assert result.misleading is False
+        assert isinstance(agent_result, AgentResult)
+        assert agent_result.prompt == "[mock]"
+        assert agent_result.output.concern_id == 5
+        assert agent_result.output.status == "KEEP"
+        assert agent_result.output.misleading is False

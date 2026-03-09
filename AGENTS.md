@@ -92,6 +92,9 @@ When modifying Jupyter notebook (.ipynb) files, validate changes using these met
   - Source information (if applicable)
 
 ## Error Handling
+- **NEVER swallow errors** — every exception must be either re-raised or logged and propagated
+- No bare `except:` or `except Exception: pass` — always handle errors explicitly
+- No silent fallbacks that hide failures from the caller
 - Scripts should continue processing other items even if one fails
 - Failed/invalid outputs must be logged appropriately
 - Scripts should track and report success/failure counts

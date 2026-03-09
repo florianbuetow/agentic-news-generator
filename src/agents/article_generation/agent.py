@@ -47,14 +47,13 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
     output_handler = OutputHandler(
         final_articles_dir=Path(article_generation_config.editor.output.final_articles_dir),
         run_artifacts_dir=Path(article_generation_config.editor.output.run_artifacts_dir),
-        save_intermediate_results=article_generation_config.editor.output.save_intermediate_results,
     )
 
     agents_config = article_generation_config.agents
     specialists_config = agents_config.specialists
 
     # --- Writer (default or mock) ---
-    writer_impl = agents_config.writer.implementation
+    writer_impl = agents_config.writer.agent_name
     if writer_impl == "mock":
         writer_agent = MockWriterAgent()
     elif writer_impl == "default":
@@ -67,10 +66,10 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             revision_prompt_file=article_generation_config.editor.prompts.revision_prompt_file,
         )
     else:
-        raise ValueError(f"Unknown writer implementation: '{writer_impl}'")
+        raise ValueError(f"Unknown writer agent_name: '{writer_impl}'")
 
     # --- Article review (default or mock) ---
-    article_review_impl = agents_config.article_review.implementation
+    article_review_impl = agents_config.article_review.agent_name
     if article_review_impl == "mock":
         article_review_agent = MockArticleReviewAgent()
     elif article_review_impl == "default":
@@ -82,10 +81,10 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             prompt_file=article_generation_config.editor.prompts.article_review_prompt_file,
         )
     else:
-        raise ValueError(f"Unknown article_review implementation: '{article_review_impl}'")
+        raise ValueError(f"Unknown article_review agent_name: '{article_review_impl}'")
 
     # --- Concern mapping (default or mock) ---
-    concern_mapping_impl = agents_config.concern_mapping.implementation
+    concern_mapping_impl = agents_config.concern_mapping.agent_name
     if concern_mapping_impl == "mock":
         concern_mapping_agent = MockConcernMappingAgent()
     elif concern_mapping_impl == "default":
@@ -97,10 +96,10 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             prompt_file=article_generation_config.editor.prompts.concern_mapping_prompt_file,
         )
     else:
-        raise ValueError(f"Unknown concern_mapping implementation: '{concern_mapping_impl}'")
+        raise ValueError(f"Unknown concern_mapping agent_name: '{concern_mapping_impl}'")
 
     # --- Fact check (default or mock) ---
-    fact_check_impl = specialists_config.fact_check.implementation
+    fact_check_impl = specialists_config.fact_check.agent_name
     if fact_check_impl == "mock":
         fact_check_agent = MockFactCheckAgent()
     elif fact_check_impl == "default":
@@ -132,17 +131,17 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             llm_client=llm_client,
             prompt_loader=prompt_loader,
             specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file="fact_check.md",
+            prompt_file=article_generation_config.editor.prompts.fact_check_prompt_file,
             knowledge_base_retriever=kb_retriever,
             institutional_memory=institutional_memory,
             kb_index_version=kb_index_version,
             kb_timeout_seconds=kb_config.timeout_seconds,
         )
     else:
-        raise ValueError(f"Unknown fact_check implementation: '{fact_check_impl}'")
+        raise ValueError(f"Unknown fact_check agent_name: '{fact_check_impl}'")
 
     # --- Evidence finding (default or mock) ---
-    evidence_finding_impl = specialists_config.evidence_finding.implementation
+    evidence_finding_impl = specialists_config.evidence_finding.agent_name
     if evidence_finding_impl == "mock":
         evidence_finding_agent = MockEvidenceFindingAgent()
     elif evidence_finding_impl == "default":
@@ -156,16 +155,16 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             llm_client=llm_client,
             prompt_loader=prompt_loader,
             specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file="evidence_finding.md",
+            prompt_file=article_generation_config.editor.prompts.evidence_finding_prompt_file,
             perplexity_client=perplexity_client,
             perplexity_model=article_generation_config.perplexity.model,
             institutional_memory=institutional_memory,
         )
     else:
-        raise ValueError(f"Unknown evidence_finding implementation: '{evidence_finding_impl}'")
+        raise ValueError(f"Unknown evidence_finding agent_name: '{evidence_finding_impl}'")
 
     # --- Opinion (default or mock) ---
-    opinion_impl = specialists_config.opinion.implementation
+    opinion_impl = specialists_config.opinion.agent_name
     if opinion_impl == "mock":
         opinion_agent = MockOpinionAgent()
     elif opinion_impl == "default":
@@ -175,13 +174,13 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             llm_client=llm_client,
             prompt_loader=prompt_loader,
             specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file="opinion.md",
+            prompt_file=article_generation_config.editor.prompts.opinion_prompt_file,
         )
     else:
-        raise ValueError(f"Unknown opinion implementation: '{opinion_impl}'")
+        raise ValueError(f"Unknown opinion agent_name: '{opinion_impl}'")
 
     # --- Attribution (default or mock) ---
-    attribution_impl = specialists_config.attribution.implementation
+    attribution_impl = specialists_config.attribution.agent_name
     if attribution_impl == "mock":
         attribution_agent = MockAttributionAgent()
     elif attribution_impl == "default":
@@ -191,13 +190,13 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             llm_client=llm_client,
             prompt_loader=prompt_loader,
             specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file="attribution.md",
+            prompt_file=article_generation_config.editor.prompts.attribution_prompt_file,
         )
     else:
-        raise ValueError(f"Unknown attribution implementation: '{attribution_impl}'")
+        raise ValueError(f"Unknown attribution agent_name: '{attribution_impl}'")
 
     # --- Style review (default or mock) ---
-    style_review_impl = specialists_config.style_review.implementation
+    style_review_impl = specialists_config.style_review.agent_name
     if style_review_impl == "mock":
         style_review_agent = MockStyleReviewAgent()
     elif style_review_impl == "default":
@@ -207,10 +206,10 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             llm_client=llm_client,
             prompt_loader=prompt_loader,
             specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file="style_review.md",
+            prompt_file=article_generation_config.editor.prompts.style_review_prompt_file,
         )
     else:
-        raise ValueError(f"Unknown style_review implementation: '{style_review_impl}'")
+        raise ValueError(f"Unknown style_review agent_name: '{style_review_impl}'")
 
     return ChiefEditorOrchestrator(
         config=config,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from src.agents.article_generation.models import Concern, ConcernMappingResult
+from src.agents.article_generation.models import AgentResult, Concern, ConcernMappingResult
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class MockConcernMappingAgent:
         source_text: str,
         generated_article_json: str,
         concerns: list[Concern],
-    ) -> ConcernMappingResult:
+    ) -> AgentResult[ConcernMappingResult]:
         """Return empty mapping result."""
         logger.info("MockConcernMappingAgent: returning empty mappings")
-        return ConcernMappingResult(mappings=[])
+        return AgentResult(prompt="[mock]", output=ConcernMappingResult(mappings=[]))

@@ -139,7 +139,6 @@ class ArticleGenerationOutputConfig(BaseModel):
 
     final_articles_dir: str = Field(..., min_length=1, description="Canonical output root directory")
     run_artifacts_dir: str = Field(..., min_length=1, description="Run artifacts root directory")
-    save_intermediate_results: bool = Field(..., description="Whether to persist iteration artifacts")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -153,6 +152,11 @@ class ArticleGenerationPromptConfig(BaseModel):
     article_review_prompt_file: str = Field(..., min_length=1, description="Article-review prompt filename")
     concern_mapping_prompt_file: str = Field(..., min_length=1, description="Concern-mapping prompt filename")
     specialists_dir: str = Field(..., min_length=1, description="Specialists prompt subdirectory")
+    fact_check_prompt_file: str = Field(..., min_length=1, description="Fact-check specialist prompt filename")
+    evidence_finding_prompt_file: str = Field(..., min_length=1, description="Evidence-finding specialist prompt filename")
+    opinion_prompt_file: str = Field(..., min_length=1, description="Opinion specialist prompt filename")
+    attribution_prompt_file: str = Field(..., min_length=1, description="Attribution specialist prompt filename")
+    style_review_prompt_file: str = Field(..., min_length=1, description="Style-review specialist prompt filename")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -168,9 +172,9 @@ class ArticleGenerationEditorConfig(BaseModel):
 
 
 class AgentSlotConfig(BaseModel):
-    """Configuration for a single agent slot with swappable implementation."""
+    """Configuration for a single agent slot with swappable agent_name."""
 
-    implementation: str = Field(..., min_length=1, description="Agent implementation name (e.g., 'default', 'mock')")
+    agent_name: str = Field(..., min_length=1, description="Agent class to use (e.g., 'default', 'mock')")
     llm: LLMConfig = Field(..., description="LLM configuration for this agent")
 
     model_config = ConfigDict(frozen=True, extra="forbid")

@@ -1,4 +1,4 @@
-"""Tests for article preprocessor script functions."""
+"""Tests for article input data preparation script functions."""
 
 import importlib.util
 import json
@@ -7,20 +7,20 @@ from pathlib import Path
 
 import pytest
 
-# Import the preprocessor script as a module
-script_path = Path(__file__).parent.parent / "scripts" / "preprocess-articles.py"
-spec = importlib.util.spec_from_file_location("preprocess_articles", script_path)
+# Import the preparation script as a module
+script_path = Path(__file__).parent.parent / "scripts" / "prepare-article-input-data.py"
+spec = importlib.util.spec_from_file_location("prepare_article_input_data", script_path)
 if spec is None or spec.loader is None:
     raise ImportError(f"Could not load script: {script_path}")
-preprocess_module = importlib.util.module_from_spec(spec)
-sys.modules["preprocess_articles"] = preprocess_module
-spec.loader.exec_module(preprocess_module)
+prepare_module = importlib.util.module_from_spec(spec)
+sys.modules["prepare_article_input_data"] = prepare_module
+spec.loader.exec_module(prepare_module)
 
-find_transcript = preprocess_module.find_transcript
-find_metadata = preprocess_module.find_metadata
-find_topics = preprocess_module.find_topics
-extract_metadata_fields = preprocess_module.extract_metadata_fields
-create_manifest = preprocess_module.create_manifest
+find_transcript = prepare_module.find_transcript
+find_metadata = prepare_module.find_metadata
+find_topics = prepare_module.find_topics
+extract_metadata_fields = prepare_module.extract_metadata_fields
+create_manifest = prepare_module.create_manifest
 
 
 def _write_json(path: Path, data: object) -> None:
@@ -110,22 +110,13 @@ class TestFindMetadata:
 
 
 class TestFindTopics:
-    """Tests for find_topics function."""
+    """Tests for find_topics function (filename-based matching)."""
 
-    def test_finds_topics_with_video_id_in_dict(self, tmp_path: Path) -> None:
+    def test_finds_topics_by_filename_pattern(self, tmp_path: Path) -> None:
         channel_dir = tmp_path / "TestChannel"
         channel_dir.mkdir()
-        topics_file = channel_dir / "topics_001.json"
-        _write_json(topics_file, {"video_id": "ABC123", "topics": []})
-
-        result = find_topics(tmp_path, "TestChannel", "ABC123")
-        assert result == topics_file
-
-    def test_finds_topics_with_video_id_in_list(self, tmp_path: Path) -> None:
-        channel_dir = tmp_path / "TestChannel"
-        channel_dir.mkdir()
-        topics_file = channel_dir / "topics_002.json"
-        _write_json(topics_file, [{"video_id": "ABC123", "topic": "AI"}])
+        topics_file = channel_dir / "Some Title [ABC123]_topics.json"
+        _write_json(topics_file, {"source_file": "test.srt", "segments": []})
 
         result = find_topics(tmp_path, "TestChannel", "ABC123")
         assert result == topics_file
@@ -137,7 +128,7 @@ class TestFindTopics:
     def test_no_match_raises_file_not_found(self, tmp_path: Path) -> None:
         channel_dir = tmp_path / "TestChannel"
         channel_dir.mkdir()
-        _write_json(channel_dir / "topics.json", {"video_id": "OTHER"})
+        _write_json(channel_dir / "Other Video [OTHER]_topics.json", {"segments": []})
 
         with pytest.raises(FileNotFoundError, match="No topics file found"):
             find_topics(tmp_path, "TestChannel", "ABC123")
@@ -149,13 +140,33 @@ class TestFindTopics:
         with pytest.raises(FileNotFoundError, match="No topics file found"):
             find_topics(tmp_path, "TestChannel", "ABC123")
 
-    def test_non_json_files_ignored(self, tmp_path: Path) -> None:
+    def test_non_topics_json_files_ignored(self, tmp_path: Path) -> None:
         channel_dir = tmp_path / "TestChannel"
         channel_dir.mkdir()
-        (channel_dir / "topics.txt").write_text("video_id: ABC123", encoding="utf-8")
+        # Has video ID but not _topics.json suffix
+        _write_json(channel_dir / "Video [ABC123]_segmentation.json", {"segments": []})
+        _write_json(channel_dir / "Video [ABC123]_embeddings.json", {"windows": []})
 
         with pytest.raises(FileNotFoundError, match="No topics file found"):
             find_topics(tmp_path, "TestChannel", "ABC123")
+
+    def test_macos_resource_fork_files_ignored(self, tmp_path: Path) -> None:
+        channel_dir = tmp_path / "TestChannel"
+        channel_dir.mkdir()
+        # macOS resource fork file
+        _write_json(channel_dir / "._Video [ABC123]_topics.json", {"segments": []})
+
+        with pytest.raises(FileNotFoundError, match="No topics file found"):
+            find_topics(tmp_path, "TestChannel", "ABC123")
+
+    def test_multiple_matches_raises_value_error(self, tmp_path: Path) -> None:
+        channel_dir = tmp_path / "TestChannel"
+        channel_dir.mkdir()
+        _write_json(channel_dir / "First [DUP001]_topics.json", {"segments": []})
+        _write_json(channel_dir / "Second [DUP001]_topics.json", {"segments": []})
+
+        with pytest.raises(ValueError, match="Multiple topics files found"):
+            find_topics(tmp_path, "TestChannel", "DUP001")
 
 
 class TestExtractMetadataFields:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate reviewed articles from article input bundles."""
 
+import argparse
 import logging
 import sys
 import time
@@ -87,9 +88,14 @@ def main() -> int:
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
+    parser = argparse.ArgumentParser(description="Generate reviewed articles from input bundles.")
+    parser.add_argument("--config", required=True, help="Path to config YAML file")
+    parser.add_argument("--skip-preflight", action="store_true", help="Skip LLM connectivity check")
+    args = parser.parse_args()
+
     logger.info("=== Article Generation Pipeline ===")
 
-    config_path = Path("config/config.yaml")
+    config_path = Path(args.config)
     logger.info("Loading configuration from %s", config_path)
     try:
         config = Config(config_path)
@@ -105,13 +111,16 @@ def main() -> int:
         article_config.default_style_mode,
     )
 
-    logger.info("Running pre-flight connectivity check...")
-    try:
-        _run_preflight_check(config=config)
-    except ConnectionError as exc:
-        logger.error("Pre-flight check FAILED: %s", exc)
-        return 1
-    logger.info("Pre-flight check passed")
+    if args.skip_preflight:
+        logger.info("Skipping pre-flight connectivity check (--skip-preflight)")
+    else:
+        logger.info("Running pre-flight connectivity check...")
+        try:
+            _run_preflight_check(config=config)
+        except ConnectionError as exc:
+            logger.error("Pre-flight check FAILED: %s", exc)
+            return 1
+        logger.info("Pre-flight check passed")
 
     logger.info("Initializing Chief Editor Orchestrator...")
     try:

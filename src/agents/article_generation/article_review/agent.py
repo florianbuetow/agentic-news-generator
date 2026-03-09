@@ -6,7 +6,7 @@ import json
 import logging
 
 from src.agents.article_generation.base import BaseAgent, LLMClient
-from src.agents.article_generation.models import ArticleResponse, ArticleReviewRaw
+from src.agents.article_generation.models import AgentResult, ArticleResponse, ArticleReviewRaw
 from src.agents.article_generation.prompts.loader import PromptLoader
 from src.config import Config, LLMConfig
 
@@ -35,7 +35,7 @@ class ArticleReviewAgent(BaseAgent):
         article: ArticleResponse,
         source_text: str,
         source_metadata: dict[str, str | None],
-    ) -> ArticleReviewRaw:
+    ) -> AgentResult[ArticleReviewRaw]:
         """Run review and return raw markdown bullets."""
         logger.info("Reviewing article: headline=%r source_chars=%d", article.headline, len(source_text))
         prompt_template = self._prompt_loader.load_prompt(prompt_file=self._prompt_file)
@@ -49,4 +49,4 @@ class ArticleReviewAgent(BaseAgent):
         review = ArticleReviewRaw(markdown_bullets=response.strip())
         bullet_count = response.count("\n- ") + response.count("\n* ") + (1 if response.lstrip().startswith(("- ", "* ")) else 0)
         logger.info("Review completed: ~%d bullets, response_chars=%d", bullet_count, len(response))
-        return review
+        return AgentResult(prompt=user_prompt, output=review)

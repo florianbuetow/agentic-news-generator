@@ -51,10 +51,10 @@ def get_valid_llm_config() -> dict[str, object]:
     }
 
 
-def get_valid_agent_slot(implementation: str = "default") -> dict[str, object]:
+def get_valid_agent_slot(agent_name: str = "default") -> dict[str, object]:
     """Return a valid agent slot config payload."""
     return {
-        "implementation": implementation,
+        "agent_name": agent_name,
         "llm": get_valid_llm_config(),
     }
 
@@ -67,7 +67,6 @@ def get_valid_article_generation_config_dict() -> dict[str, object]:
             "output": {
                 "final_articles_dir": "./data/output/articles",
                 "run_artifacts_dir": "./data/output/article_editor_runs",
-                "save_intermediate_results": True,
             },
             "prompts": {
                 "root_dir": "./prompts/article_editor",
@@ -76,6 +75,11 @@ def get_valid_article_generation_config_dict() -> dict[str, object]:
                 "article_review_prompt_file": "article_review.md",
                 "concern_mapping_prompt_file": "concern_mapping.md",
                 "specialists_dir": "specialists",
+                "fact_check_prompt_file": "fact_check.md",
+                "evidence_finding_prompt_file": "evidence_finding.md",
+                "opinion_prompt_file": "opinion.md",
+                "attribution_prompt_file": "attribution.md",
+                "style_review_prompt_file": "style_review.md",
             },
         },
         "agents": {
@@ -185,9 +189,7 @@ class TestConfigIntegration:
             assert article_config.editor.editor_max_rounds == 3
             assert config.get_allowed_article_styles() == ["NATURE_NEWS", "SCIAM_MAGAZINE"]
             assert config.get_article_editor_max_rounds() == 3
-            # get_article_timeout_seconds() still references the old writer_llm path
-            # in Config — that getter is updated in Task 3
-            assert config.get_article_generation_config().agents.writer.llm.timeout_seconds == 60
+            assert config.get_article_timeout_seconds() == 60
         finally:
             temp_path.unlink()
 
@@ -219,22 +221,22 @@ class TestConfigIntegration:
 
 
 class TestAgentConfigWithImplementation:
-    """Tests for agent config with implementation field."""
+    """Tests for agent config with agent_name field."""
 
-    def test_agent_config_accepts_implementation_field(self) -> None:
-        """Agent config block must accept implementation + llm sub-key."""
+    def test_agent_config_accepts_agent_name_field(self) -> None:
+        """Agent config block must accept agent_name + llm sub-key."""
         from src.config import AgentSlotConfig
 
         payload = {
-            "implementation": "default",
+            "agent_name": "default",
             "llm": get_valid_llm_config(),
         }
         slot = AgentSlotConfig.model_validate(payload)
-        assert slot.implementation == "default"
+        assert slot.agent_name == "default"
         assert slot.llm.model == "test-model"
 
-    def test_agent_config_implementation_required(self) -> None:
-        """Missing implementation field must fail."""
+    def test_agent_config_agent_name_required(self) -> None:
+        """Missing agent_name field must fail."""
         from src.config import AgentSlotConfig
 
         payload = {"llm": get_valid_llm_config()}

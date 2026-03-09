@@ -7,7 +7,7 @@ import logging
 from typing import cast
 
 from src.agents.article_generation.base import BaseAgent, LLMClient
-from src.agents.article_generation.models import Concern, ConcernMapping, ConcernMappingResult
+from src.agents.article_generation.models import AgentResult, Concern, ConcernMapping, ConcernMappingResult
 from src.agents.article_generation.prompts.loader import PromptLoader
 from src.config import Config, LLMConfig
 
@@ -37,7 +37,7 @@ class ConcernMappingAgent(BaseAgent):
         source_text: str,
         generated_article_json: str,
         concerns: list[Concern],
-    ) -> ConcernMappingResult:
+    ) -> AgentResult[ConcernMappingResult]:
         """Map concerns to specialists and validate strict output schema."""
         logger.info("Mapping %d concerns to specialists", len(concerns))
         prompt_template = self._prompt_loader.load_prompt(prompt_file=self._prompt_file)
@@ -71,8 +71,8 @@ class ConcernMappingAgent(BaseAgent):
 
             mappings = [ConcernMapping.model_validate(item) for item in typed_items]
             logger.info("Concern mapping completed: %d mappings (array format)", len(mappings))
-            return ConcernMappingResult(mappings=mappings)
+            return AgentResult(prompt=user_prompt, output=ConcernMappingResult(mappings=mappings))
 
         result = self._parse_json_response(response=text, model_class=ConcernMappingResult)
         logger.info("Concern mapping completed: %d mappings (object format)", len(result.mappings))
-        return result
+        return AgentResult(prompt=user_prompt, output=result)

@@ -8,12 +8,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
 
-from src.agents.article_generation.article_review.agent import ArticleReviewAgent
+from src.agents.article_generation.base import (
+    ArticleReviewAgentProtocol,
+    ConcernMappingAgentProtocol,
+    SpecialistAgentProtocol,
+    WriterAgentProtocol,
+)
 from src.agents.article_generation.chief_editor.bullet_parser import ArticleReviewBulletParser
 from src.agents.article_generation.chief_editor.institutional_memory import InstitutionalMemoryStore
 from src.agents.article_generation.chief_editor.output_handler import OutputHandler
-from src.agents.article_generation.concern_mapping.agent import ConcernMappingAgent
+from src.agents.article_generation.chief_editor.verbose_context_logger import VerboseContextLogger
 from src.agents.article_generation.models import (
+    AgentResult,
     ArticleGenerationResult,
     ArticleMetadata,
     ArticleResponse,
@@ -24,12 +30,6 @@ from src.agents.article_generation.models import (
     Verdict,
     WriterFeedback,
 )
-from src.agents.article_generation.specialists.attribution.agent import AttributionAgent
-from src.agents.article_generation.specialists.evidence_finding.agent import EvidenceFindingAgent
-from src.agents.article_generation.specialists.fact_check.agent import FactCheckAgent
-from src.agents.article_generation.specialists.opinion.agent import OpinionAgent
-from src.agents.article_generation.specialists.style_review.agent import StyleReviewAgent
-from src.agents.article_generation.writer.agent import WriterAgent
 from src.config import Config
 
 logger = logging.getLogger(__name__)
@@ -42,14 +42,14 @@ class ChiefEditorOrchestrator:
         self,
         *,
         config: Config,
-        writer_agent: WriterAgent,
-        article_review_agent: ArticleReviewAgent,
-        concern_mapping_agent: ConcernMappingAgent,
-        fact_check_agent: FactCheckAgent,
-        evidence_finding_agent: EvidenceFindingAgent,
-        opinion_agent: OpinionAgent,
-        attribution_agent: AttributionAgent,
-        style_review_agent: StyleReviewAgent,
+        writer_agent: WriterAgentProtocol,
+        article_review_agent: ArticleReviewAgentProtocol,
+        concern_mapping_agent: ConcernMappingAgentProtocol,
+        fact_check_agent: SpecialistAgentProtocol,
+        evidence_finding_agent: SpecialistAgentProtocol,
+        opinion_agent: SpecialistAgentProtocol,
+        attribution_agent: SpecialistAgentProtocol,
+        style_review_agent: SpecialistAgentProtocol,
         bullet_parser: ArticleReviewBulletParser,
         institutional_memory: InstitutionalMemoryStore,
         output_handler: OutputHandler,
@@ -88,197 +88,211 @@ class ChiefEditorOrchestrator:
             style_mode=style_mode,
         )
 
-        iteration_reports: list[IterationReport] = []
-        current_article: ArticleResponse | None = None
+        ctx = VerboseContextLogger(artifacts_dir=artifacts_dir)
 
-        try:
-            self._progress(run_label=run_label, message="Generating initial writer draft")
-            current_article = self._writer_agent.generate(
+        # Log source inputs
+        ctx.log(agent_name="source", step="context", content=source_text, fmt="txt")
+        ctx.log(agent_name="source", step="metadata", content=dict(source_metadata), fmt="json")
+        ctx.log(agent_name="source", step="run_params", content={"style_mode": style_mode, "reader_preference": reader_preference}, fmt="json")
+
+        iteration_reports: list[IterationReport] = []
+
+        self._progress(run_label=run_label, message="Generating initial writer draft")
+        writer_result = self._writer_agent.generate(
+            source_text=source_text,
+            source_metadata=source_metadata,
+            style_mode=style_mode,
+            reader_preference=reader_preference,
+        )
+        ctx.log(agent_name="writer", step="prompt", content=writer_result.prompt, fmt="md")
+        ctx.log(agent_name="writer", step="output", content=writer_result.output.model_dump(), fmt="json")
+        ctx.log(agent_name="writer", step="output", content=writer_result.output.article_body, fmt="md")
+        current_article = writer_result.output
+        self._progress(run_label=run_label, message=f"Initial draft stored in {artifacts_dir}")
+
+        editor_max_rounds = self._config.get_article_editor_max_rounds()
+        self._progress(run_label=run_label, message=f"Starting editor loop with max rounds={editor_max_rounds}")
+
+        for iteration in range(1, editor_max_rounds + 1):
+            self._progress(run_label=run_label, message=f"Round {iteration}: Article review")
+            review_result = self._article_review_agent.review(
+                article=current_article,
+                source_text=source_text,
+                source_metadata=source_metadata,
+            )
+            ctx.log(agent_name="article_review", step="prompt", content=review_result.prompt, fmt="md")
+            ctx.log(agent_name="article_review", step="output", content=review_result.output.markdown_bullets, fmt="md")
+            review_raw = review_result.output
+
+            parsed_review = self._bullet_parser.parse(markdown_bullets=review_raw.markdown_bullets)
+            ctx.log(agent_name="article_review", step="parsed", content=parsed_review.model_dump(), fmt="json")
+            self._progress(
+                run_label=run_label,
+                message=f"Round {iteration}: Parsed {len(parsed_review.concerns)} concerns",
+            )
+
+            if len(parsed_review.concerns) == 0:
+                editor_report = EditorReport(
+                    iterations=iteration_reports,
+                    total_iterations=iteration,
+                    final_status="SUCCESS",
+                    blocking_concerns=None,
+                )
+                result = self._build_success_result(
+                    article=current_article,
+                    source_metadata=source_metadata,
+                    style_mode=style_mode,
+                    editor_report=editor_report,
+                    artifacts_dir=artifacts_dir,
+                )
+                self._log_final_artifacts(ctx=ctx, result=result, editor_report=editor_report)
+                self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
+                self._progress(run_label=run_label, message=f"Completed successfully in round {iteration}")
+                return result
+
+            self._progress(run_label=run_label, message=f"Round {iteration}: Concern mapping")
+            mapping_agent_result = self._concern_mapping_agent.map_concerns(
+                style_requirements=style_mode,
+                source_text=source_text,
+                generated_article_json=current_article.model_dump_json(),
+                concerns=parsed_review.concerns,
+            )
+            ctx.log(agent_name="concern_mapping", step="prompt", content=mapping_agent_result.prompt, fmt="md")
+            ctx.log(agent_name="concern_mapping", step="output", content=mapping_agent_result.output.model_dump(), fmt="json")
+            mapping_result = mapping_agent_result.output
+            self._progress(
+                run_label=run_label,
+                message=f"Round {iteration}: Evaluating {len(mapping_result.mappings)} mapped concerns",
+            )
+
+            verdicts: list[Verdict] = []
+            for mapping in mapping_result.mappings:
+                self._progress(
+                    run_label=run_label,
+                    message=f"Round {iteration}: Specialist evaluation for concern #{mapping.concern_id} ({mapping.selected_agent})",
+                )
+                concern = self._find_concern(concerns=parsed_review.concerns, concern_id=mapping.concern_id)
+                specialist_result = self._evaluate_mapping(
+                    mapping=mapping,
+                    concern=concern,
+                    article=current_article,
+                    source_text=source_text,
+                    source_metadata=source_metadata,
+                    style_requirements=style_mode,
+                )
+                ctx.log(agent_name=mapping.selected_agent, step="prompt", content=specialist_result.prompt, fmt="md")
+                ctx.log(agent_name=mapping.selected_agent, step="output", content=specialist_result.output.model_dump(), fmt="json")
+                verdicts.append(specialist_result.output)
+
+            is_passed = all(not verdict.misleading for verdict in verdicts)
+            if is_passed:
+                self._progress(run_label=run_label, message=f"Round {iteration}: All specialist verdicts passed")
+                iteration_reports.append(
+                    IterationReport(
+                        iteration_number=iteration,
+                        concerns=parsed_review.concerns,
+                        mappings=mapping_result.mappings,
+                        verdicts=verdicts,
+                        feedback_to_writer=None,
+                        article_draft=current_article,
+                    )
+                )
+                editor_report = EditorReport(
+                    iterations=iteration_reports,
+                    total_iterations=iteration,
+                    final_status="SUCCESS",
+                    blocking_concerns=None,
+                )
+                result = self._build_success_result(
+                    article=current_article,
+                    source_metadata=source_metadata,
+                    style_mode=style_mode,
+                    editor_report=editor_report,
+                    artifacts_dir=artifacts_dir,
+                )
+                self._log_final_artifacts(ctx=ctx, result=result, editor_report=editor_report)
+                self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
+                self._progress(run_label=run_label, message=f"Completed successfully in round {iteration}")
+                return result
+
+            if iteration == editor_max_rounds:
+                blocking_concerns = self._blocking_concerns(concerns=parsed_review.concerns, verdicts=verdicts)
+                iteration_reports.append(
+                    IterationReport(
+                        iteration_number=iteration,
+                        concerns=parsed_review.concerns,
+                        mappings=mapping_result.mappings,
+                        verdicts=verdicts,
+                        feedback_to_writer=None,
+                        article_draft=current_article,
+                    )
+                )
+                editor_report = EditorReport(
+                    iterations=iteration_reports,
+                    total_iterations=iteration,
+                    final_status="FAILED",
+                    blocking_concerns=blocking_concerns,
+                )
+                result = ArticleGenerationResult(
+                    success=False,
+                    article=current_article,
+                    metadata=self._build_metadata(
+                        source_metadata=source_metadata,
+                        style_mode=style_mode,
+                    ),
+                    editor_report=editor_report,
+                    artifacts_dir=str(artifacts_dir),
+                    error="Unresolved misleading concerns after editor_max_rounds",
+                )
+                self._log_final_artifacts(ctx=ctx, result=result, editor_report=editor_report)
+                self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
+                self._progress(run_label=run_label, message=f"Failed after {editor_max_rounds} rounds with unresolved concerns")
+                return result
+
+            self._progress(run_label=run_label, message=f"Round {iteration}: Compiling writer feedback")
+            feedback = self._compile_feedback(iteration=iteration, verdicts=verdicts)
+            ctx.log(agent_name="feedback", step="output", content=feedback.model_dump(), fmt="json")
+
+            iteration_reports.append(
+                IterationReport(
+                    iteration_number=iteration,
+                    concerns=parsed_review.concerns,
+                    mappings=mapping_result.mappings,
+                    verdicts=verdicts,
+                    feedback_to_writer=feedback,
+                    article_draft=current_article,
+                )
+            )
+
+            revision_context = self._build_revision_context(
                 source_text=source_text,
                 source_metadata=source_metadata,
                 style_mode=style_mode,
                 reader_preference=reader_preference,
+                current_article=current_article,
             )
-            self._output_handler.write_writer_draft(artifacts_dir=artifacts_dir, iteration=1, article=current_article)
-            self._progress(run_label=run_label, message=f"Initial draft stored in {artifacts_dir}")
+            self._progress(run_label=run_label, message=f"Round {iteration}: Requesting writer revision")
+            revision_result = self._writer_agent.revise(context=revision_context, feedback=feedback)
+            ctx.log(agent_name="writer", step="prompt", content=revision_result.prompt, fmt="md")
+            ctx.log(agent_name="writer", step="output", content=revision_result.output.model_dump(), fmt="json")
+            ctx.log(agent_name="writer", step="output", content=revision_result.output.article_body, fmt="md")
+            current_article = revision_result.output
+            self._progress(run_label=run_label, message=f"Round {iteration}: Revision draft stored")
 
-            editor_max_rounds = self._config.get_article_editor_max_rounds()
-            self._progress(run_label=run_label, message=f"Starting editor loop with max rounds={editor_max_rounds}")
+        raise RuntimeError("Orchestration loop exited without returning a result")
 
-            for iteration in range(1, editor_max_rounds + 1):
-                self._progress(run_label=run_label, message=f"Round {iteration}: Article review")
-                review_raw = self._article_review_agent.review(
-                    article=current_article,
-                    source_text=source_text,
-                    source_metadata=source_metadata,
-                )
-                self._output_handler.write_article_review_raw(artifacts_dir=artifacts_dir, iteration=iteration, review_raw=review_raw)
-
-                review_result = self._bullet_parser.parse(markdown_bullets=review_raw.markdown_bullets)
-                self._output_handler.write_article_review_parsed(artifacts_dir=artifacts_dir, iteration=iteration, review=review_result)
-                self._progress(
-                    run_label=run_label,
-                    message=f"Round {iteration}: Parsed {len(review_result.concerns)} concerns",
-                )
-
-                if len(review_result.concerns) == 0:
-                    editor_report = EditorReport(
-                        iterations=iteration_reports,
-                        total_iterations=iteration,
-                        final_status="SUCCESS",
-                        blocking_concerns=None,
-                    )
-                    result = self._build_success_result(
-                        article=current_article,
-                        source_metadata=source_metadata,
-                        style_mode=style_mode,
-                        editor_report=editor_report,
-                        artifacts_dir=artifacts_dir,
-                    )
-                    self._output_handler.write_final_artifacts(artifacts_dir=artifacts_dir, result=result, editor_report=editor_report)
-                    self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
-                    self._progress(run_label=run_label, message=f"Completed successfully in round {iteration}")
-                    return result
-
-                self._progress(run_label=run_label, message=f"Round {iteration}: Concern mapping")
-                mapping_result = self._concern_mapping_agent.map_concerns(
-                    style_requirements=style_mode,
-                    source_text=source_text,
-                    generated_article_json=current_article.model_dump_json(),
-                    concerns=review_result.concerns,
-                )
-                self._output_handler.write_concern_mapping(artifacts_dir=artifacts_dir, iteration=iteration, mapping=mapping_result)
-                self._progress(
-                    run_label=run_label,
-                    message=f"Round {iteration}: Evaluating {len(mapping_result.mappings)} mapped concerns",
-                )
-
-                verdicts: list[Verdict] = []
-                for mapping in mapping_result.mappings:
-                    self._progress(
-                        run_label=run_label,
-                        message=f"Round {iteration}: Specialist evaluation for concern #{mapping.concern_id} ({mapping.selected_agent})",
-                    )
-                    concern = self._find_concern(concerns=review_result.concerns, concern_id=mapping.concern_id)
-                    verdict = self._evaluate_mapping(
-                        mapping=mapping,
-                        concern=concern,
-                        article=current_article,
-                        source_text=source_text,
-                        source_metadata=source_metadata,
-                        style_requirements=style_mode,
-                    )
-                    verdicts.append(verdict)
-
-                self._output_handler.write_verdicts(artifacts_dir=artifacts_dir, iteration=iteration, verdicts=verdicts)
-
-                is_passed = all(not verdict.misleading for verdict in verdicts)
-                if is_passed:
-                    self._progress(run_label=run_label, message=f"Round {iteration}: All specialist verdicts passed")
-                    iteration_reports.append(
-                        IterationReport(
-                            iteration_number=iteration,
-                            concerns=review_result.concerns,
-                            mappings=mapping_result.mappings,
-                            verdicts=verdicts,
-                            feedback_to_writer=None,
-                            article_draft=current_article,
-                        )
-                    )
-                    editor_report = EditorReport(
-                        iterations=iteration_reports,
-                        total_iterations=iteration,
-                        final_status="SUCCESS",
-                        blocking_concerns=None,
-                    )
-                    result = self._build_success_result(
-                        article=current_article,
-                        source_metadata=source_metadata,
-                        style_mode=style_mode,
-                        editor_report=editor_report,
-                        artifacts_dir=artifacts_dir,
-                    )
-                    self._output_handler.write_final_artifacts(artifacts_dir=artifacts_dir, result=result, editor_report=editor_report)
-                    self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
-                    self._progress(run_label=run_label, message=f"Completed successfully in round {iteration}")
-                    return result
-
-                if iteration == editor_max_rounds:
-                    blocking_concerns = self._blocking_concerns(concerns=review_result.concerns, verdicts=verdicts)
-                    iteration_reports.append(
-                        IterationReport(
-                            iteration_number=iteration,
-                            concerns=review_result.concerns,
-                            mappings=mapping_result.mappings,
-                            verdicts=verdicts,
-                            feedback_to_writer=None,
-                            article_draft=current_article,
-                        )
-                    )
-                    editor_report = EditorReport(
-                        iterations=iteration_reports,
-                        total_iterations=iteration,
-                        final_status="FAILED",
-                        blocking_concerns=blocking_concerns,
-                    )
-                    result = ArticleGenerationResult(
-                        success=False,
-                        article=current_article,
-                        metadata=self._build_metadata(
-                            source_metadata=source_metadata,
-                            style_mode=style_mode,
-                        ),
-                        editor_report=editor_report,
-                        artifacts_dir=str(artifacts_dir),
-                        error="Unresolved misleading concerns after editor_max_rounds",
-                    )
-                    self._output_handler.write_final_artifacts(artifacts_dir=artifacts_dir, result=result, editor_report=editor_report)
-                    self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
-                    self._progress(run_label=run_label, message=f"Failed after {editor_max_rounds} rounds with unresolved concerns")
-                    return result
-
-                self._progress(run_label=run_label, message=f"Round {iteration}: Compiling writer feedback")
-                feedback = self._compile_feedback(iteration=iteration, verdicts=verdicts)
-                self._output_handler.write_feedback(artifacts_dir=artifacts_dir, iteration=iteration, feedback=feedback)
-
-                iteration_reports.append(
-                    IterationReport(
-                        iteration_number=iteration,
-                        concerns=review_result.concerns,
-                        mappings=mapping_result.mappings,
-                        verdicts=verdicts,
-                        feedback_to_writer=feedback,
-                        article_draft=current_article,
-                    )
-                )
-
-                revision_context = self._build_revision_context(
-                    source_text=source_text,
-                    source_metadata=source_metadata,
-                    style_mode=style_mode,
-                    reader_preference=reader_preference,
-                    current_article=current_article,
-                )
-                self._progress(run_label=run_label, message=f"Round {iteration}: Requesting writer revision")
-                current_article = self._writer_agent.revise(context=revision_context, feedback=feedback)
-                self._output_handler.write_writer_draft(artifacts_dir=artifacts_dir, iteration=iteration + 1, article=current_article)
-                self._progress(run_label=run_label, message=f"Round {iteration}: Revision draft stored")
-
-            raise RuntimeError("Orchestration loop terminated unexpectedly")
-
-        except Exception as exc:
-            self._progress(run_label=run_label, message=f"Failed with exception: {exc}")
-            error_message = f"Orchestration failed: {exc}"
-            failed_result = ArticleGenerationResult(
-                success=False,
-                article=current_article,
-                metadata=None,
-                editor_report=None,
-                artifacts_dir=str(artifacts_dir),
-                error=error_message,
-            )
-            self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=failed_result)
-            return failed_result
+    def _log_final_artifacts(
+        self,
+        *,
+        ctx: VerboseContextLogger,
+        result: ArticleGenerationResult,
+        editor_report: EditorReport,
+    ) -> None:
+        """Write final artifacts using the verbose context logger."""
+        if result.article is not None:
+            ctx.log_final(agent_name="final", step="article", content=result.article.article_body, fmt="md")
+        ctx.log_final(agent_name="final", step="article_result", content=result.model_dump(), fmt="json")
+        ctx.log_final(agent_name="final", step="editor_report", content=editor_report.model_dump(), fmt="json")
 
     def _progress(self, *, run_label: str, message: str) -> None:
         """Emit orchestration progress updates."""
@@ -293,41 +307,19 @@ class ChiefEditorOrchestrator:
         source_text: str,
         source_metadata: dict[str, str | None],
         style_requirements: str,
-    ) -> Verdict:
-        """Route a concern to the selected specialist and return its verdict."""
-        if mapping.selected_agent == "fact_check":
-            return self._fact_check_agent.evaluate(
-                concern=concern,
-                article=article,
-                source_text=source_text,
-                source_metadata=source_metadata,
-                style_requirements=style_requirements,
-            )
-        if mapping.selected_agent == "evidence_finding":
-            return self._evidence_finding_agent.evaluate(
-                concern=concern,
-                article=article,
-                source_text=source_text,
-                source_metadata=source_metadata,
-                style_requirements=style_requirements,
-            )
-        if mapping.selected_agent == "opinion":
-            return self._opinion_agent.evaluate(
-                concern=concern,
-                article=article,
-                source_text=source_text,
-                source_metadata=source_metadata,
-                style_requirements=style_requirements,
-            )
-        if mapping.selected_agent == "attribution":
-            return self._attribution_agent.evaluate(
-                concern=concern,
-                article=article,
-                source_text=source_text,
-                source_metadata=source_metadata,
-                style_requirements=style_requirements,
-            )
-        return self._style_review_agent.evaluate(
+    ) -> AgentResult[Verdict]:
+        """Route a concern to the selected specialist and return its full AgentResult."""
+        agents = {
+            "fact_check": self._fact_check_agent,
+            "evidence_finding": self._evidence_finding_agent,
+            "opinion": self._opinion_agent,
+            "attribution": self._attribution_agent,
+            "style_review": self._style_review_agent,
+        }
+        agent = agents.get(mapping.selected_agent)
+        if agent is None:
+            raise ValueError(f"Unknown specialist agent: {mapping.selected_agent}")
+        return agent.evaluate(
             concern=concern,
             article=article,
             source_text=source_text,
@@ -420,7 +412,7 @@ class ChiefEditorOrchestrator:
         """Build article metadata from source context."""
         publish_date = source_metadata.get("publish_date")
         references_raw = source_metadata.get("references")
-        references: list[dict[str, str]] = json.loads(references_raw) if isinstance(references_raw, str) else []
+        references: list[dict[str, str]] = json.loads(references_raw) if references_raw is not None else []
         return ArticleMetadata(
             source_file=self._require_metadata_value(source_metadata, "source_file"),
             channel_name=self._require_metadata_value(source_metadata, "channel_name"),

@@ -180,11 +180,18 @@ transcripts-remove-hallucinations:
     @uv run python scripts/transcript-hallucination-removal.py
     @echo ""
 
+# Prepare article input bundles from video IDs
+prepare-article-input +VIDEO_IDS:
+    @echo ""
+    @printf "\033[0;34m=== Preparing Article Input Bundles ===\033[0m\n"
+    @uv run scripts/prepare-article-input-data.py {{VIDEO_IDS}}
+    @echo ""
+
 # Generate articles from topic transcripts
 generate-articles:
     @echo ""
     @printf "\033[0;34m=== Generating Articles from Topics ===\033[0m\n"
-    @uv run scripts/generate-articles.py
+    @uv run scripts/generate-articles.py --config config/config.yaml
     @echo ""
 
 # Generate embeddings from SRT transcripts (Step 1)
@@ -526,6 +533,47 @@ test:
     fi
     echo ""
     exit $EXIT_CODE
+
+# Run article generation E2E tests (all agents mocked, no LLM required)
+test-article-generation:
+    #!/usr/bin/env bash
+    set +e
+    echo ""
+    printf "\033[0;34m=== Running Article Generation E2E Tests (mocked) ===\033[0m\n"
+    uv run pytest tests/e2e/ -v -s -m e2e
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -ne 0 ] && [ $EXIT_CODE -ne 5 ]; then
+        echo ""
+        exit $EXIT_CODE
+    fi
+    echo ""
+    printf "\033[0;32m=== Test Output ===\033[0m\n"
+    OUTPUT_DIR="data/test/output/article_editor_runs"
+    if [ -d "$OUTPUT_DIR" ]; then
+        LATEST=$(find "$OUTPUT_DIR" -name "article.md" -type f -print0 | xargs -0 ls -t 2>/dev/null | head -1)
+        if [ -n "$LATEST" ]; then
+            ARTIFACT_DIR=$(dirname "$LATEST")
+            printf "\033[0;32mArticle artifacts: %s\033[0m\n" "$ARTIFACT_DIR"
+            ls "$ARTIFACT_DIR"
+        fi
+    fi
+    echo ""
+    exit 0
+
+# Run article generation pipeline with all mocked agents (no LLM required)
+generate-articles-mock:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Generating Articles (mocked agents) ===\033[0m\n"
+    uv run python scripts/generate-articles.py --config config/config.test.yaml --skip-preflight
+    echo ""
+    printf "\033[0;32m✓ Output written to data/test/output/articles/\033[0m\n"
+    echo ""
+    ls -la data/test/output/articles/ 2>/dev/null || true
+    echo ""
+    printf "Run artifacts:\n"
+    find data/test/output/article_editor_runs/ -type f 2>/dev/null || true
 
 # Run unit tests with coverage report and threshold check
 test-coverage: init

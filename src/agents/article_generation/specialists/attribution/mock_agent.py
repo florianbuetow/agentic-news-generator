@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from src.agents.article_generation.models import ArticleResponse, Concern, Verdict
+from src.agents.article_generation.models import AgentResult, ArticleResponse, Concern, Verdict
 
 logger = logging.getLogger(__name__)
 
@@ -20,15 +20,18 @@ class MockAttributionAgent:
         source_text: str,
         source_metadata: dict[str, str | None],
         style_requirements: str,
-    ) -> Verdict:
+    ) -> AgentResult[Verdict]:
         """Return a static KEEP verdict."""
         logger.info("MockAttributionAgent: returning static KEEP for concern #%d", concern.concern_id)
-        return Verdict(
-            concern_id=concern.concern_id,
-            misleading=False,
-            status="KEEP",
-            rationale="Mock attribution: no LLM available in test configuration",
-            suggested_fix=None,
-            evidence=None,
-            citations=None,
+        return AgentResult(
+            prompt="[mock]",
+            output=Verdict(
+                concern_id=concern.concern_id,
+                misleading=False,
+                status="KEEP",
+                rationale="Mock attribution: no LLM available in test configuration",
+                suggested_fix=None,
+                evidence=None,
+                citations=None,
+            ),
         )

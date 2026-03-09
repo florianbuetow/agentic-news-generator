@@ -6,7 +6,7 @@ import json
 import logging
 
 from src.agents.article_generation.base import BaseAgent, LLMClient
-from src.agents.article_generation.models import ArticleResponse, WriterFeedback
+from src.agents.article_generation.models import AgentResult, ArticleResponse, WriterFeedback
 from src.agents.article_generation.prompts.loader import PromptLoader
 from src.config import Config, LLMConfig
 
@@ -38,7 +38,7 @@ class WriterAgent(BaseAgent):
         source_metadata: dict[str, str | None],
         style_mode: str,
         reader_preference: str,
-    ) -> ArticleResponse:
+    ) -> AgentResult[ArticleResponse]:
         """Generate an initial article draft."""
         logger.info(
             "Generating initial draft: style=%s source_chars=%d reader_preference=%s",
@@ -60,14 +60,14 @@ class WriterAgent(BaseAgent):
         response = self._call_llm(messages=[{"role": "user", "content": user_prompt}])
         article = self._parse_json_response(response=response, model_class=ArticleResponse)
         logger.info("Draft generated: headline=%r body_chars=%d", article.headline, len(article.article_body))
-        return article
+        return AgentResult(prompt=user_prompt, output=article)
 
     def revise(
         self,
         *,
         context: str,
         feedback: WriterFeedback,
-    ) -> ArticleResponse:
+    ) -> AgentResult[ArticleResponse]:
         """Revise an article draft using deterministic feedback fields."""
         logger.info(
             "Revising draft: iteration=%d rating=%d todos=%d suggestions=%d",
@@ -81,7 +81,9 @@ class WriterAgent(BaseAgent):
             rating=feedback.rating,
             pass_status=str(feedback.passed),
             reasoning=feedback.reasoning,
-            improvement_suggestions="\n".join(feedback.improvement_suggestions),
+            todo_list="\n".join(f"- {todo}" for todo in feedback.todo_list),
+            improvement_suggestions="\n".join(f"- {s}" for s in feedback.improvement_suggestions),
+            verdicts=json.dumps([v.model_dump() for v in feedback.verdicts], ensure_ascii=False, indent=2),
             context=context,
         )
         logger.info("Revision prompt assembled: %d chars", len(user_prompt))
@@ -89,4 +91,4 @@ class WriterAgent(BaseAgent):
         response = self._call_llm(messages=[{"role": "user", "content": user_prompt}])
         article = self._parse_json_response(response=response, model_class=ArticleResponse)
         logger.info("Revised draft: headline=%r body_chars=%d", article.headline, len(article.article_body))
-        return article
+        return AgentResult(prompt=user_prompt, output=article)

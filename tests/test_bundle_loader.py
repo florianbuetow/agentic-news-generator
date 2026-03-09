@@ -46,7 +46,7 @@ def _create_valid_bundle(bundle_dir: Path) -> None:
     bundle_dir.mkdir(parents=True, exist_ok=True)
     _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
     (bundle_dir / "transcript.txt").write_text("This is the transcript content.", encoding="utf-8")
-    _write_json(bundle_dir / "topics.json", [{"topic": "AI", "start": 0, "end": 100}])
+    _write_json(bundle_dir / "topics.json", {"source_file": "test.srt", "segments": [{"topic": "AI", "start": 0, "end": 100}]})
 
 
 class TestManifestModel:
@@ -167,14 +167,15 @@ class TestLoadBundle:
         bundle = load_bundle(bundle_dir)
         assert bundle.manifest.slug == "TEST123"
         assert "transcript content" in bundle.source_text
-        assert len(bundle.topics) == 1
+        assert isinstance(bundle.topics, dict)
+        assert bundle.topics["source_file"] == "test.srt"
         assert bundle.bundle_dir == str(bundle_dir)
 
     def test_missing_transcript_raises(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "TEST123"
         bundle_dir.mkdir(parents=True)
         _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
-        _write_json(bundle_dir / "topics.json", [])
+        _write_json(bundle_dir / "topics.json", {"segments": []})
         with pytest.raises(FileNotFoundError, match="transcript.txt.*not found"):
             load_bundle(bundle_dir)
 
@@ -183,7 +184,7 @@ class TestLoadBundle:
         bundle_dir.mkdir(parents=True)
         _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
         (bundle_dir / "transcript.txt").write_text("", encoding="utf-8")
-        _write_json(bundle_dir / "topics.json", [])
+        _write_json(bundle_dir / "topics.json", {"segments": []})
         with pytest.raises(ValueError, match="empty"):
             load_bundle(bundle_dir)
 
@@ -192,7 +193,7 @@ class TestLoadBundle:
         bundle_dir.mkdir(parents=True)
         _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
         (bundle_dir / "transcript.txt").write_text("   \n\t  ", encoding="utf-8")
-        _write_json(bundle_dir / "topics.json", [])
+        _write_json(bundle_dir / "topics.json", {"segments": []})
         with pytest.raises(ValueError, match="empty"):
             load_bundle(bundle_dir)
 
@@ -204,45 +205,40 @@ class TestLoadBundle:
         with pytest.raises(FileNotFoundError, match="topics.json.*not found"):
             load_bundle(bundle_dir)
 
-    def test_topics_not_array_raises(self, tmp_path: Path) -> None:
+    def test_topics_as_object_loads(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "TEST123"
         bundle_dir.mkdir(parents=True)
         _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
         (bundle_dir / "transcript.txt").write_text("Some content.", encoding="utf-8")
-        _write_json(bundle_dir / "topics.json", {"not": "an array"})
-        with pytest.raises(ValueError, match="JSON array"):
+        _write_json(bundle_dir / "topics.json", {"source_file": "test.srt", "segments": [{"topic": "AI"}]})
+        bundle = load_bundle(bundle_dir)
+        assert isinstance(bundle.topics, dict)
+
+    def test_topics_as_array_loads(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "TEST123"
+        bundle_dir.mkdir(parents=True)
+        _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
+        (bundle_dir / "transcript.txt").write_text("Some content.", encoding="utf-8")
+        _write_json(bundle_dir / "topics.json", [{"topic": "AI"}])
+        bundle = load_bundle(bundle_dir)
+        assert isinstance(bundle.topics, list)
+
+    def test_topics_invalid_type_raises(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "TEST123"
+        bundle_dir.mkdir(parents=True)
+        _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
+        (bundle_dir / "transcript.txt").write_text("Some content.", encoding="utf-8")
+        _write_json(bundle_dir / "topics.json", "just a string")
+        with pytest.raises(ValueError, match="JSON object or array"):
             load_bundle(bundle_dir)
 
     def test_missing_manifest_raises(self, tmp_path: Path) -> None:
         bundle_dir = tmp_path / "TEST123"
         bundle_dir.mkdir(parents=True)
         (bundle_dir / "transcript.txt").write_text("Some content.", encoding="utf-8")
-        _write_json(bundle_dir / "topics.json", [])
+        _write_json(bundle_dir / "topics.json", {"segments": []})
         with pytest.raises(FileNotFoundError, match="manifest.json not found"):
             load_bundle(bundle_dir)
-
-    def test_multiple_topics_loaded(self, tmp_path: Path) -> None:
-        bundle_dir = tmp_path / "TEST123"
-        bundle_dir.mkdir(parents=True)
-        _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
-        (bundle_dir / "transcript.txt").write_text("Content here.", encoding="utf-8")
-        topics = [
-            {"topic": "AI Safety", "start": 0, "end": 50},
-            {"topic": "LLM Engineering", "start": 50, "end": 100},
-            {"topic": "Agentic Systems", "start": 100, "end": 150},
-        ]
-        _write_json(bundle_dir / "topics.json", topics)
-        bundle = load_bundle(bundle_dir)
-        assert len(bundle.topics) == 3
-
-    def test_empty_topics_array_valid(self, tmp_path: Path) -> None:
-        bundle_dir = tmp_path / "TEST123"
-        bundle_dir.mkdir(parents=True)
-        _write_json(bundle_dir / "manifest.json", _create_valid_manifest())
-        (bundle_dir / "transcript.txt").write_text("Content here.", encoding="utf-8")
-        _write_json(bundle_dir / "topics.json", [])
-        bundle = load_bundle(bundle_dir)
-        assert len(bundle.topics) == 0
 
 
 class TestBundleToSourceMetadata:
@@ -287,7 +283,7 @@ class TestBundleToSourceMetadata:
         bundle = LoadedBundle(
             manifest=manifest,
             source_text="content",
-            topics=[],
+            topics={},
             bundle_dir="/tmp/test",
         )
         with pytest.raises(ValueError, match="No channel name"):
@@ -318,7 +314,7 @@ class TestBundleToSourceMetadata:
         manifest_data["references"] = refs
         _write_json(bundle_dir / "manifest.json", manifest_data)
         (bundle_dir / "transcript.txt").write_text("Content.", encoding="utf-8")
-        _write_json(bundle_dir / "topics.json", [])
+        _write_json(bundle_dir / "topics.json", {"segments": []})
 
         bundle = load_bundle(bundle_dir)
         metadata = bundle_to_source_metadata(bundle)

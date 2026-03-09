@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Protocol, TypeVar
@@ -13,7 +14,15 @@ from src.config import Config, LLMConfig
 from src.util.token_validator import validate_token_usage
 
 if TYPE_CHECKING:
-    from src.agents.article_generation.models import ArticleResponse, Concern, Verdict
+    from src.agents.article_generation.models import (
+        AgentResult,
+        ArticleResponse,
+        ArticleReviewRaw,
+        Concern,
+        ConcernMappingResult,
+        Verdict,
+        WriterFeedback,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +49,65 @@ class PerplexityClient(Protocol):
     def search(self, *, query: str, model: str, timeout_seconds: int) -> dict[str, object]:
         """Execute a search request."""
         ...
+
+
+class WriterAgentProtocol(Protocol):
+    """Protocol for writer agents (real or mock)."""
+
+    def generate(
+        self,
+        *,
+        source_text: str,
+        source_metadata: dict[str, str | None],
+        style_mode: str,
+        reader_preference: str,
+    ) -> AgentResult[ArticleResponse]: ...
+
+    def revise(
+        self,
+        *,
+        context: str,
+        feedback: WriterFeedback,
+    ) -> AgentResult[ArticleResponse]: ...
+
+
+class ArticleReviewAgentProtocol(Protocol):
+    """Protocol for article review agents (real or mock)."""
+
+    def review(
+        self,
+        *,
+        article: ArticleResponse,
+        source_text: str,
+        source_metadata: dict[str, str | None],
+    ) -> AgentResult[ArticleReviewRaw]: ...
+
+
+class ConcernMappingAgentProtocol(Protocol):
+    """Protocol for concern mapping agents (real or mock)."""
+
+    def map_concerns(
+        self,
+        *,
+        style_requirements: str,
+        source_text: str,
+        generated_article_json: str,
+        concerns: list[Concern],
+    ) -> AgentResult[ConcernMappingResult]: ...
+
+
+class SpecialistAgentProtocol(Protocol):
+    """Protocol for specialist agents (real or mock)."""
+
+    def evaluate(
+        self,
+        *,
+        concern: Concern,
+        article: ArticleResponse,
+        source_text: str,
+        source_metadata: dict[str, str | None],
+        style_requirements: str,
+    ) -> AgentResult[Verdict]: ...
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -112,5 +180,19 @@ class BaseSpecialistAgent(BaseAgent, ABC):
         source_text: str,
         source_metadata: dict[str, str | None],
         style_requirements: str,
-    ) -> Verdict:
+    ) -> AgentResult[Verdict]:
         """Evaluate a concern and return a verdict."""
+
+    def _normalize_query(self, query: str) -> str:
+        """Normalize query for stable cache keys."""
+        return re.sub(r"\s+", " ", query.strip().lower())
+
+    def _build_article_id(self, source_metadata: dict[str, str | None]) -> str:
+        """Build deterministic article identifier."""
+        source_file = source_metadata.get("source_file")
+        topic_slug = source_metadata.get("topic_slug")
+        if source_file is None:
+            raise ValueError("Missing required metadata field: source_file")
+        if topic_slug is None:
+            raise ValueError("Missing required metadata field: topic_slug")
+        return f"{source_file}:{topic_slug}"

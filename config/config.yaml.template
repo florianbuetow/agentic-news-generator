@@ -124,7 +124,6 @@ article_generation:
     output:
       final_articles_dir: ./data/output/articles
       run_artifacts_dir: ./data/output/article_editor_runs
-      save_intermediate_results: true
 
     prompts:
       root_dir: ./prompts/article_editor
@@ -133,10 +132,15 @@ article_generation:
       article_review_prompt_file: article_review.md
       concern_mapping_prompt_file: concern_mapping.md
       specialists_dir: specialists
+      fact_check_prompt_file: fact_check.md
+      evidence_finding_prompt_file: evidence_finding.md
+      opinion_prompt_file: opinion.md
+      attribution_prompt_file: attribution.md
+      style_review_prompt_file: style_review.md
 
   agents:
     writer:
-      implementation: default
+      agent_name: default
       llm:
         model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
         api_base: http://127.0.0.1:1234/v1
@@ -150,7 +154,7 @@ article_generation:
         timeout_seconds: 180
 
     article_review:
-      implementation: default
+      agent_name: default
       llm:
         model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
         api_base: http://127.0.0.1:1234/v1
@@ -164,7 +168,7 @@ article_generation:
         timeout_seconds: 90
 
     concern_mapping:
-      implementation: default
+      agent_name: default
       llm:
         model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
         api_base: http://127.0.0.1:1234/v1
@@ -179,7 +183,7 @@ article_generation:
 
     specialists:
       fact_check:
-        implementation: default
+        agent_name: default
         llm:
           model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
           api_base: http://127.0.0.1:1234/v1
@@ -193,7 +197,7 @@ article_generation:
           timeout_seconds: 60
 
       evidence_finding:
-        implementation: default
+        agent_name: default
         llm:
           model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
           api_base: http://127.0.0.1:1234/v1
@@ -207,7 +211,7 @@ article_generation:
           timeout_seconds: 60
 
       opinion:
-        implementation: default
+        agent_name: default
         llm:
           model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
           api_base: http://127.0.0.1:1234/v1
@@ -221,7 +225,7 @@ article_generation:
           timeout_seconds: 60
 
       attribution:
-        implementation: default
+        agent_name: default
         llm:
           model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
           api_base: http://127.0.0.1:1234/v1
@@ -235,7 +239,7 @@ article_generation:
           timeout_seconds: 60
 
       style_review:
-        implementation: default
+        agent_name: default
         llm:
           model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
           api_base: http://127.0.0.1:1234/v1

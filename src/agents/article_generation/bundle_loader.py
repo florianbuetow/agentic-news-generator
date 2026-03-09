@@ -45,7 +45,7 @@ class LoadedBundle(BaseModel):
 
     manifest: Manifest
     source_text: str = Field(..., min_length=1)
-    topics: list[dict[str, Any]]
+    topics: dict[str, Any] | list[dict[str, Any]]
     bundle_dir: str
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -103,17 +103,16 @@ def load_bundle(bundle_dir: Path) -> LoadedBundle:
     with open(topics_path, encoding="utf-8") as handle:
         topics_raw = json.load(handle)
 
-    if not isinstance(topics_raw, list):
-        raise ValueError(f"Topics file must contain a JSON array: {topics_path}")
+    if not isinstance(topics_raw, (dict, list)):
+        raise ValueError(f"Topics file must contain a JSON object or array: {topics_path}")
 
-    topics = cast(list[dict[str, Any]], topics_raw)
+    topics = cast(dict[str, Any] | list[dict[str, Any]], topics_raw)
 
     logger.info(
-        "Loaded bundle: slug=%s title=%r source_chars=%d topics=%d",
+        "Loaded bundle: slug=%s title=%r source_chars=%d",
         manifest.slug,
         manifest.article_title,
         len(source_text),
-        len(topics),
     )
 
     return LoadedBundle(

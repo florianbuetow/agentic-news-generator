@@ -6,8 +6,14 @@ PASSED: {pass_status}
 REASONING:
 {reasoning}
 
+REQUIRED CHANGES:
+{todo_list}
+
 IMPROVEMENT SUGGESTIONS:
 {improvement_suggestions}
+
+SPECIALIST VERDICTS:
+{verdicts}
 
 Please revise your article. Here is the original context:
 

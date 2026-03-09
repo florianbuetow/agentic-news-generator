@@ -41,7 +41,7 @@ def _write_test_config(
     spec_overrides = specialist_overrides or {}
 
     def agent_slot(impl: str = "default") -> dict:
-        return {"implementation": impl, "llm": llm}
+        return {"agent_name": impl, "llm": llm}
 
     # Create required directories
     for subdir in ["knowledgebase", "knowledgebase_index", "institutional_memory",
@@ -84,7 +84,6 @@ def _write_test_config(
                 "output": {
                     "final_articles_dir": str(tmp_dir / "output" / "articles"),
                     "run_artifacts_dir": str(tmp_dir / "output" / "article_editor_runs"),
-                    "save_intermediate_results": True,
                 },
                 "prompts": {
                     "root_dir": "./prompts/article_editor",
@@ -93,6 +92,11 @@ def _write_test_config(
                     "article_review_prompt_file": "article_review.md",
                     "concern_mapping_prompt_file": "concern_mapping.md",
                     "specialists_dir": "specialists",
+                    "fact_check_prompt_file": "fact_check.md",
+                    "evidence_finding_prompt_file": "evidence_finding.md",
+                    "opinion_prompt_file": "opinion.md",
+                    "attribution_prompt_file": "attribution.md",
+                    "style_review_prompt_file": "style_review.md",
                 },
             },
             "agents": {
@@ -147,7 +151,7 @@ class TestAgentFactory:
     """Tests for config-driven agent factory."""
 
     def test_mock_specialists_selected_by_config(self, tmp_path: Path) -> None:
-        """When config says implementation=mock, factory returns Mock* agents."""
+        """When config says agent_name=mock, factory returns Mock* agents."""
         config_path = _write_test_config(
             tmp_path,
             specialist_overrides={
@@ -190,57 +194,90 @@ class TestAgentFactory:
         assert isinstance(orchestrator._attribution_agent, MockAttributionAgent)
         assert isinstance(orchestrator._style_review_agent, MockStyleReviewAgent)
 
-    def test_unknown_fact_check_implementation_raises(self, tmp_path: Path) -> None:
-        """Unknown implementation value raises ValueError."""
+    def test_unknown_fact_check_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown agent_name value raises ValueError."""
         config_path = _write_test_config(
             tmp_path,
             specialist_overrides={"fact_check": "unknown_impl"},
         )
         config = Config(config_path)
 
-        with pytest.raises(ValueError, match="Unknown fact_check implementation: 'unknown_impl'"):
+        with pytest.raises(ValueError, match="Unknown fact_check agent_name: 'unknown_impl'"):
             build_chief_editor_orchestrator(config=config)
 
-    def test_unknown_evidence_finding_implementation_raises(self, tmp_path: Path) -> None:
-        """Unknown implementation value raises ValueError."""
+    def test_unknown_evidence_finding_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown agent_name value raises ValueError."""
         config_path = _write_test_config(
             tmp_path,
             specialist_overrides={"evidence_finding": "bogus"},
         )
         config = Config(config_path)
 
-        with pytest.raises(ValueError, match="Unknown evidence_finding implementation: 'bogus'"):
+        with pytest.raises(ValueError, match="Unknown evidence_finding agent_name: 'bogus'"):
             build_chief_editor_orchestrator(config=config)
 
-    def test_unknown_writer_implementation_raises(self, tmp_path: Path) -> None:
-        """Unknown writer implementation raises ValueError."""
+    def test_unknown_writer_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown writer agent_name raises ValueError."""
         config_path = _write_test_config(
             tmp_path,
             agent_overrides={"writer": "bogus"},
         )
         config = Config(config_path)
 
-        with pytest.raises(ValueError, match="Unknown writer implementation: 'bogus'"):
+        with pytest.raises(ValueError, match="Unknown writer agent_name: 'bogus'"):
             build_chief_editor_orchestrator(config=config)
 
-    def test_unknown_article_review_implementation_raises(self, tmp_path: Path) -> None:
-        """Unknown article_review implementation raises ValueError."""
+    def test_unknown_article_review_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown article_review agent_name raises ValueError."""
         config_path = _write_test_config(
             tmp_path,
             agent_overrides={"article_review": "bogus"},
         )
         config = Config(config_path)
 
-        with pytest.raises(ValueError, match="Unknown article_review implementation: 'bogus'"):
+        with pytest.raises(ValueError, match="Unknown article_review agent_name: 'bogus'"):
             build_chief_editor_orchestrator(config=config)
 
-    def test_unknown_concern_mapping_implementation_raises(self, tmp_path: Path) -> None:
-        """Unknown concern_mapping implementation raises ValueError."""
+    def test_unknown_concern_mapping_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown concern_mapping agent_name raises ValueError."""
         config_path = _write_test_config(
             tmp_path,
             agent_overrides={"concern_mapping": "bogus"},
         )
         config = Config(config_path)
 
-        with pytest.raises(ValueError, match="Unknown concern_mapping implementation: 'bogus'"):
+        with pytest.raises(ValueError, match="Unknown concern_mapping agent_name: 'bogus'"):
+            build_chief_editor_orchestrator(config=config)
+
+    def test_unknown_opinion_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown opinion agent_name raises ValueError."""
+        config_path = _write_test_config(
+            tmp_path,
+            specialist_overrides={"opinion": "bogus"},
+        )
+        config = Config(config_path)
+
+        with pytest.raises(ValueError, match="Unknown opinion agent_name: 'bogus'"):
+            build_chief_editor_orchestrator(config=config)
+
+    def test_unknown_attribution_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown attribution agent_name raises ValueError."""
+        config_path = _write_test_config(
+            tmp_path,
+            specialist_overrides={"attribution": "bogus"},
+        )
+        config = Config(config_path)
+
+        with pytest.raises(ValueError, match="Unknown attribution agent_name: 'bogus'"):
+            build_chief_editor_orchestrator(config=config)
+
+    def test_unknown_style_review_agent_name_raises(self, tmp_path: Path) -> None:
+        """Unknown style_review agent_name raises ValueError."""
+        config_path = _write_test_config(
+            tmp_path,
+            specialist_overrides={"style_review": "bogus"},
+        )
+        config = Config(config_path)
+
+        with pytest.raises(ValueError, match="Unknown style_review agent_name: 'bogus'"):
             build_chief_editor_orchestrator(config=config)

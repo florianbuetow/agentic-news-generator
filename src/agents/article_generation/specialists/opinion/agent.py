@@ -6,7 +6,7 @@ import json
 import logging
 
 from src.agents.article_generation.base import BaseSpecialistAgent, LLMClient
-from src.agents.article_generation.models import ArticleResponse, Concern, Verdict
+from src.agents.article_generation.models import AgentResult, ArticleResponse, Concern, Verdict
 from src.agents.article_generation.prompts.loader import PromptLoader
 from src.config import Config, LLMConfig
 
@@ -39,7 +39,7 @@ class OpinionAgent(BaseSpecialistAgent):
         source_text: str,
         source_metadata: dict[str, str | None],
         style_requirements: str,
-    ) -> Verdict:
+    ) -> AgentResult[Verdict]:
         """Evaluate concern using opinion prompt."""
         logger.info("Evaluating concern #%d: excerpt=%r", concern.concern_id, concern.excerpt[:80])
         prompt_template = self._prompt_loader.load_specialist_prompt(
@@ -57,4 +57,4 @@ class OpinionAgent(BaseSpecialistAgent):
         response = self._call_llm(messages=[{"role": "user", "content": user_prompt}])
         verdict = self._parse_json_response(response=response, model_class=Verdict)
         logger.info("Opinion verdict: concern_id=%d status=%s misleading=%s", verdict.concern_id, verdict.status, verdict.misleading)
-        return verdict
+        return AgentResult(prompt=user_prompt, output=verdict)

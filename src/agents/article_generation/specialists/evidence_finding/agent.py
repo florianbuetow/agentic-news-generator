@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from datetime import UTC, datetime
 from typing import cast
 
 from src.agents.article_generation.base import BaseSpecialistAgent, LLMClient, PerplexityClient
 from src.agents.article_generation.chief_editor.institutional_memory import InstitutionalMemoryStore
-from src.agents.article_generation.models import ArticleResponse, Concern, EvidenceRecord, Verdict
+from src.agents.article_generation.models import AgentResult, ArticleResponse, Concern, EvidenceRecord, Verdict
 from src.agents.article_generation.prompts.loader import PromptLoader
 from src.config import Config, LLMConfig
 
@@ -49,7 +48,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
         source_text: str,
         source_metadata: dict[str, str | None],
         style_requirements: str,
-    ) -> Verdict:
+    ) -> AgentResult[Verdict]:
         """Evaluate evidence support with cached external search."""
         logger.info("Evaluating concern #%d: excerpt=%r", concern.concern_id, concern.excerpt[:80])
         normalized_query = self._normalize_query(concern.review_note)
@@ -60,7 +59,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
         )
         if cached_record is not None:
             logger.info("Evidence cache hit for concern #%d", concern.concern_id)
-            return cached_record.verdict
+            return AgentResult(prompt="[cache-hit]", output=cached_record.verdict)
 
         logger.info("Evidence cache miss for concern #%d, querying Perplexity model=%s", concern.concern_id, self._perplexity_model)
         search_response = self._perplexity_client.search(
@@ -111,11 +110,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
         self._institutional_memory.persist_evidence(record=record)
         logger.info("Evidence record persisted: cache_key=%s", cache_key_hash)
 
-        return verdict
-
-    def _normalize_query(self, query: str) -> str:
-        """Normalize query for stable cache keys."""
-        return re.sub(r"\s+", " ", query.strip().lower())
+        return AgentResult(prompt=user_prompt, output=verdict)
 
     def _extract_citations(self, *, search_response: dict[str, object]) -> list[str]:
         """Extract citations from a Perplexity-compatible response payload."""
@@ -124,13 +119,3 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
             typed_citations = cast(list[object], citations_value)
             return [item for item in typed_citations if isinstance(item, str)]
         return []
-
-    def _build_article_id(self, source_metadata: dict[str, str | None]) -> str:
-        """Build deterministic article identifier."""
-        source_file = source_metadata.get("source_file")
-        topic_slug = source_metadata.get("topic_slug")
-        if source_file is None:
-            raise ValueError("Missing required metadata field: source_file")
-        if topic_slug is None:
-            raise ValueError("Missing required metadata field: topic_slug")
-        return f"{source_file}:{topic_slug}"

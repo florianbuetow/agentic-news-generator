@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Preprocess article inputs: create bundles from video source files.
+"""Prepare article input data: create bundles from video source files.
 
-Given a video ID, finds the cleaned transcript, metadata, and topics files,
-then copies them into a bundle directory with a manifest.json.
+Given one or more video IDs, finds the cleaned transcript, metadata, and topics
+files, then copies them into a bundle directory with a manifest.json.
+
+The source files (transcript, topics, metadata) are copied as-is — they are
+immutable inputs from earlier pipeline stages. Only the manifest is created
+by this script.
 """
 
 import json
@@ -25,7 +29,7 @@ def find_transcript(transcripts_cleaned_dir: Path, video_id: str) -> Path:
     Raises:
         FileNotFoundError: If no matching transcript is found.
     """
-    pattern = f"*[{video_id}]*.txt"
+    pattern = f"*[[]{video_id}[]]*.txt"
     matches = list(transcripts_cleaned_dir.rglob(pattern))
     if len(matches) == 0:
         raise FileNotFoundError(f"No cleaned transcript found for video_id={video_id} in {transcripts_cleaned_dir}")
@@ -43,7 +47,7 @@ def find_metadata(metadata_dir: Path, channel_name: str, video_id: str) -> Path:
     video_metadata_dir = metadata_dir / channel_name / "video"
     if not video_metadata_dir.exists():
         raise FileNotFoundError(f"Video metadata directory not found: {video_metadata_dir}")
-    pattern = f"*[{video_id}]*.info.json"
+    pattern = f"*[[]{video_id}[]]*.info.json"
     matches = list(video_metadata_dir.glob(pattern))
     if len(matches) == 0:
         raise FileNotFoundError(f"No metadata found for video_id={video_id} in {video_metadata_dir}")
@@ -53,9 +57,10 @@ def find_metadata(metadata_dir: Path, channel_name: str, video_id: str) -> Path:
 
 
 def find_topics(topics_dir: Path, channel_name: str, video_id: str) -> Path:
-    """Find the topics JSON file matching a video ID.
+    """Find the topics JSON file matching a video ID by filename pattern.
 
-    Scans JSON files in the channel's topics directory for a matching video_id field.
+    Searches for files matching *[<video_id>]*_topics.json in the channel's
+    topics directory. This matches the output pattern from extract-topics.py.
 
     Raises:
         FileNotFoundError: If no matching topics file is found.
@@ -63,18 +68,15 @@ def find_topics(topics_dir: Path, channel_name: str, video_id: str) -> Path:
     channel_topics_dir = topics_dir / channel_name
     if not channel_topics_dir.exists():
         raise FileNotFoundError(f"Channel topics directory not found: {channel_topics_dir}")
-
-    for json_file in channel_topics_dir.glob("*.json"):
-        with open(json_file, encoding="utf-8") as handle:
-            file_data: object = json.load(handle)
-        if isinstance(file_data, dict) and file_data.get("video_id") == video_id:
-            return json_file
-        if isinstance(file_data, list):
-            for item in file_data:
-                if isinstance(item, dict) and item.get("video_id") == video_id:
-                    return json_file
-
-    raise FileNotFoundError(f"No topics file found for video_id={video_id} in {channel_topics_dir}")
+    pattern = f"*[[]{video_id}[]]*_topics.json"
+    matches = list(channel_topics_dir.glob(pattern))
+    # Exclude macOS resource fork files
+    matches = [m for m in matches if not m.name.startswith("._")]
+    if len(matches) == 0:
+        raise FileNotFoundError(f"No topics file found for video_id={video_id} in {channel_topics_dir}")
+    if len(matches) > 1:
+        raise ValueError(f"Multiple topics files found for video_id={video_id}: {matches}")
+    return matches[0]
 
 
 def extract_metadata_fields(metadata_path: Path) -> dict[str, str]:
@@ -133,15 +135,20 @@ def create_manifest(
     }
 
 
-def preprocess_video(*, config: Config, video_id: str) -> Path:
+def prepare_bundle(*, config: Config, video_id: str) -> Path:
     """Create an article input bundle for a video ID.
+
+    Finds the cleaned transcript, metadata, and topics files for the given
+    video ID, copies them as-is into a bundle directory, and creates a
+    manifest.json.
 
     Returns:
         Path to the created bundle directory.
     """
     transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
     metadata_dir = config.getDataDownloadsMetadataDir()
-    topics_dir = config.getDataTranscriptsTopicsDir()
+    td_config = config.get_topic_detection_config()
+    topics_dir = config.getDataDir() / td_config.output_dir
     articles_input_dir = config.getDataArticlesInputDir()
 
     logger.info("Finding source files for video_id=%s", video_id)
@@ -180,7 +187,7 @@ def preprocess_video(*, config: Config, video_id: str) -> Path:
 
 
 def main() -> int:
-    """Run article preprocessing for given video IDs."""
+    """Prepare article input bundles for given video IDs."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)-8s %(name)s — %(message)s",
@@ -188,7 +195,7 @@ def main() -> int:
     )
 
     if len(sys.argv) < 2:
-        logger.error("Usage: preprocess-articles.py <video_id> [<video_id> ...]")
+        logger.error("Usage: prepare-article-input-data.py <video_id> [<video_id> ...]")
         return 1
 
     video_ids = sys.argv[1:]
@@ -206,15 +213,15 @@ def main() -> int:
 
     for video_id in video_ids:
         try:
-            logger.info("=== Preprocessing video: %s ===", video_id)
-            preprocess_video(config=config, video_id=video_id)
+            logger.info("=== Preparing article input data: %s ===", video_id)
+            prepare_bundle(config=config, video_id=video_id)
             success_count += 1
         except Exception as exc:
-            logger.exception("Failed to preprocess video %s: %s", video_id, exc)
+            logger.exception("Failed to prepare bundle for video %s: %s", video_id, exc)
             failure_count += 1
 
     logger.info(
-        "=== Preprocessing Complete === success=%d failures=%d total=%d",
+        "=== Preparation Complete === success=%d failures=%d total=%d",
         success_count,
         failure_count,
         len(video_ids),
