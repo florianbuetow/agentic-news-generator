@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+    xmlns:xml="http://www.w3.org/XML/1998/namespace">
+  <skos:Concept rdf:about="urn:root_a">
+    <skos:prefLabel xml:lang="en">A Root</skos:prefLabel>
+  </skos:Concept>
+
+  <skos:Concept rdf:about="urn:root_b">
+    <skos:prefLabel xml:lang="en">B Root</skos:prefLabel>
+  </skos:Concept>
+
+  <skos:Concept rdf:about="urn:root_c">
+    <skos:prefLabel xml:lang="en">Z Root</skos:prefLabel>
+    <skos:prefLabel xml:lang="en">C Root</skos:prefLabel>
+  </skos:Concept>
+
+  <skos:Concept rdf:about="urn:child_x">
+    <skos:prefLabel xml:lang="en">Child</skos:prefLabel>
+    <skos:broader rdf:resource="urn:root_a" />
+    <skos:broader rdf:resource="urn:root_b" />
+  </skos:Concept>
+
+  <skos:Concept rdf:about="urn:grand_y">
+    <skos:prefLabel xml:lang="en">Grand</skos:prefLabel>
+    <skos:broader rdf:resource="urn:child_x" />
+  </skos:Concept>
+</rdf:RDF>

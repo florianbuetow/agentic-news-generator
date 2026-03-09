@@ -1,0 +1,67 @@
+1
+00:00:00,000 --> 00:00:05,000
+Welcome to today's episode where we discuss the latest developments in artificial intelligence.
+
+2
+00:00:05,000 --> 00:00:10,000
+Large language models have been making significant progress in reasoning capabilities.
+
+3
+00:00:10,000 --> 00:00:15,000
+Companies like OpenAI and Google are competing to build the most capable models.
+
+4
+00:00:15,000 --> 00:00:20,000
+The compute requirements for training these models continue to grow exponentially.
+
+5
+00:00:20,000 --> 00:00:25,000
+New chip architectures from Nvidia and AMD are designed specifically for AI workloads.
+
+6
+00:00:25,000 --> 00:00:30,000
+The H100 GPU has become the standard hardware for training large models.
+
+7
+00:00:30,000 --> 00:00:35,000
+Meanwhile regulation of AI systems is becoming a major policy topic.
+
+8
+00:00:35,000 --> 00:00:40,000
+The European Union has passed the AI Act which creates new compliance requirements.
+
+9
+00:00:40,000 --> 00:00:45,000
+Companies must now classify their AI systems by risk level under the new framework.
+
+10
+00:00:45,000 --> 00:00:50,000
+In the United States Congress is still debating various approaches to AI governance.
+
+11
+00:00:50,000 --> 00:00:55,000
+Some lawmakers favor a light touch approach while others want strict regulations.
+
+12
+00:00:55,000 --> 00:01:00,000
+The debate around AI safety continues to intensify as models become more capable.
+
+13
+00:01:00,000 --> 00:01:05,000
+Researchers are working on alignment techniques to ensure AI systems behave as intended.
+
+14
+00:01:05,000 --> 00:01:10,000
+Constitutional AI and reinforcement learning from human feedback are two key approaches.
+
+15
+00:01:10,000 --> 00:01:15,000
+The open source community has also made impressive progress with models like Llama and Mistral.
+
+16
+00:01:15,000 --> 00:01:20,000
+These open models are enabling smaller companies and researchers to experiment with AI.
+
+17
+00:01:20,000 --> 00:01:25,000
+That wraps up our discussion for today. Thanks for watching and see you next time.
