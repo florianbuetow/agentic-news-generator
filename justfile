@@ -1,9 +1,44 @@
+# =============================================================================
+# Justfile Rules (follow these when editing justfile):
+#
+# 1. Use printf (not echo) to print colors — some terminals won't render
+#    colors with echo.
+#
+# 2. Always add an empty `@echo ""` line before and after each target's
+#    command block.
+#
+# 3. Always add new targets to the help section and update it when targets
+#    are added, modified or removed.
+#
+# 4. Target ordering in help (and in this file) matters:
+#    - Setup targets first (init, setup, install, etc.)
+#    - Start/stop/run targets next
+#    - Code generation / data tooling targets next
+#    - Checks, linting, and tests next (ordered fastest to slowest)
+#    Group related targets together and separate groups with an empty
+#    `@echo ""` line in the help output.
+#
+# 5. Composite targets (e.g. ci) that call multiple sub-targets must fail
+#    fast: exit 1 on the first error. Never skip over errors or warnings.
+#    Use `set -e` or `&&` chaining to ensure immediate abort with the
+#    appropriate error message.
+#
+# 6. Every target must end with a clear short status message:
+#    - On success: green (\033[32m) message confirming completion.
+#      E.g. printf "\033[32m✓ init completed successfully\033[0m\n"
+#    - On failure: red (\033[31m) message indicating what failed, then exit 1.
+#      E.g. printf "\033[31m✗ ci failed: tests exited with errors\033[0m\n"
+# 7. Targets must be shown in groups separated by empty newlines in the help section.
+#    - init/destroy/clean/help on top, ci and other tests on the bottom, between other groups
+# =============================================================================
+
+
 # Load environment variables from .env file
 set dotenv-load := true
 
 # Default recipe: show available commands
 _default:
-    @just --list
+    @just help
 
 # Show help information
 help:
@@ -12,8 +47,71 @@ help:
     @echo ""
     @printf "\033[0;34m=== agentic-news-generator ===\033[0m\n"
     @echo ""
-    @echo "Available commands:"
-    @just --list
+    @printf "\033[0;33mSetup & Lifecycle:\033[0m\n"
+    @printf "  %-38s %s\n" "init" "Initialize the development environment"
+    @printf "  %-38s %s\n" "destroy" "Destroy the virtual environment and frontend artifacts"
+    @printf "  %-38s %s\n" "newspaper-destroy" "Clean up generated newspaper files"
+    @printf "  %-38s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
+    @printf "  %-38s %s\n" "check" "Check if all required tools and prerequisites are available"
+    @printf "  %-38s %s\n" "help" "Show this help information"
+    @echo ""
+    @printf "\033[0;33mRun & Pipeline:\033[0m\n"
+    @printf "  %-38s %s\n" "run" "Run the main application"
+    @printf "  %-38s %s\n" "all" "Run the complete pipeline"
+    @printf "  %-38s %s\n" "all-ingestion" "Run pipeline without topic detection"
+    @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
+    @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
+    @printf "  %-38s %s\n" "stats" "Show processing status of downloads"
+    @echo ""
+    @printf "\033[0;33mData Pipeline:\033[0m\n"
+    @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
+    @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
+    @printf "  %-38s %s\n" "transcribe" "Transcribe audio files to text"
+    @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
+    @printf "  %-38s %s\n" "analyze-transcripts-hallucinations" "Analyze transcripts for hallucinations"
+    @printf "  %-38s %s\n" "transcripts-remove-hallucinations" "Remove hallucinations from transcripts using LLM"
+    @echo ""
+    @printf "\033[0;33mTopic Detection:\033[0m\n"
+    @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
+    @printf "  %-38s %s\n" "topics-tree" "Build hierarchical topic trees (TreeSeg-style)"
+    @printf "  %-38s %s\n" "topics-embed" "Generate embeddings from SRT transcripts (Step 1)"
+    @printf "  %-38s %s\n" "topics-boundaries" "Detect topic boundaries from embeddings (Step 2)"
+    @printf "  %-38s %s\n" "topics-extract" "Extract topics from segments using LLM (Step 3)"
+    @printf "  %-38s %s\n" "topics-visualize" "Generate visualizations from embeddings (Step 4)"
+    @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
+    @echo ""
+    @printf "\033[0;33mNewspaper & Frontend:\033[0m\n"
+    @printf "  %-38s %s\n" "notebooks" "Launch Jupyter notebook server"
+    @printf "  %-38s %s\n" "compile-articles" "Compile markdown articles into articles.js"
+    @printf "  %-38s %s\n" "newspaper-generate" "Generate static newspaper website"
+    @printf "  %-38s %s\n" "newspaper-serve" "Run newspaper development server"
+    @echo ""
+    @printf "\033[0;33mCode Quality:\033[0m\n"
+    @printf "  %-38s %s\n" "code-format" "Auto-fix code style and formatting"
+    @printf "  %-38s %s\n" "code-style" "Check code style and formatting (read-only)"
+    @printf "  %-38s %s\n" "code-config" "Check config.yaml matches template structure"
+    @printf "  %-38s %s\n" "code-spell" "Check spelling in code and documentation"
+    @printf "  %-38s %s\n" "code-typecheck" "Run static type checking with mypy"
+    @printf "  %-38s %s\n" "code-lspchecks" "Run strict type checking with Pyright (LSP-based)"
+    @printf "  %-38s %s\n" "code-security" "Run security checks with bandit"
+    @printf "  %-38s %s\n" "code-deptry" "Check dependency hygiene with deptry"
+    @printf "  %-38s %s\n" "code-semgrep" "Run Semgrep static analysis"
+    @printf "  %-38s %s\n" "code-audit" "Scan dependencies for known vulnerabilities"
+    @printf "  %-38s %s\n" "code-stats" "Generate code statistics with pygount"
+    @echo ""
+    @printf "\033[0;33mAI Reviews:\033[0m\n"
+    @printf "  %-38s %s\n" "ai-review-unit-tests" "Run AI-powered fake unit test detector"
+    @printf "  %-38s %s\n" "ai-review-unit-tests-nocache" "Run AI-powered fake unit test detector (no cache)"
+    @printf "  %-38s %s\n" "ai-review-shell-scripts" "Run AI-powered shell script reviewer"
+    @printf "  %-38s %s\n" "ai-review-shell-scripts-nocache" "Run AI-powered shell script reviewer (no cache)"
+    @echo ""
+    @printf "\033[0;33mCI & Testing:\033[0m\n"
+    @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
+    @printf "  %-38s %s\n" "test-coverage" "Run unit tests with coverage report"
+    @printf "  %-38s %s\n" "ci" "Run ALL validation checks (verbose)"
+    @printf "  %-38s %s\n" "ci-quiet" "Run ALL validation checks silently"
+    @printf "  %-38s %s\n" "ci-ai" "Run AI-based CI checks"
+    @printf "  %-38s %s\n" "ci-ai-quiet" "Run AI-based CI checks silently"
     @echo ""
 
 # Initialize the development environment
@@ -215,6 +313,13 @@ topics-extract:
     @uv run python scripts/extract-topics.py
     @echo ""
 
+# Build deterministic hierarchical topic trees (TreeSeg-style)
+topics-tree:
+    @echo ""
+    @printf "\033[0;34m=== Building Hierarchical Topic Trees ===\033[0m\n"
+    @uv run python scripts/topic-tree.py
+    @echo ""
+
 # Generate visualizations from embeddings (Step 4)
 topics-visualize:
     @echo ""
@@ -222,19 +327,29 @@ topics-visualize:
     @uv run python scripts/visualize-embeddings.py
     @echo ""
 
+# Export topic segments to mini-rag format (.txt + .json pairs). Requires: --export-dir <path> [--file <path>] [--force]
+export-to-minirag *ARGS:
+    @echo ""
+    @printf "\033[0;34m=== Exporting Topics to Mini-RAG Format ===\033[0m\n"
+    @uv run python scripts/export-to-minirag.py {{ ARGS }}
+    @echo ""
+
 # Run complete topic detection pipeline (all 4 steps)
 topics-all:
     @echo ""
     @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
-    @just topics-embed
-    @just topics-boundaries
-    @just topics-extract
-    @just topics-visualize
+    @just topics-tree
     @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 
-# Show processing status of downloads
+# Check if LM Studio is running and required models are loaded
 status:
+    @echo ""
+    @uv run scripts/lmstudio_status.py
+    @echo ""
+
+# Show processing status of downloads
+stats:
     @echo ""
     @uv run scripts/status.py
     @echo ""

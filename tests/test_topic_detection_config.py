@@ -10,7 +10,13 @@ from src.config import (
     Config,
     TopicDetectionConfig,
     TopicDetectionEmbeddingConfig,
+    TopicDetectionHierarchicalSegmentationConfig,
+    TopicDetectionKeyBERTKeyphrasesConfig,
+    TopicDetectionKeyphrasesConfig,
     TopicDetectionSlidingWindowConfig,
+    TopicDetectionTaxonomyConfig,
+    TopicDetectionTFIDFKeyphrasesConfig,
+    TopicDetectionYAKEKeyphrasesConfig,
 )
 
 
@@ -80,6 +86,67 @@ def get_valid_topic_detection_config() -> dict[str, object]:
             "max_retries": 3,
             "retry_delay": 2.0,
             "timeout_seconds": 30,
+        },
+        "hierarchical_segmentation": {
+            "enabled": True,
+            "method": "treeseg_divisive_sse",
+            "context_window_entries": 8,
+            "max_depth": 4,
+            "min_leaf_entries": 12,
+            "min_leaf_seconds": 45.0,
+            "min_gain": 0.02,
+        },
+        "taxonomy": {
+            "enabled": True,
+            "taxonomy_name": "acm_ccs_2012",
+            "acm_ccs_2012_xml_path": "input/taxonomies/acm_ccs2012.xml",
+            "cache_dir": "input/taxonomies/cache",
+            "top_k_per_node": 3,
+            "min_similarity": 0.3,
+        },
+        "keyphrases": {
+            "tfidf": {
+                "enabled": True,
+                "top_k_per_node": 12,
+                "ngram_range_min": 1,
+                "ngram_range_max": 3,
+                "min_df": 2,
+                "max_df": 0.9,
+                "stop_words": "english",
+                "max_features": 20000,
+                "lowercase": True,
+            },
+            "yake": {
+                "enabled": True,
+                "top_k_per_node": 12,
+                "max_ngram_size": 3,
+                "deduplication_threshold": 0.9,
+                "deduplication_algo": "seqm",
+                "window_size": 1,
+            },
+            "keybert": {
+                "enabled": True,
+                "top_k_per_node": 12,
+                "keyphrase_ngram_range_min": 1,
+                "keyphrase_ngram_range_max": 3,
+                "use_mmr": True,
+                "mmr_diversity": 0.5,
+                "stop_words": "english",
+            },
+        },
+        "llm_label": {
+            "enabled": True,
+            "llm": {
+                "model": "openai/gemma-3-1b-it",
+                "api_base": "http://127.0.0.1:1234/v1",
+                "api_key": "lm-studio",
+                "context_window": 8192,
+                "max_tokens": 512,
+                "temperature": 0.3,
+                "context_window_threshold": 90,
+                "max_retries": 3,
+                "retry_delay": 2.0,
+            },
         },
         "output_dir": "output/topics",
     }
@@ -181,6 +248,112 @@ class TestTopicDetectionSlidingWindowConfig:
         assert any(err["loc"] == ("stride",) for err in errors)
 
 
+class TestTopicDetectionHierarchicalSegmentationConfig:
+    """Tests for TopicDetectionHierarchicalSegmentationConfig model."""
+
+    def test_valid_hierarchical_segmentation_config(self) -> None:
+        """Test valid hierarchical segmentation configuration."""
+        config = TopicDetectionHierarchicalSegmentationConfig(
+            enabled=True,
+            method="treeseg_divisive_sse",
+            context_window_entries=8,
+            max_depth=4,
+            min_leaf_entries=12,
+            min_leaf_seconds=45.0,
+            min_gain=0.02,
+        )
+        assert config.enabled is True
+        assert config.method == "treeseg_divisive_sse"
+        assert config.context_window_entries == 8
+        assert config.max_depth == 4
+
+    def test_invalid_method_raises(self) -> None:
+        """Test invalid method raises ValidationError."""
+        with pytest.raises(ValidationError):
+            TopicDetectionHierarchicalSegmentationConfig(
+                enabled=True,
+                method="unknown",
+                context_window_entries=8,
+                max_depth=4,
+                min_leaf_entries=12,
+                min_leaf_seconds=45.0,
+                min_gain=0.02,
+            )
+
+
+class TestTopicDetectionTaxonomyConfig:
+    """Tests for TopicDetectionTaxonomyConfig model."""
+
+    def test_valid_taxonomy_config(self) -> None:
+        """Test valid taxonomy configuration."""
+        config = TopicDetectionTaxonomyConfig(
+            enabled=True,
+            taxonomy_name="acm_ccs_2012",
+            acm_ccs_2012_xml_path="input/taxonomies/acm_ccs2012.xml",
+            cache_dir="input/taxonomies/cache",
+            top_k_per_node=3,
+            min_similarity=0.3,
+        )
+        assert config.enabled is True
+        assert config.top_k_per_node == 3
+
+
+class TestTopicDetectionKeyphrasesConfig:
+    """Tests for TopicDetectionKeyphrasesConfig container and sub-models."""
+
+    def test_valid_tfidf_config(self) -> None:
+        """Test valid TF-IDF keyphrases configuration."""
+        config = TopicDetectionTFIDFKeyphrasesConfig(
+            enabled=True,
+            top_k_per_node=12,
+            ngram_range_min=1,
+            ngram_range_max=3,
+            min_df=2,
+            max_df=0.9,
+            stop_words="english",
+            max_features=20000,
+            lowercase=True,
+        )
+        assert config.enabled is True
+        assert config.top_k_per_node == 12
+
+    def test_valid_yake_config(self) -> None:
+        """Test valid YAKE keyphrases configuration."""
+        config = TopicDetectionYAKEKeyphrasesConfig(
+            enabled=True,
+            top_k_per_node=12,
+            max_ngram_size=3,
+            deduplication_threshold=0.9,
+            deduplication_algo="seqm",
+            window_size=1,
+        )
+        assert config.enabled is True
+        assert config.top_k_per_node == 12
+        assert config.max_ngram_size == 3
+
+    def test_valid_keybert_config(self) -> None:
+        """Test valid KeyBERT keyphrases configuration."""
+        config = TopicDetectionKeyBERTKeyphrasesConfig(
+            enabled=True,
+            top_k_per_node=12,
+            keyphrase_ngram_range_min=1,
+            keyphrase_ngram_range_max=3,
+            use_mmr=True,
+            mmr_diversity=0.5,
+            stop_words="english",
+        )
+        assert config.enabled is True
+        assert config.use_mmr is True
+
+    def test_valid_container_config(self) -> None:
+        """Test valid container keyphrases configuration."""
+        config_dict = get_valid_topic_detection_config()["keyphrases"]
+        config = TopicDetectionKeyphrasesConfig.model_validate(config_dict)
+        assert config.tfidf.enabled is True
+        assert config.yake.enabled is True
+        assert config.keybert.enabled is True
+
+
 class TestTopicDetectionConfig:
     """Tests for TopicDetectionConfig model."""
 
@@ -192,6 +365,9 @@ class TestTopicDetectionConfig:
         assert config.embedding.provider == "lmstudio"
         assert config.sliding_window.window_size == 50
         assert config.topic_detection_llm.model == "openai/test-model"
+        assert config.hierarchical_segmentation.method == "treeseg_divisive_sse"
+        assert config.taxonomy.taxonomy_name == "acm_ccs_2012"
+        assert config.keyphrases.tfidf.top_k_per_node == 12
         assert config.output_dir == "output/topics"
 
     def test_missing_embedding_section(self) -> None:
@@ -213,6 +389,36 @@ class TestTopicDetectionConfig:
             TopicDetectionConfig.model_validate(config_dict)
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("sliding_window",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_hierarchical_segmentation_section(self) -> None:
+        """Test config with missing hierarchical_segmentation section."""
+        config_dict = get_valid_topic_detection_config()
+        del config_dict["hierarchical_segmentation"]
+
+        with pytest.raises(ValidationError) as exc_info:
+            TopicDetectionConfig.model_validate(config_dict)
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("hierarchical_segmentation",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_taxonomy_section(self) -> None:
+        """Test config with missing taxonomy section."""
+        config_dict = get_valid_topic_detection_config()
+        del config_dict["taxonomy"]
+
+        with pytest.raises(ValidationError) as exc_info:
+            TopicDetectionConfig.model_validate(config_dict)
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("taxonomy",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_keyphrases_section(self) -> None:
+        """Test config with missing keyphrases section."""
+        config_dict = get_valid_topic_detection_config()
+        del config_dict["keyphrases"]
+
+        with pytest.raises(ValidationError) as exc_info:
+            TopicDetectionConfig.model_validate(config_dict)
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("keyphrases",) and err["type"] == "missing" for err in errors)
 
 
 class TestConfigTopicDetectionIntegration:
@@ -236,6 +442,7 @@ class TestConfigTopicDetectionIntegration:
         assert td_config.embedding.provider == "lmstudio"
         assert td_config.sliding_window.window_size == 50
         assert td_config.topic_detection_llm.model == "openai/test-model"
+        assert td_config.hierarchical_segmentation.method == "treeseg_divisive_sse"
 
     def test_config_get_topic_detection_config_when_missing(self, tmp_path: Path) -> None:
         """Test that get_topic_detection_config raises KeyError when section is missing."""
@@ -265,6 +472,10 @@ class TestConfigTopicDetectionIntegration:
                 },
                 "sliding_window": get_valid_topic_detection_config()["sliding_window"],
                 "topic_detection_llm": get_valid_topic_detection_config()["topic_detection_llm"],
+                "hierarchical_segmentation": get_valid_topic_detection_config()["hierarchical_segmentation"],
+                "taxonomy": get_valid_topic_detection_config()["taxonomy"],
+                "keyphrases": get_valid_topic_detection_config()["keyphrases"],
+                "llm_label": get_valid_topic_detection_config()["llm_label"],
                 "output_dir": "output/topics",
             },
         }

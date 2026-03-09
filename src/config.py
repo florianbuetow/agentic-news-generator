@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator
 
 
 class ParagraphConfig(BaseModel):
@@ -286,12 +286,142 @@ class TopicDetectionSlidingWindowConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class TopicDetectionHierarchicalSegmentationConfig(BaseModel):
+    """Configuration for deterministic hierarchical topic segmentation."""
+
+    enabled: bool = Field(..., description="Enable hierarchical topic segmentation output")
+    method: str = Field(..., description="Segmentation method identifier")
+    context_window_entries: int = Field(..., gt=0, description="Number of SRT entries in each embedding context block")
+    max_depth: int = Field(..., ge=0, description="Maximum depth of the binary topic tree (0=root only)")
+    min_leaf_entries: int = Field(..., gt=0, description="Minimum SRT entries in each leaf node")
+    min_leaf_seconds: float = Field(..., ge=0, description="Minimum duration in seconds for each leaf node")
+    min_gain: float = Field(..., ge=0, description="Minimum SSE gain required to accept a split")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, method: str) -> str:
+        """Validate supported hierarchical segmentation methods."""
+        valid = {"treeseg_divisive_sse"}
+        if method not in valid:
+            raise ValueError(f"Invalid hierarchical segmentation method: '{method}'. Supported: {', '.join(sorted(valid))}")
+        return method
+
+
+class TopicDetectionTaxonomyConfig(BaseModel):
+    """Configuration for deterministic taxonomy mapping."""
+
+    enabled: bool = Field(..., description="Enable taxonomy label mapping for each node")
+    taxonomy_name: str = Field(..., min_length=1, description="Taxonomy identifier (e.g., 'acm_ccs_2012')")
+    acm_ccs_2012_xml_path: str = Field(..., min_length=1, description="Path to ACM CCS 2012 SKOS XML (relative to data_dir)")
+    cache_dir: str = Field(..., min_length=1, description="Directory for cached taxonomy embeddings (relative to data_dir)")
+    top_k_per_node: int = Field(..., gt=0, description="Top-K taxonomy labels to emit per node")
+    min_similarity: float = Field(..., ge=0.0, le=1.0, description="Minimum cosine similarity threshold to emit a label")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionTFIDFKeyphrasesConfig(BaseModel):
+    """Configuration for deterministic TF-IDF keyphrase extraction."""
+
+    enabled: bool = Field(..., description="Enable TF-IDF keyphrase extraction for each node")
+    top_k_per_node: int = Field(..., gt=0, description="Top-K TF-IDF keyphrases to emit per node")
+    ngram_range_min: int = Field(..., ge=1, description="Minimum n-gram length for keyphrases")
+    ngram_range_max: int = Field(..., ge=1, description="Maximum n-gram length for keyphrases")
+    min_df: int = Field(..., ge=1, description="Minimum document frequency for terms")
+    max_df: float = Field(..., gt=0.0, le=1.0, description="Maximum document frequency fraction for terms (0-1)")
+    stop_words: str | None = Field(..., description="Stop word list name (e.g., 'english') or None")
+    max_features: int = Field(..., gt=0, description="Maximum vocabulary size for TF-IDF")
+    lowercase: bool = Field(..., description="Lowercase text before tokenization")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @field_validator("ngram_range_max")
+    @classmethod
+    def validate_ngram_range(cls, ngram_range_max: int, info: ValidationInfo) -> int:
+        """Validate that ngram_range_max is >= ngram_range_min."""
+        ngram_range_min_raw = info.data.get("ngram_range_min")
+        if ngram_range_min_raw is None:
+            raise ValueError("ngram_range_min must be provided")
+
+        ngram_range_min = cast(int, ngram_range_min_raw)
+        if ngram_range_max < ngram_range_min:
+            raise ValueError("ngram_range_max must be >= ngram_range_min")
+        return ngram_range_max
+
+
+class TopicDetectionYAKEKeyphrasesConfig(BaseModel):
+    """Configuration for YAKE keyphrase extraction."""
+
+    enabled: bool = Field(..., description="Enable YAKE keyphrase extraction for each node")
+    top_k_per_node: int = Field(..., gt=0, description="Top-K YAKE keyphrases to emit per node")
+    max_ngram_size: int = Field(..., ge=1, description="Maximum n-gram size for keyphrases")
+    deduplication_threshold: float = Field(..., ge=0.0, le=1.0, description="Deduplication threshold for similar keyphrases")
+    deduplication_algo: str = Field(..., description="Deduplication algorithm ('seqm' or 'lev')")
+    window_size: int = Field(..., ge=1, description="Window size for co-occurrence statistics")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionKeyBERTKeyphrasesConfig(BaseModel):
+    """Configuration for KeyBERT keyphrase extraction."""
+
+    enabled: bool = Field(..., description="Enable KeyBERT keyphrase extraction for each node")
+    top_k_per_node: int = Field(..., gt=0, description="Top-K KeyBERT keyphrases to emit per node")
+    keyphrase_ngram_range_min: int = Field(..., ge=1, description="Minimum n-gram length for keyphrases")
+    keyphrase_ngram_range_max: int = Field(..., ge=1, description="Maximum n-gram length for keyphrases")
+    use_mmr: bool = Field(..., description="Use Maximal Marginal Relevance for diverse keyphrases")
+    mmr_diversity: float = Field(..., ge=0.0, le=1.0, description="MMR diversity parameter (0=most similar, 1=most diverse)")
+    stop_words: str | None = Field(..., description="Stop word list name (e.g., 'english') or None")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @field_validator("keyphrase_ngram_range_max")
+    @classmethod
+    def validate_ngram_range(cls, keyphrase_ngram_range_max: int, info: ValidationInfo) -> int:
+        """Validate that keyphrase_ngram_range_max is >= keyphrase_ngram_range_min."""
+        keyphrase_ngram_range_min_raw = info.data.get("keyphrase_ngram_range_min")
+        if keyphrase_ngram_range_min_raw is None:
+            raise ValueError("keyphrase_ngram_range_min must be provided")
+
+        keyphrase_ngram_range_min = cast(int, keyphrase_ngram_range_min_raw)
+        if keyphrase_ngram_range_max < keyphrase_ngram_range_min:
+            raise ValueError("keyphrase_ngram_range_max must be >= keyphrase_ngram_range_min")
+        return keyphrase_ngram_range_max
+
+
+class TopicDetectionKeyphrasesConfig(BaseModel):
+    """Container configuration for all keyphrase extraction methods."""
+
+    tfidf: TopicDetectionTFIDFKeyphrasesConfig = Field(..., description="TF-IDF keyphrase extraction configuration")
+    yake: TopicDetectionYAKEKeyphrasesConfig = Field(..., description="YAKE keyphrase extraction configuration")
+    keybert: TopicDetectionKeyBERTKeyphrasesConfig = Field(..., description="KeyBERT keyphrase extraction configuration")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TopicDetectionLLMLabelConfig(BaseModel):
+    """Configuration for LLM-based topic labeling."""
+
+    enabled: bool = Field(..., description="Enable LLM topic labeling for each node")
+    llm: LLMConfig = Field(..., description="LLM connection configuration")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class TopicDetectionConfig(BaseModel):
     """Complete topic detection configuration."""
 
     embedding: TopicDetectionEmbeddingConfig = Field(..., description="Embedding generator configuration")
     sliding_window: TopicDetectionSlidingWindowConfig = Field(..., description="Sliding window segmenter configuration")
     topic_detection_llm: LLMConfig = Field(..., description="LLM config for topic extraction agent")
+    hierarchical_segmentation: TopicDetectionHierarchicalSegmentationConfig = Field(
+        ..., description="Hierarchical topic segmentation configuration"
+    )
+    taxonomy: TopicDetectionTaxonomyConfig = Field(..., description="Taxonomy mapping configuration")
+    keyphrases: TopicDetectionKeyphrasesConfig = Field(..., description="Keyphrase extraction configuration")
+    llm_label: TopicDetectionLLMLabelConfig = Field(..., description="LLM-based topic labeling configuration")
     output_dir: str = Field(..., description="Output directory for topic detection results")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -333,6 +463,11 @@ class TranscriptionConfig(BaseModel):
     verbose: bool = Field(
         ...,
         description="Enable verbose output during transcription",
+    )
+    min_duration: int = Field(
+        ...,
+        ge=0,
+        description="Minimum video duration in seconds to transcribe (shorter videos are skipped)",
     )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -965,3 +1100,13 @@ class Config:
         if not hasattr(self, "_transcription"):
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.sleep_between_files
+
+    def getTranscriptionMinDuration(self) -> int:
+        """Get minimum video duration in seconds for transcription.
+
+        Raises:
+            KeyError: If transcription section is not configured.
+        """
+        if not hasattr(self, "_transcription"):
+            raise KeyError("Missing required key 'transcription' in config file")
+        return self._transcription.min_duration

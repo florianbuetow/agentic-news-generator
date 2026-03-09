@@ -1,12 +1,12 @@
 """SRT file preprocessing utilities.
 
 This module provides functionality to preprocess SRT content,
-converting it from SRT format to simplified format.
+converting it from SRT format to plain text.
 """
 
 from pathlib import Path
 
-from src.processing.srt_converter import srt_to_simplified_format
+from src.processing.srt_converter import srt_to_plain_text
 from src.util import FSUtil
 
 
@@ -14,18 +14,18 @@ class SRTPreprocessor:
     """Preprocessor for SRT transcript content."""
 
     def process(self, srt_content: str) -> str:
-        """Process SRT content and convert it to simplified format.
+        """Process SRT content and convert it to plain text.
 
         Args:
             srt_content: Raw SRT format content.
 
         Returns:
-            Simplified format content with timestamp prefixes.
+            Plain text content with timestamps stripped.
 
         Raises:
             ValueError: If SRT content cannot be parsed or is invalid.
         """
-        return srt_to_simplified_format(srt_content)
+        return srt_to_plain_text(srt_content)
 
 
 def process_srt_file(
