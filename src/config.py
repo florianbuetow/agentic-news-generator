@@ -300,8 +300,7 @@ class TopicDetectionTaxonomyConfig(BaseModel):
 
     enabled: bool = Field(..., description="Enable taxonomy label mapping for each node")
     taxonomy_name: str = Field(..., min_length=1, description="Taxonomy identifier (e.g., 'acm_ccs_2012')")
-    acm_ccs_2012_xml_path: str = Field(..., min_length=1, description="Path to ACM CCS 2012 SKOS XML (relative to data_dir)")
-    cache_dir: str = Field(..., min_length=1, description="Directory for cached taxonomy embeddings (relative to data_dir)")
+    acm_ccs_2012_xml_file: str = Field(..., min_length=1, description="Filename for ACM CCS 2012 SKOS XML")
     top_k_per_node: int = Field(..., gt=0, description="Top-K taxonomy labels to emit per node")
     min_similarity: float = Field(..., ge=0.0, le=1.0, description="Minimum cosine similarity threshold to emit a label")
 
@@ -409,7 +408,6 @@ class TopicDetectionConfig(BaseModel):
     taxonomy: TopicDetectionTaxonomyConfig = Field(..., description="Taxonomy mapping configuration")
     keyphrases: TopicDetectionKeyphrasesConfig = Field(..., description="Keyphrase extraction configuration")
     llm_label: TopicDetectionLLMLabelConfig = Field(..., description="LLM-based topic labeling configuration")
-    output_dir: str = Field(..., description="Output directory for topic detection results")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

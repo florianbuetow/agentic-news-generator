@@ -58,8 +58,7 @@ def taxonomy_cfg() -> TopicDetectionTaxonomyConfig:
     return TopicDetectionTaxonomyConfig(
         enabled=True,
         taxonomy_name="acm_ccs_2012",
-        acm_ccs_2012_xml_path="input/taxonomies/acm_ccs2012.xml",
-        cache_dir="input/taxonomies/cache",
+        acm_ccs_2012_xml_file="acm_ccs2012.xml",
         top_k_per_node=2,
         min_similarity=0.1,
     )
@@ -94,6 +93,7 @@ def keyphrases_cfg() -> TopicDetectionKeyphrasesConfig:
             keyphrase_ngram_range_max=2,
             use_mmr=False,
             mmr_diversity=0.5,
+            min_score=0.0,
             stop_words="english",
         ),
     )

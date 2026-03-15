@@ -24,8 +24,7 @@ class TaxonomyConfigData(BaseModel):
 
     enabled: bool
     taxonomy_name: str
-    acm_ccs_2012_xml_path: str
-    cache_dir: str
+    acm_ccs_2012_xml_file: str
     top_k_per_node: int = Field(..., gt=0)
     min_similarity: float = Field(..., ge=0.0, le=1.0)
 
@@ -70,6 +69,7 @@ class KeyBERTKeyphrasesConfigData(BaseModel):
     keyphrase_ngram_range_max: int = Field(..., ge=1)
     use_mmr: bool
     mmr_diversity: float = Field(..., ge=0.0, le=1.0)
+    min_score: float = Field(..., ge=-1.0, le=1.0)
     stop_words: str | None
 
     model_config = ConfigDict(frozen=True, extra="forbid")

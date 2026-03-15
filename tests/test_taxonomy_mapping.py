@@ -12,8 +12,7 @@ def test_taxonomy_matcher_orders_ties_deterministically() -> None:
     cfg = TopicDetectionTaxonomyConfig(
         enabled=True,
         taxonomy_name="acm_ccs_2012",
-        acm_ccs_2012_xml_path="input/taxonomies/acm_ccs2012.xml",
-        cache_dir="input/taxonomies/cache",
+        acm_ccs_2012_xml_file="acm_ccs2012.xml",
         top_k_per_node=3,
         min_similarity=0.0,
     )

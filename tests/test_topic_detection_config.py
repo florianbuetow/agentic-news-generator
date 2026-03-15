@@ -108,8 +108,7 @@ def get_valid_topic_detection_config() -> dict[str, object]:
         "taxonomy": {
             "enabled": True,
             "taxonomy_name": "acm_ccs_2012",
-            "acm_ccs_2012_xml_path": "input/taxonomies/acm_ccs2012.xml",
-            "cache_dir": "input/taxonomies/cache",
+            "acm_ccs_2012_xml_file": "acm_ccs2012.xml",
             "top_k_per_node": 3,
             "min_similarity": 0.3,
         },
@@ -159,7 +158,6 @@ def get_valid_topic_detection_config() -> dict[str, object]:
                 "timeout_seconds": 30,
             },
         },
-        "output_dir": "output/topics",
     }
 
 
@@ -300,8 +298,7 @@ class TestTopicDetectionTaxonomyConfig:
         config = TopicDetectionTaxonomyConfig(
             enabled=True,
             taxonomy_name="acm_ccs_2012",
-            acm_ccs_2012_xml_path="input/taxonomies/acm_ccs2012.xml",
-            cache_dir="input/taxonomies/cache",
+            acm_ccs_2012_xml_file="acm_ccs2012.xml",
             top_k_per_node=3,
             min_similarity=0.3,
         )
@@ -381,7 +378,6 @@ class TestTopicDetectionConfig:
         assert config.hierarchical_segmentation.method == "treeseg_divisive_sse"
         assert config.taxonomy.taxonomy_name == "acm_ccs_2012"
         assert config.keyphrases.tfidf.top_k_per_node == 12
-        assert config.output_dir == "output/topics"
 
     def test_missing_embedding_section(self) -> None:
         """Test config with missing embedding section."""
@@ -489,7 +485,6 @@ class TestConfigTopicDetectionIntegration:
                 "taxonomy": get_valid_topic_detection_config()["taxonomy"],
                 "keyphrases": get_valid_topic_detection_config()["keyphrases"],
                 "llm_label": get_valid_topic_detection_config()["llm_label"],
-                "output_dir": "output/topics",
             },
         }
 
