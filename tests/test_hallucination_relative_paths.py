@@ -251,6 +251,15 @@ paths:
   data_output_articles_dir: {data_dir / "output" / "articles"}
   data_articles_input_dir: {data_dir / "articles" / "input"}
   reports_dir: reports
+  data_article_generation_output_dir: {data_dir / "output" / "articles"}
+  data_article_generation_artifacts_dir: {data_dir / "output" / "article_editor_runs"}
+  data_article_generation_kb_dir: {data_dir / "knowledgebase"}
+  data_article_generation_kb_index_dir: {data_dir / "knowledgebase_index"}
+  data_article_generation_institutional_memory_dir: {data_dir / "institutional_memory"}
+  data_article_generation_prompts_dir: prompts/article_editor
+  data_topic_detection_output_dir: {data_dir / "output" / "topics"}
+  data_topic_detection_taxonomies_dir: {data_dir / "input" / "taxonomies"}
+  data_topic_detection_taxonomy_cache_dir: {data_dir / "input" / "taxonomies" / "cache"}
 
 channels: []
 

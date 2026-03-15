@@ -22,6 +22,19 @@ paths:
   # Model benchmark and visualization paths
   reports_dir: reports
 
+  # Article generation paths
+  data_article_generation_output_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/output/articles
+  data_article_generation_artifacts_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/output/article_editor_runs
+  data_article_generation_kb_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/knowledgebase
+  data_article_generation_kb_index_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/knowledgebase_index
+  data_article_generation_institutional_memory_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/institutional_memory
+  data_article_generation_prompts_dir: prompts/article_editor
+
+  # Topic detection paths
+  data_topic_detection_output_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/output/topics
+  data_topic_detection_taxonomies_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/input/taxonomies
+  data_topic_detection_taxonomy_cache_dir: /Volumes/2TB/data/projects/agentic-news-generator/data/input/taxonomies/cache
+
 channels:
   - url: https://www.youtube.com/@NateBJones/videos
     name: Nate B Jones

@@ -32,6 +32,15 @@ def _default_paths(overrides: dict[str, str] | None = None) -> dict[str, str]:
         "data_output_articles_dir": "data/output/articles",
         "data_articles_input_dir": "data/articles/input",
         "reports_dir": "reports",
+        "data_article_generation_output_dir": "data/output/articles",
+        "data_article_generation_artifacts_dir": "data/output/article_editor_runs",
+        "data_article_generation_kb_dir": "data/knowledgebase",
+        "data_article_generation_kb_index_dir": "data/knowledgebase_index",
+        "data_article_generation_institutional_memory_dir": "data/institutional_memory",
+        "data_article_generation_prompts_dir": "prompts/article_editor",
+        "data_topic_detection_output_dir": "data/output/topics",
+        "data_topic_detection_taxonomies_dir": "data/input/taxonomies",
+        "data_topic_detection_taxonomy_cache_dir": "data/input/taxonomies/cache",
     }
     if overrides:
         base.update(overrides)
@@ -85,6 +94,15 @@ GETTER_REGISTRY: list[tuple[str, str]] = [
     ("getDataOutputArticlesDir", "data_output_articles_dir"),
     ("getDataArticlesInputDir", "data_articles_input_dir"),
     ("getReportsDir", "reports_dir"),
+    ("getArticleGenerationOutputDir", "data_article_generation_output_dir"),
+    ("getArticleGenerationArtifactsDir", "data_article_generation_artifacts_dir"),
+    ("getArticleGenerationKbDir", "data_article_generation_kb_dir"),
+    ("getArticleGenerationKbIndexDir", "data_article_generation_kb_index_dir"),
+    ("getArticleGenerationInstitutionalMemoryDir", "data_article_generation_institutional_memory_dir"),
+    ("getArticleGenerationPromptsDir", "data_article_generation_prompts_dir"),
+    ("getTopicDetectionOutputDir", "data_topic_detection_output_dir"),
+    ("getTopicDetectionTaxonomiesDir", "data_topic_detection_taxonomies_dir"),
+    ("getTopicDetectionTaxonomyCacheDir", "data_topic_detection_taxonomy_cache_dir"),
 ]
 
 
@@ -259,3 +277,33 @@ class TestExhaustiveGetterCoverage:
         assert config.getDataModelsDir() == tmp_path / "data" / "models"
         assert config.getDataOutputDir() == Path("/absolute/output")
         assert config.getReportsDir() == tmp_path / "reports"
+
+
+class TestDomainSpecificGetters:
+    """TS-21 through TS-25: New domain-specific getters."""
+
+    def test_topic_detection_output_dir_relative(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_topic_detection_output_dir": "data/output/topics"})
+        result = config.getTopicDetectionOutputDir()
+        assert result == tmp_path / "data" / "output" / "topics"
+        assert result.is_absolute()
+
+    def test_article_generation_output_dir_absolute(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_article_generation_output_dir": "/Volumes/data/output/articles"})
+        result = config.getArticleGenerationOutputDir()
+        assert result == Path("/Volumes/data/output/articles")
+
+    def test_article_generation_artifacts_dir_relative(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_article_generation_artifacts_dir": "data/output/article_editor_runs"})
+        result = config.getArticleGenerationArtifactsDir()
+        assert result == tmp_path / "data" / "output" / "article_editor_runs"
+
+    def test_article_generation_kb_dir_relative(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_article_generation_kb_dir": "data/knowledgebase"})
+        result = config.getArticleGenerationKbDir()
+        assert result == tmp_path / "data" / "knowledgebase"
+
+    def test_topic_detection_taxonomies_dir_relative(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_topic_detection_taxonomies_dir": "data/input/taxonomies"})
+        result = config.getTopicDetectionTaxonomiesDir()
+        assert result == tmp_path / "data" / "input" / "taxonomies"

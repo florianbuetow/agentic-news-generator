@@ -498,6 +498,19 @@ class PathsConfig(BaseModel):
     data_output_articles_dir: str = Field(..., description="Generated articles directory path", min_length=1)
     data_articles_input_dir: str = Field(..., description="Article generation input bundles directory path", min_length=1)
     reports_dir: str = Field(..., description="Model benchmark reports directory path", min_length=1)
+    data_article_generation_output_dir: str = Field(..., description="Article generation final output directory", min_length=1)
+    data_article_generation_artifacts_dir: str = Field(..., description="Article generation run artifacts directory", min_length=1)
+    data_article_generation_kb_dir: str = Field(..., description="Knowledge base data directory", min_length=1)
+    data_article_generation_kb_index_dir: str = Field(..., description="Knowledge base index directory", min_length=1)
+    data_article_generation_institutional_memory_dir: str = Field(
+        ..., description="Institutional memory directory", min_length=1
+    )
+    data_article_generation_prompts_dir: str = Field(..., description="Article generation prompts directory", min_length=1)
+    data_topic_detection_output_dir: str = Field(..., description="Topic detection output directory", min_length=1)
+    data_topic_detection_taxonomies_dir: str = Field(..., description="Topic detection taxonomies directory", min_length=1)
+    data_topic_detection_taxonomy_cache_dir: str = Field(
+        ..., description="Topic detection taxonomy cache directory", min_length=1
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -991,6 +1004,42 @@ class Config:
             Path object pointing to the reports directory.
         """
         return self._resolve_path(self._paths.reports_dir)
+
+    def getArticleGenerationOutputDir(self) -> Path:
+        """Get article generation final output directory."""
+        return self._resolve_path(self._paths.data_article_generation_output_dir)
+
+    def getArticleGenerationArtifactsDir(self) -> Path:
+        """Get article generation run artifacts directory."""
+        return self._resolve_path(self._paths.data_article_generation_artifacts_dir)
+
+    def getArticleGenerationKbDir(self) -> Path:
+        """Get knowledge base data directory."""
+        return self._resolve_path(self._paths.data_article_generation_kb_dir)
+
+    def getArticleGenerationKbIndexDir(self) -> Path:
+        """Get knowledge base index directory."""
+        return self._resolve_path(self._paths.data_article_generation_kb_index_dir)
+
+    def getArticleGenerationInstitutionalMemoryDir(self) -> Path:
+        """Get institutional memory directory."""
+        return self._resolve_path(self._paths.data_article_generation_institutional_memory_dir)
+
+    def getArticleGenerationPromptsDir(self) -> Path:
+        """Get article generation prompts directory."""
+        return self._resolve_path(self._paths.data_article_generation_prompts_dir)
+
+    def getTopicDetectionOutputDir(self) -> Path:
+        """Get topic detection output directory."""
+        return self._resolve_path(self._paths.data_topic_detection_output_dir)
+
+    def getTopicDetectionTaxonomiesDir(self) -> Path:
+        """Get topic detection taxonomies directory."""
+        return self._resolve_path(self._paths.data_topic_detection_taxonomies_dir)
+
+    def getTopicDetectionTaxonomyCacheDir(self) -> Path:
+        """Get topic detection taxonomy cache directory."""
+        return self._resolve_path(self._paths.data_topic_detection_taxonomy_cache_dir)
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.

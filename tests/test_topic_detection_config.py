@@ -23,25 +23,34 @@ from src.config import (
 def get_valid_paths_config() -> dict[str, str]:
     """Return a valid paths configuration dictionary for tests."""
     return {
-        "data_dir": "./data/",
-        "data_models_dir": "./data/models/",
-        "data_downloads_dir": "./data/downloads",
-        "data_downloads_videos_dir": "./data/downloads/videos/",
-        "data_downloads_transcripts_dir": "./data/downloads/transcripts",
-        "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
-        "data_downloads_transcripts_cleaned_dir": "./data/downloads/transcripts_cleaned",
-        "data_transcripts_topics_dir": "./data/downloads/transcripts-topics",
-        "data_downloads_audio_dir": "./data/downloads/audio",
-        "data_downloads_metadata_dir": "./data/downloads/metadata",
-        "data_output_dir": "./data/output/",
-        "data_input_dir": "./data/input/",
-        "data_temp_dir": "./data/temp",
-        "data_archive_dir": "./data/archive",
-        "data_archive_videos_dir": "./data/archive/videos",
-        "data_logs_dir": "./logs",
-        "data_output_articles_dir": "./data/output/articles",
-        "data_articles_input_dir": "./data/articles/input",
+        "data_dir": "data",
+        "data_models_dir": "data/models",
+        "data_downloads_dir": "data/downloads",
+        "data_downloads_videos_dir": "data/downloads/videos",
+        "data_downloads_transcripts_dir": "data/downloads/transcripts",
+        "data_downloads_transcripts_hallucinations_dir": "data/downloads/transcripts-hallucinations",
+        "data_downloads_transcripts_cleaned_dir": "data/downloads/transcripts_cleaned",
+        "data_transcripts_topics_dir": "data/downloads/transcripts-topics",
+        "data_downloads_audio_dir": "data/downloads/audio",
+        "data_downloads_metadata_dir": "data/downloads/metadata",
+        "data_output_dir": "data/output",
+        "data_input_dir": "data/input",
+        "data_temp_dir": "data/temp",
+        "data_archive_dir": "data/archive",
+        "data_archive_videos_dir": "data/archive/videos",
+        "data_logs_dir": "logs",
+        "data_output_articles_dir": "data/output/articles",
+        "data_articles_input_dir": "data/articles/input",
         "reports_dir": "reports",
+        "data_article_generation_output_dir": "data/output/articles",
+        "data_article_generation_artifacts_dir": "data/output/article_editor_runs",
+        "data_article_generation_kb_dir": "data/knowledgebase",
+        "data_article_generation_kb_index_dir": "data/knowledgebase_index",
+        "data_article_generation_institutional_memory_dir": "data/institutional_memory",
+        "data_article_generation_prompts_dir": "prompts/article_editor",
+        "data_topic_detection_output_dir": "data/output/topics",
+        "data_topic_detection_taxonomies_dir": "data/input/taxonomies",
+        "data_topic_detection_taxonomy_cache_dir": "data/input/taxonomies/cache",
     }
 
 
@@ -131,6 +140,7 @@ def get_valid_topic_detection_config() -> dict[str, object]:
                 "keyphrase_ngram_range_max": 3,
                 "use_mmr": True,
                 "mmr_diversity": 0.5,
+                "min_score": 0.0,
                 "stop_words": "english",
             },
         },
@@ -146,6 +156,7 @@ def get_valid_topic_detection_config() -> dict[str, object]:
                 "context_window_threshold": 90,
                 "max_retries": 3,
                 "retry_delay": 2.0,
+                "timeout_seconds": 30,
             },
         },
         "output_dir": "output/topics",
@@ -340,10 +351,12 @@ class TestTopicDetectionKeyphrasesConfig:
             keyphrase_ngram_range_max=3,
             use_mmr=True,
             mmr_diversity=0.5,
+            min_score=0.0,
             stop_words="english",
         )
         assert config.enabled is True
         assert config.use_mmr is True
+        assert config.min_score == 0.0
 
     def test_valid_container_config(self) -> None:
         """Test valid container keyphrases configuration."""

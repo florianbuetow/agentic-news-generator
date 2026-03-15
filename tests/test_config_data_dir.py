@@ -32,6 +32,15 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_output_articles_dir": "data/output/articles",
         "data_articles_input_dir": "data/articles/input",
         "reports_dir": "reports",
+        "data_article_generation_output_dir": "data/output/articles",
+        "data_article_generation_artifacts_dir": "data/output/article_editor_runs",
+        "data_article_generation_kb_dir": "data/knowledgebase",
+        "data_article_generation_kb_index_dir": "data/knowledgebase_index",
+        "data_article_generation_institutional_memory_dir": "data/institutional_memory",
+        "data_article_generation_prompts_dir": "prompts/article_editor",
+        "data_topic_detection_output_dir": "data/output/topics",
+        "data_topic_detection_taxonomies_dir": "data/input/taxonomies",
+        "data_topic_detection_taxonomy_cache_dir": "data/input/taxonomies/cache",
     }
 
 

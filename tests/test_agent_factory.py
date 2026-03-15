@@ -40,16 +40,26 @@ def _write_test_config(
     overrides = agent_overrides or {}
     spec_overrides = specialist_overrides or {}
 
-    def agent_slot(impl: str = "default") -> dict:
+    def agent_slot(impl: str = "default") -> dict[str, object]:
         return {"agent_name": impl, "llm": llm}
 
     # Create required directories
-    for subdir in ["knowledgebase", "knowledgebase_index", "institutional_memory",
-                   "institutional_memory/fact_checking", "institutional_memory/evidence_finding",
-                   "output/articles", "output/article_editor_runs", "articles/input"]:
+    for subdir in [
+        "knowledgebase",
+        "knowledgebase_index",
+        "institutional_memory",
+        "institutional_memory/fact_checking",
+        "institutional_memory/evidence_finding",
+        "prompts/article_editor",
+        "input/taxonomies/cache",
+        "output/articles",
+        "output/topics",
+        "output/article_editor_runs",
+        "articles/input",
+    ]:
         (tmp_dir / subdir).mkdir(parents=True, exist_ok=True)
 
-    config_data = {
+    config_data: dict[str, object] = {
         "paths": {
             "data_dir": str(tmp_dir),
             "data_models_dir": str(tmp_dir / "models"),
@@ -70,6 +80,15 @@ def _write_test_config(
             "data_output_articles_dir": str(tmp_dir / "output" / "articles"),
             "data_articles_input_dir": str(tmp_dir / "articles" / "input"),
             "reports_dir": str(tmp_dir / "reports"),
+            "data_article_generation_output_dir": str(tmp_dir / "output" / "articles"),
+            "data_article_generation_artifacts_dir": str(tmp_dir / "output" / "article_editor_runs"),
+            "data_article_generation_kb_dir": str(tmp_dir / "knowledgebase"),
+            "data_article_generation_kb_index_dir": str(tmp_dir / "knowledgebase_index"),
+            "data_article_generation_institutional_memory_dir": str(tmp_dir / "institutional_memory"),
+            "data_article_generation_prompts_dir": str(tmp_dir / "prompts" / "article_editor"),
+            "data_topic_detection_output_dir": str(tmp_dir / "output" / "topics"),
+            "data_topic_detection_taxonomies_dir": str(tmp_dir / "input" / "taxonomies"),
+            "data_topic_detection_taxonomy_cache_dir": str(tmp_dir / "input" / "taxonomies" / "cache"),
         },
         "channels": [],
         "defaults": {
@@ -162,8 +181,8 @@ class TestAgentFactory:
         config = Config(config_path)
         orchestrator = build_chief_editor_orchestrator(config=config)
 
-        assert isinstance(orchestrator._fact_check_agent, MockFactCheckAgent)
-        assert isinstance(orchestrator._evidence_finding_agent, MockEvidenceFindingAgent)
+        assert isinstance(orchestrator._fact_check_agent, MockFactCheckAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._evidence_finding_agent, MockEvidenceFindingAgent)  # pyright: ignore[reportPrivateUsage]
 
     def test_all_mock_agents_selected_by_config(self, tmp_path: Path) -> None:
         """When all agents are set to mock, factory returns all Mock* agents."""
@@ -185,14 +204,14 @@ class TestAgentFactory:
         config = Config(config_path)
         orchestrator = build_chief_editor_orchestrator(config=config)
 
-        assert isinstance(orchestrator._writer_agent, MockWriterAgent)
-        assert isinstance(orchestrator._article_review_agent, MockArticleReviewAgent)
-        assert isinstance(orchestrator._concern_mapping_agent, MockConcernMappingAgent)
-        assert isinstance(orchestrator._fact_check_agent, MockFactCheckAgent)
-        assert isinstance(orchestrator._evidence_finding_agent, MockEvidenceFindingAgent)
-        assert isinstance(orchestrator._opinion_agent, MockOpinionAgent)
-        assert isinstance(orchestrator._attribution_agent, MockAttributionAgent)
-        assert isinstance(orchestrator._style_review_agent, MockStyleReviewAgent)
+        assert isinstance(orchestrator._writer_agent, MockWriterAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._article_review_agent, MockArticleReviewAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._concern_mapping_agent, MockConcernMappingAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._fact_check_agent, MockFactCheckAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._evidence_finding_agent, MockEvidenceFindingAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._opinion_agent, MockOpinionAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._attribution_agent, MockAttributionAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator._style_review_agent, MockStyleReviewAgent)  # pyright: ignore[reportPrivateUsage]
 
     def test_unknown_fact_check_agent_name_raises(self, tmp_path: Path) -> None:
         """Unknown agent_name value raises ValueError."""
