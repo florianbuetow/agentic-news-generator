@@ -1,23 +1,23 @@
 # Project directories
 paths:
-  data_dir: ./data/
-  data_models_dir: ./data/models/
-  data_downloads_dir: ./data/downloads
-  data_downloads_videos_dir: ./data/downloads/videos/
-  data_downloads_transcripts_dir: ./data/downloads/transcripts
-  data_downloads_transcripts_hallucinations_dir: ./data/downloads/transcripts-hallucinations
-  data_downloads_transcripts_cleaned_dir: ./data/downloads/transcripts_cleaned
-  data_transcripts_topics_dir: ./data/downloads/transcripts-topics
-  data_downloads_audio_dir: ./data/downloads/audio
-  data_downloads_metadata_dir: ./data/downloads/metadata
-  data_output_dir: ./data/output/
-  data_input_dir: ./data/input/
-  data_temp_dir: ./data/temp
-  data_archive_dir: ./data/archive
-  data_archive_videos_dir: ./data/archive/videos
-  data_logs_dir: ./logs
-  data_output_articles_dir: ./data/output/articles
-  data_articles_input_dir: ./data/articles/input
+  data_dir: data
+  data_models_dir: data/models
+  data_downloads_dir: data/downloads
+  data_downloads_videos_dir: data/downloads/videos
+  data_downloads_transcripts_dir: data/downloads/transcripts
+  data_downloads_transcripts_hallucinations_dir: data/downloads/transcripts-hallucinations
+  data_downloads_transcripts_cleaned_dir: data/downloads/transcripts_cleaned
+  data_transcripts_topics_dir: data/downloads/transcripts-topics
+  data_downloads_audio_dir: data/downloads/audio
+  data_downloads_metadata_dir: data/downloads/metadata
+  data_output_dir: data/output
+  data_input_dir: data/input
+  data_temp_dir: data/temp
+  data_archive_dir: data/archive
+  data_archive_videos_dir: data/archive/videos
+  data_logs_dir: logs
+  data_output_articles_dir: data/output/articles
+  data_articles_input_dir: data/articles/input
 
   # Model benchmark and visualization paths
   reports_dir: reports
@@ -304,7 +304,7 @@ topic_detection:
 
   # Topic detection agent LLM
   topic_detection_llm:
-    model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+    model: openai/qwen/qwen3.5-35b-a3b
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -360,21 +360,23 @@ topic_detection:
       keyphrase_ngram_range_max: 3
       use_mmr: true
       mmr_diversity: 0.5
+      min_score: 0.0
       stop_words: english
 
   # LLM topic labeling settings
   llm_label:
     enabled: true
     llm:
-      model: google/gemma-3-1b
+      model: openai/qwen/qwen3.5-35b-a3b
       api_base: http://127.0.0.1:1234/v1
       api_key: lm-studio
-      context_window: 32768
+      context_window: 262144
       max_tokens: 32768
       temperature: 0.3
       context_window_threshold: 90
       max_retries: 3
       retry_delay: 2.0
+      timeout_seconds: 120
 
   # Output settings
   output_dir: output/topics
