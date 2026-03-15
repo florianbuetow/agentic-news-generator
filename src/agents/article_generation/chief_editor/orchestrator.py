@@ -93,7 +93,8 @@ class ChiefEditorOrchestrator:
         # Log source inputs
         ctx.log(agent_name="source", step="context", content=source_text, fmt="txt")
         ctx.log(agent_name="source", step="metadata", content=dict(source_metadata), fmt="json")
-        ctx.log(agent_name="source", step="run_params", content={"style_mode": style_mode, "reader_preference": reader_preference}, fmt="json")
+        run_params: dict[str, object] = {"style_mode": style_mode, "reader_preference": reader_preference}
+        ctx.log(agent_name="source", step="run_params", content=run_params, fmt="json")
 
         iteration_reports: list[IterationReport] = []
 

@@ -1,17 +1,13 @@
 """Pydantic models for the multi-agent article generation system."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
-from typing import Generic, Literal, TypeVar
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-T = TypeVar("T")
-
 
 @dataclass(frozen=True)
-class AgentResult(Generic[T]):
+class AgentResult[T]:
     """Wrapper returned by agents: the assembled prompt and the parsed output."""
 
     prompt: str

@@ -63,7 +63,9 @@ class TestMockFactCheckAgent:
         concern = Concern(concern_id=42, excerpt="claim", review_note="note")
         article = _sample_article()
         agent_result = agent.evaluate(
-            concern=concern, article=article, source_text="s",
+            concern=concern,
+            article=article,
+            source_text="s",
             source_metadata={"source_file": "f", "topic_slug": "s"},
             style_requirements="SCIAM_MAGAZINE",
         )

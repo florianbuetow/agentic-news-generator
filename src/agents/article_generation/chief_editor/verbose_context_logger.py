@@ -45,8 +45,7 @@ class VerboseContextLogger:
         """
         if self._sequence >= 900:
             raise RuntimeError(
-                f"VerboseContextLogger sequence overflow: {self._sequence} >= 900. "
-                f"Reduce editor rounds or agent calls per run."
+                f"VerboseContextLogger sequence overflow: {self._sequence} >= 900. Reduce editor rounds or agent calls per run."
             )
         path = self._write(
             sequence=self._sequence,
@@ -124,10 +123,7 @@ class VerboseContextLogger:
             try:
                 parsed = json.loads(content)
             except json.JSONDecodeError as exc:
-                raise ValueError(
-                    f"Content for artifact is not valid JSON (first 200 chars): "
-                    f"{content[:200]!r}"
-                ) from exc
+                raise ValueError(f"Content for artifact is not valid JSON (first 200 chars): {content[:200]!r}") from exc
             return json.dumps(parsed, indent=2, ensure_ascii=False)
 
         return content

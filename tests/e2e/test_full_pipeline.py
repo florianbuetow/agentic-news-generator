@@ -56,7 +56,7 @@ class TestFullPipeline:
 
         print(f"\n{'=' * 60}")
         print(f"Article artifacts: {artifacts}")
-        print(f"Files:")
+        print("Files:")
         for f in sorted(artifacts.iterdir()):
             print(f"  {f.name}")
         print(f"{'=' * 60}")

@@ -61,14 +61,18 @@ class WriterAgentProtocol(Protocol):
         source_metadata: dict[str, str | None],
         style_mode: str,
         reader_preference: str,
-    ) -> AgentResult[ArticleResponse]: ...
+    ) -> AgentResult[ArticleResponse]:
+        """Generate an article from source material."""
+        ...
 
     def revise(
         self,
         *,
         context: str,
         feedback: WriterFeedback,
-    ) -> AgentResult[ArticleResponse]: ...
+    ) -> AgentResult[ArticleResponse]:
+        """Revise an article based on editorial feedback."""
+        ...
 
 
 class ArticleReviewAgentProtocol(Protocol):
@@ -80,7 +84,9 @@ class ArticleReviewAgentProtocol(Protocol):
         article: ArticleResponse,
         source_text: str,
         source_metadata: dict[str, str | None],
-    ) -> AgentResult[ArticleReviewRaw]: ...
+    ) -> AgentResult[ArticleReviewRaw]:
+        """Review an article and return raw editorial feedback."""
+        ...
 
 
 class ConcernMappingAgentProtocol(Protocol):
@@ -93,7 +99,9 @@ class ConcernMappingAgentProtocol(Protocol):
         source_text: str,
         generated_article_json: str,
         concerns: list[Concern],
-    ) -> AgentResult[ConcernMappingResult]: ...
+    ) -> AgentResult[ConcernMappingResult]:
+        """Map review concerns to specialist agents."""
+        ...
 
 
 class SpecialistAgentProtocol(Protocol):
@@ -107,7 +115,9 @@ class SpecialistAgentProtocol(Protocol):
         source_text: str,
         source_metadata: dict[str, str | None],
         style_requirements: str,
-    ) -> AgentResult[Verdict]: ...
+    ) -> AgentResult[Verdict]:
+        """Evaluate a concern and return a verdict."""
+        ...
 
 
 T = TypeVar("T", bound=BaseModel)
