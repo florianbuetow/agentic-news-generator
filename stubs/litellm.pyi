@@ -15,6 +15,11 @@ class Message:
 
     content: str | None
 
+def token_counter(
+    model: str,
+    messages: list[dict[str, str]],
+) -> int: ...
+
 def completion(
     model: str,
     messages: list[dict[str, str]],

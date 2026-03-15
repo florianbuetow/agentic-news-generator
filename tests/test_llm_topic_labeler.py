@@ -23,6 +23,7 @@ def make_config(*, enabled: bool = True) -> TopicDetectionLLMLabelConfig:
             context_window_threshold=90,
             max_retries=2,
             retry_delay=0.01,
+            timeout_seconds=30,
         ),
     )
 

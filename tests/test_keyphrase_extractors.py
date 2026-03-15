@@ -1,5 +1,7 @@
 """Tests for YAKE and KeyBERT keyphrase extractors."""
 
+from unittest.mock import MagicMock
+
 import numpy as np
 from numpy.typing import NDArray
 
@@ -85,6 +87,7 @@ class TestKeyBERTKeyphraseExtractor:
             keyphrase_ngram_range_max=2,
             use_mmr=True,
             mmr_diversity=0.5,
+            min_score=0.0,
             stop_words="english",
         )
 
@@ -114,3 +117,20 @@ class TestKeyBERTKeyphraseExtractor:
         extractor = KeyBERTKeyphraseExtractor(config=self._make_config(), embedding_generator=generator)
         result = extractor.extract(text="   ")
         assert result == []
+
+    def test_extract_filters_scores_below_min_score(self):
+        generator = _MockEmbeddingGenerator()
+        extractor = KeyBERTKeyphraseExtractor(config=self._make_config(), embedding_generator=generator)
+        extractor._model = MagicMock()  # pyright: ignore[reportPrivateUsage]
+        extractor._model.extract_keywords.return_value = [  # pyright: ignore[reportPrivateUsage]
+            ("relevant phrase", 0.4321),
+            ("negative phrase", -0.0504),
+            ("edge phrase", 0.0),
+        ]
+
+        result = extractor.extract(text=SAMPLE_TEXT)
+
+        assert [(kp.phrase, kp.score) for kp in result] == [
+            ("relevant phrase", 0.4321),
+            ("edge phrase", 0.0),
+        ]
