@@ -230,7 +230,7 @@ def main() -> int:  # noqa: C901
 
     # Load Config class for data_dir
     config = Config(config_path)
-    data_dir = Path(__file__).parent.parent / config.getDataDir()
+    data_dir = config.getDataDir()
 
     # Load raw YAML to access hallucination_detection config
     with open(config_path, encoding="utf-8") as f:
@@ -294,13 +294,13 @@ Examples:
         return 1
 
     # Find all SRT files (using paths from config)
-    transcripts_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsDir()
+    transcripts_dir = config.getDataDownloadsTranscriptsDir()
     if not transcripts_dir.exists():
         print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
         return 1
 
     # Hallucination detection output directory from config
-    transcripts_hallucinations_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsHallucinationsDir()
+    transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
 
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
 

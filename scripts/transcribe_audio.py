@@ -277,9 +277,9 @@ def main() -> int:  # noqa: C901
         return 1
 
     # Get paths from config
-    audio_dir = project_root / config.getDataDownloadsAudioDir()
-    transcripts_dir = project_root / config.getDataDownloadsTranscriptsDir()
-    metadata_dir = project_root / config.getDataDownloadsMetadataDir()
+    audio_dir = config.getDataDownloadsAudioDir()
+    transcripts_dir = config.getDataDownloadsTranscriptsDir()
+    metadata_dir = config.getDataDownloadsMetadataDir()
 
     # Get transcription settings from config
     model_en_repo = config.getTranscriptionModelEnRepo()

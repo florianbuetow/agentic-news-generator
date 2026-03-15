@@ -220,10 +220,8 @@ def main() -> int:
 
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
-    td_config = config.get_topic_detection_config()
-
     data_dir = config.getDataDir()
-    output_dir = data_dir / td_config.output_dir
+    output_dir = config.getTopicDetectionOutputDir()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     result = get_srt_files(args, config)

@@ -147,8 +147,7 @@ def prepare_bundle(*, config: Config, video_id: str) -> Path:
     """
     transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
     metadata_dir = config.getDataDownloadsMetadataDir()
-    td_config = config.get_topic_detection_config()
-    topics_dir = config.getDataDir() / td_config.output_dir
+    topics_dir = config.getTopicDetectionOutputDir()
     articles_input_dir = config.getDataArticlesInputDir()
 
     logger.info("Finding source files for video_id=%s", video_id)

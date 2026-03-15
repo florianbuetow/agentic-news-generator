@@ -554,8 +554,7 @@ def main() -> int:
 
         config_path = Path(__file__).parent.parent / "config" / "config.yaml"
         config = Config(config_path)
-        td_config = config.get_topic_detection_config()
-        topics_dir = config.getDataDir() / td_config.output_dir
+        topics_dir = config.getTopicDetectionOutputDir()
 
         if not topics_dir.exists():
             print(f"Error: Topics directory not found: {topics_dir}", file=sys.stderr)

@@ -164,8 +164,7 @@ def main() -> int:
     transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
 
     # Topics output directory
-    td_config = config.get_topic_detection_config()
-    topics_dir = config.getDataDir() / td_config.output_dir
+    topics_dir = config.getTopicDetectionOutputDir()
 
     if not downloads_dir.exists():
         print(f"Error: Downloads directory not found: {downloads_dir}")

@@ -348,8 +348,7 @@ def main() -> int:
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
 
-    td_config = config.get_topic_detection_config()
-    topics_dir = config.getDataDir() / td_config.output_dir
+    topics_dir = config.getTopicDetectionOutputDir()
     metadata_dir = config.getDataDownloadsMetadataDir()
     metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
     export_dir = args.export_dir

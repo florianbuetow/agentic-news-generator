@@ -72,11 +72,10 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
 
     config = Config(config_path)
 
-    base_dir = Path(__file__).parent.parent
-    data_dir = base_dir / config.getDataDir()
-    transcripts_dir = base_dir / config.getDataDownloadsTranscriptsDir()
-    hallucinations_dir = base_dir / config.getDataDownloadsTranscriptsHallucinationsDir()
-    output_dir = base_dir / config.getDataDownloadsTranscriptsCleanedDir()
+    data_dir = config.getDataDir()
+    transcripts_dir = config.getDataDownloadsTranscriptsDir()
+    hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
+    output_dir = config.getDataDownloadsTranscriptsCleanedDir()
 
     if not transcripts_dir.exists():
         print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
