@@ -18,37 +18,43 @@ if [ ! -f "$CONFIG_FILE" ]; then
     exit 1
 fi
 
-# Extract data_dir from config.yaml using Python (available via uv)
-DATA_DIR_RELATIVE=$(cd "$PROJECT_ROOT" && uv run python -c "
+# Read and resolve path keys from config.yaml
+read_config_path() {
+    local key="$1"
+    local raw
+    raw=$(cd "$PROJECT_ROOT" && uv run python -c "
 import yaml
-import sys
 with open('config/config.yaml', 'r') as f:
     config = yaml.safe_load(f)
-    print(config['paths']['data_dir'])
+print(config['paths']['$key'])
 " 2>/dev/null)
+    if [ -z "$raw" ]; then
+        echo "ERROR: Failed to read paths.$key from config.yaml" >&2
+        exit 1
+    fi
+    if [[ "$raw" == /* ]]; then
+        echo "$raw"
+    else
+        echo "$PROJECT_ROOT/$raw"
+    fi
+}
 
-if [ -z "$DATA_DIR_RELATIVE" ]; then
-    echo "🚨 ERROR: Failed to read paths.data_dir from config.yaml" >&2
-    exit 1
-fi
-
-# Convert relative path to absolute path
-DATA_DIR="$(cd "$PROJECT_ROOT" && cd "$DATA_DIR_RELATIVE" && pwd)"
-DOWNLOADS_DIR="$DATA_DIR/downloads"
-VIDEOS_DIR="$DOWNLOADS_DIR/videos"
-AUDIO_DIR="$DOWNLOADS_DIR/audio"
-TRANSCRIPTS_DIR="$DOWNLOADS_DIR/transcripts"
-METADATA_DIR="$DOWNLOADS_DIR/metadata"
+DATA_DIR="$(read_config_path data_dir)"
+DOWNLOADS_DIR="$(read_config_path data_downloads_dir)"
+VIDEOS_DIR="$(read_config_path data_downloads_videos_dir)"
+AUDIO_DIR="$(read_config_path data_downloads_audio_dir)"
+TRANSCRIPTS_DIR="$(read_config_path data_downloads_transcripts_dir)"
+METADATA_DIR="$(read_config_path data_downloads_metadata_dir)"
 # Metadata subdirectories (per channel):
 # - [channelname]/video/        - Video metadata (.info.json from yt-dlp)
 # - [channelname]/audio/        - Audio metadata (.silence_map.json)
 # - [channelname]/               - Channel metadata (.info.json for playlist/channel)
 METADATA_VIDEO_SUBDIR="video"
 METADATA_AUDIO_SUBDIR="audio"
-ARCHIVE_DIR="$DATA_DIR/archive"
-ARCHIVE_VIDEOS_DIR="$ARCHIVE_DIR/videos"
-TEMP_DIR="$DATA_DIR/temp"
-OUTPUT_DIR="$DATA_DIR/output"
+ARCHIVE_DIR="$(read_config_path data_archive_dir)"
+ARCHIVE_VIDEOS_DIR="$(read_config_path data_archive_videos_dir)"
+TEMP_DIR="$(read_config_path data_temp_dir)"
+OUTPUT_DIR="$(read_config_path data_output_dir)"
 
 # --- Video/Audio Processing Settings ---
 # Whitelist of allowed video file extensions
