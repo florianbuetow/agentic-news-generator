@@ -640,7 +640,7 @@ test:
     set +e
     echo ""
     printf "\033[0;34m=== Running Unit Tests ===\033[0m\n"
-    uv run pytest tests/ -v
+    uv run pytest tests/ -v -m "not e2e"
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 5 ]; then
         printf "\033[0;33m⚠ No tests found (this is OK)\033[0m\n"
