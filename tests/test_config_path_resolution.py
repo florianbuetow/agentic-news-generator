@@ -1,8 +1,7 @@
 """Tests for Config path resolution: absolute vs relative paths."""
 
-import os
-import tempfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -56,7 +55,7 @@ def _write_config(tmp_path: Path, path_overrides: dict[str, str] | None = None) 
     config_dir = tmp_path / "config"
     config_dir.mkdir(parents=True, exist_ok=True)
 
-    config_data = {
+    config_data: dict[str, Any] = {
         "paths": _default_paths(path_overrides),
         "channels": [],
         "defaults": {
@@ -166,7 +165,7 @@ class TestProjectRootDerivation:
     def test_config_from_nonstandard_location(self, tmp_path: Path) -> None:
         """Config at tmp_path/test_config.yaml -> project_root = tmp_path.parent."""
         config_path = tmp_path / "test_config.yaml"
-        config_data = {
+        config_data: dict[str, Any] = {
             "paths": _default_paths({"data_dir": "mydata"}),
             "channels": [],
             "defaults": {
@@ -192,7 +191,7 @@ class TestSchemaValidation:
         config_dir.mkdir(parents=True, exist_ok=True)
         paths = _default_paths()
         paths["nonexistent_dir"] = "foo"
-        config_data = {
+        config_data: dict[str, Any] = {
             "paths": paths,
             "channels": [],
             "defaults": {
@@ -211,7 +210,7 @@ class TestSchemaValidation:
     def test_empty_string_path_rejected(self, tmp_path: Path) -> None:
         config_dir = tmp_path / "config"
         config_dir.mkdir(parents=True, exist_ok=True)
-        config_data = {
+        config_data: dict[str, Any] = {
             "paths": _default_paths({"data_dir": ""}),
             "channels": [],
             "defaults": {
@@ -248,7 +247,10 @@ class TestExhaustiveGetterCoverage:
 
     @pytest.mark.parametrize("getter_name,paths_key", GETTER_REGISTRY)
     def test_getter_returns_absolute_with_absolute_value(
-        self, tmp_path: Path, getter_name: str, paths_key: str,
+        self,
+        tmp_path: Path,
+        getter_name: str,
+        paths_key: str,
     ) -> None:
         config = _write_config(tmp_path, {paths_key: f"/abs/{paths_key}"})
         result = getattr(config, getter_name)()
@@ -258,7 +260,10 @@ class TestExhaustiveGetterCoverage:
 
     @pytest.mark.parametrize("getter_name,paths_key", GETTER_REGISTRY)
     def test_getter_returns_absolute_with_relative_value(
-        self, tmp_path: Path, getter_name: str, paths_key: str,
+        self,
+        tmp_path: Path,
+        getter_name: str,
+        paths_key: str,
     ) -> None:
         config = _write_config(tmp_path, {paths_key: f"rel/{paths_key}"})
         result = getattr(config, getter_name)()
@@ -267,12 +272,15 @@ class TestExhaustiveGetterCoverage:
         assert result == tmp_path / "rel" / paths_key
 
     def test_mixed_absolute_and_relative_in_same_config(self, tmp_path: Path) -> None:
-        config = _write_config(tmp_path, {
-            "data_dir": "/absolute/data",
-            "data_models_dir": "data/models",
-            "data_output_dir": "/absolute/output",
-            "reports_dir": "reports",
-        })
+        config = _write_config(
+            tmp_path,
+            {
+                "data_dir": "/absolute/data",
+                "data_models_dir": "data/models",
+                "data_output_dir": "/absolute/output",
+                "reports_dir": "reports",
+            },
+        )
         assert config.getDataDir() == Path("/absolute/data")
         assert config.getDataModelsDir() == tmp_path / "data" / "models"
         assert config.getDataOutputDir() == Path("/absolute/output")

@@ -486,15 +486,11 @@ class PathsConfig(BaseModel):
     data_article_generation_artifacts_dir: str = Field(..., description="Article generation run artifacts directory", min_length=1)
     data_article_generation_kb_dir: str = Field(..., description="Knowledge base data directory", min_length=1)
     data_article_generation_kb_index_dir: str = Field(..., description="Knowledge base index directory", min_length=1)
-    data_article_generation_institutional_memory_dir: str = Field(
-        ..., description="Institutional memory directory", min_length=1
-    )
+    data_article_generation_institutional_memory_dir: str = Field(..., description="Institutional memory directory", min_length=1)
     data_article_generation_prompts_dir: str = Field(..., description="Article generation prompts directory", min_length=1)
     data_topic_detection_output_dir: str = Field(..., description="Topic detection output directory", min_length=1)
     data_topic_detection_taxonomies_dir: str = Field(..., description="Topic detection taxonomies directory", min_length=1)
-    data_topic_detection_taxonomy_cache_dir: str = Field(
-        ..., description="Topic detection taxonomy cache directory", min_length=1
-    )
+    data_topic_detection_taxonomy_cache_dir: str = Field(..., description="Topic detection taxonomy cache directory", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -834,12 +830,10 @@ class Config:
         Otherwise, it is resolved relative to the project root
         (config_path.parent.parent).
         """
-        stripped = raw.rstrip("/")
-        if stripped == "":
-            stripped = "/"
-        if stripped.startswith("/"):
-            return Path(stripped)
-        return self._project_root / stripped
+        path = Path(raw)
+        if path.is_absolute():
+            return path
+        return self._project_root / path
 
     def getDataDir(self) -> Path:
         """Get the data directory path.

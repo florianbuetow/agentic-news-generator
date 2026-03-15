@@ -2,9 +2,9 @@
 
 import re
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
-
 
 PROJECT_ROOT = Path(__file__).parent.parent
 CONFIG_PATH = PROJECT_ROOT / "config" / "config.yaml"
@@ -16,23 +16,23 @@ class TestConfigYamlPathFormatting:
 
     def test_no_trailing_slashes_in_paths(self) -> None:
         with open(CONFIG_PATH) as f:
-            config = yaml.safe_load(f)
-        paths = config["paths"]
-        violations = [k for k, v in paths.items() if isinstance(v, str) and v.endswith("/")]
+            config = cast(dict[str, Any], yaml.safe_load(f))
+        paths = cast(dict[str, Any], config["paths"])
+        violations: list[str] = [k for k, v in paths.items() if isinstance(v, str) and v.endswith("/")]
         assert violations == [], f"Paths with trailing slashes: {violations}"
 
     def test_no_dot_slash_prefix_in_paths(self) -> None:
         with open(CONFIG_PATH) as f:
-            config = yaml.safe_load(f)
-        paths = config["paths"]
-        violations = [k for k, v in paths.items() if isinstance(v, str) and v.startswith("./")]
+            config = cast(dict[str, Any], yaml.safe_load(f))
+        paths = cast(dict[str, Any], config["paths"])
+        violations: list[str] = [k for k, v in paths.items() if isinstance(v, str) and v.startswith("./")]
         assert violations == [], f"Paths with ./ prefix: {violations}"
 
     def test_paths_start_with_slash_or_letter(self) -> None:
         with open(CONFIG_PATH) as f:
-            config = yaml.safe_load(f)
-        paths = config["paths"]
-        violations = []
+            config = cast(dict[str, Any], yaml.safe_load(f))
+        paths = cast(dict[str, Any], config["paths"])
+        violations: list[str] = []
         for k, v in paths.items():
             if isinstance(v, str) and v and not v[0].isalpha() and not v[0].isdigit() and v[0] != "/":
                 violations.append(k)
@@ -43,7 +43,7 @@ class TestScriptsUseConfigGetters:
     """TS-16: Scripts use Config getters without manual path construction."""
 
     def test_no_project_root_prefix_on_config_getters(self) -> None:
-        violations = []
+        violations: list[str] = []
         for py_file in SCRIPTS_DIR.glob("*.py"):
             content = py_file.read_text()
             if re.search(r"(project_root|base_dir)\s*/\s*config\.get", content):
@@ -51,7 +51,7 @@ class TestScriptsUseConfigGetters:
         assert violations == [], f"Scripts with project_root/base_dir prefix on config getters: {violations}"
 
     def test_no_manual_data_dir_joins(self) -> None:
-        violations = []
+        violations: list[str] = []
         for py_file in SCRIPTS_DIR.glob("*.py"):
             content = py_file.read_text()
             if re.search(r"config\.getDataDir\(\)\s*/\s*td_config\.", content):
@@ -61,7 +61,7 @@ class TestScriptsUseConfigGetters:
         assert violations == [], f"Scripts with manual data_dir / td_config joins: {violations}"
 
     def test_no_direct_config_data_access(self) -> None:
-        violations = []
+        violations: list[str] = []
         for py_file in SCRIPTS_DIR.glob("*.py"):
             content = py_file.read_text()
             if "config._data" in content:
