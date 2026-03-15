@@ -108,10 +108,9 @@ class ACMCCS2012Loader:
         while q:
             cid = q.popleft()
             parent_level = levels[cid]
-            child_ids = children.get(cid)
-            if child_ids is None:
-                child_ids = []
-            for child_id in child_ids:
+            if cid not in children:
+                continue
+            for child_id in children[cid]:
                 proposed = parent_level + 1
                 existing = levels.get(child_id)
                 if existing is None or proposed < existing:
@@ -142,10 +141,9 @@ class ACMCCS2012Loader:
 
         max_level = max(levels.values())
         for level in range(2, max_level + 1):
-            level_concepts = concepts_by_level.get(level)
-            if level_concepts is None:
-                level_concepts = []
-            for cid in sorted(level_concepts):
+            if level not in concepts_by_level:
+                continue
+            for cid in sorted(concepts_by_level[level]):
                 label, parents = raw_concepts[cid]
                 eligible_parents = [p for p in parents if levels[p] == level - 1]
                 if not eligible_parents:
@@ -178,17 +176,23 @@ class ACMCCS2012Loader:
         """Extract the English skos:prefLabel from a concept element."""
         labels: list[str] = []
         for label_el in concept_el.findall("skos:prefLabel", namespaces=self._NS):
-            lang = label_el.get(f"{{{self._NS['xml']}}}lang")
-            if lang is None:
-                lang = label_el.get("lang")
+            xml_lang = label_el.get(f"{{{self._NS['xml']}}}lang")
+            bare_lang = label_el.get("lang")
+            if xml_lang is not None:
+                lang = xml_lang
+            elif bare_lang is not None:
+                lang = bare_lang
+            else:
+                continue
             if lang == "en" and label_el.text is not None:
                 labels.append(label_el.text.strip())
 
         labels = [label_item for label_item in labels if label_item != ""]
         if not labels:
             concept_id = concept_el.get(f"{{{self._NS['rdf']}}}about")
-            concept_id_display = concept_id if concept_id is not None else ""
-            raise ValueError(f"Concept '{concept_id_display}' is missing an English skos:prefLabel")
+            if concept_id is None:
+                raise ValueError("Concept without rdf:about is missing an English skos:prefLabel")
+            raise ValueError(f"Concept '{concept_id}' is missing an English skos:prefLabel")
 
         if len(labels) > 1:
             # Deterministic selection when multiple English labels exist.

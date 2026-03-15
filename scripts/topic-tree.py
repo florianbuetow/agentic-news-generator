@@ -15,6 +15,7 @@ Usage:
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -58,6 +59,24 @@ from src.topic_detection.taxonomy.embedding_cache import (
     write_cache,
 )
 from src.util.srt_util import SRTEntry, SRTUtil
+
+
+def format_duration(seconds: float) -> str:
+    """Format seconds as [HHh:MMm] string."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    return f"[{hours:02d}h:{minutes:02d}m]"
+
+
+def calculate_eta(file_idx: int, total: int, start_time: float) -> str:
+    """Calculate ETA string based on average time per processed file."""
+    if file_idx <= 1:
+        return ""
+    elapsed = time.time() - start_time
+    avg_time_per_file = elapsed / (file_idx - 1)
+    remaining_files = total - file_idx + 1
+    eta_seconds = avg_time_per_file * remaining_files
+    return f" ETA {format_duration(eta_seconds)}"
 
 
 def format_timedelta(td: timedelta) -> str:
@@ -382,13 +401,9 @@ def main() -> int:
     llm_label_cfg = td_config.llm_label
     llm_labeler = LLMTopicLabeler(config=llm_label_cfg) if llm_label_cfg.enabled else None
 
-    print(f"Found {len(srt_files)} SRT file(s)")
-    print(f"Output directory: {output_dir}")
-    print()
-
-    succeeded = 0
+    # Prescan: separate files to process from already-done files
+    files_to_process: list[tuple[Path, Path, Path]] = []
     skipped = 0
-    failed = 0
 
     for srt_path in srt_files:
         relative_path = srt_path.relative_to(base_dir)
@@ -397,41 +412,52 @@ def main() -> int:
         output_path = output_subdir / output_filename
 
         if output_path.exists() and not args.force:
-            print(f"Skipping: {relative_path} (_topic_tree.json already exists)")
             skipped += 1
             continue
 
-        print(f"Processing: {relative_path}")
+        files_to_process.append((srt_path, output_subdir, output_path))
 
-        try:
-            output = build_tree_output(
-                srt_path=srt_path,
-                data_dir=data_dir,
-                seg_cfg=seg_cfg,
-                taxonomy_cfg=taxonomy_cfg,
-                keyphrases_cfg=keyphrases_cfg,
-                embedding_generator=embedding_generator,
-                embedding_model=td_config.embedding.model_name,
-                matcher=matcher,
-                tfidf_extractor=tfidf_extractor,
-                yake_extractor=yake_extractor,
-                keybert_extractor=keybert_extractor,
-                llm_labeler=llm_labeler,
-            )
-            output_subdir.mkdir(parents=True, exist_ok=True)
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(output.model_dump(), f, indent=2, ensure_ascii=False)
+    total_to_process = len(files_to_process)
+    print(f"Processing {total_to_process} file(s), {skipped} already processed")
+    print(f"Output directory: {output_dir}")
+    print()
 
-            print(f"  → {output.total_nodes} nodes → {output_path}")
-            succeeded += 1
-        except Exception as e:
-            print(f"  Error: {e}", file=sys.stderr)
-            failed += 1
+    succeeded = 0
+    start_time = time.time()
+
+    for file_idx, (srt_path, output_subdir, output_path) in enumerate(files_to_process, start=1):
+        relative_path = srt_path.relative_to(base_dir)
+        progress_pct = (file_idx / total_to_process) * 100
+        eta_str = calculate_eta(file_idx, total_to_process, start_time)
+
+        print(f"Processing [{file_idx}/{total_to_process}] ({progress_pct:.0f}%){eta_str}: {relative_path}")
+
+        output = build_tree_output(
+            srt_path=srt_path,
+            data_dir=data_dir,
+            seg_cfg=seg_cfg,
+            taxonomy_cfg=taxonomy_cfg,
+            keyphrases_cfg=keyphrases_cfg,
+            embedding_generator=embedding_generator,
+            embedding_model=td_config.embedding.model_name,
+            matcher=matcher,
+            tfidf_extractor=tfidf_extractor,
+            yake_extractor=yake_extractor,
+            keybert_extractor=keybert_extractor,
+            llm_labeler=llm_labeler,
+        )
+        output_subdir.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(output.model_dump(), f, indent=2, ensure_ascii=False)
+
+        print(f"  → {output.total_nodes} nodes → {output_path}")
+        succeeded += 1
         print()
 
+    total_elapsed = time.time() - start_time
     print("=" * 50)
-    print(f"Completed: {succeeded} succeeded, {skipped} skipped, {failed} failed")
-    return 1 if failed > 0 else 0
+    print(f"Completed: {succeeded} succeeded, {skipped} skipped (elapsed: {format_duration(total_elapsed)})")
+    return 0
 
 
 if __name__ == "__main__":

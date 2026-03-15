@@ -288,7 +288,7 @@ class KeyBERTKeyphraseExtractor:
             diversity=self._cfg.mmr_diversity,
         )
 
-        return [Keyphrase(phrase=kw, score=score) for kw, score in keywords]
+        return [Keyphrase(phrase=kw, score=score) for kw, score in keywords if score >= self._cfg.min_score]
 
 
 _LLM_TOPIC_LABEL_SYSTEM_PROMPT = (
@@ -342,6 +342,11 @@ class LLMTopicLabeler:
             {"role": "user", "content": _LLM_TOPIC_LABEL_USER_PROMPT.format(text=text)},
         ]
 
+        token_count = litellm.token_counter(model=self._llm.model, messages=messages)
+        print(f"      LLM input: {token_count} tokens (context window: {self._cfg.llm.context_window})")
+        if token_count > self._cfg.llm.context_window:
+            raise ValueError(f"Input tokens ({token_count}) exceed context window ({self._cfg.llm.context_window})")
+
         try:
             response = litellm.completion(
                 model=self._llm.model,
@@ -350,6 +355,7 @@ class LLMTopicLabeler:
                 api_key=self._llm.api_key,
                 max_tokens=self._llm.max_tokens,
                 temperature=self._llm.temperature,
+                timeout=self._llm.timeout_seconds,
             )
         except BadRequestError as e:
             error_msg = str(e)
@@ -366,7 +372,9 @@ class LLMTopicLabeler:
         if response_text is None or response_text.strip() == "":
             raise ValueError("LLM returned empty response")
 
-        return self.parse_response(response_text)
+        result = self.parse_response(response_text)
+        print(f"      LLM result: summary={result.summary[:80]!r}... about={result.about[:80]!r}... labels={result.topic_labels}")
+        return result
 
     def parse_response(self, response_text: str) -> LLMTopicLabelData:
         """Parse LLM response into LLMTopicLabelData."""
