@@ -13,24 +13,24 @@ from src.config import Config, PathsConfig
 def get_valid_paths_config() -> dict[str, str]:
     """Return a valid paths configuration dictionary."""
     return {
-        "data_dir": "./data/",
-        "data_models_dir": "./data/models/",
-        "data_downloads_dir": "./data/downloads",
-        "data_downloads_videos_dir": "./data/downloads/videos/",
-        "data_downloads_transcripts_dir": "./data/downloads/transcripts",
-        "data_downloads_transcripts_hallucinations_dir": "./data/downloads/transcripts-hallucinations",
-        "data_downloads_transcripts_cleaned_dir": "./data/downloads/transcripts_cleaned",
-        "data_transcripts_topics_dir": "./data/downloads/transcripts-topics",
-        "data_downloads_audio_dir": "./data/downloads/audio",
-        "data_downloads_metadata_dir": "./data/downloads/metadata",
-        "data_output_dir": "./data/output/",
-        "data_input_dir": "./data/input/",
-        "data_temp_dir": "./data/temp",
-        "data_archive_dir": "./data/archive",
-        "data_archive_videos_dir": "./data/archive/videos",
-        "data_logs_dir": "./logs",
-        "data_output_articles_dir": "./data/output/articles",
-        "data_articles_input_dir": "./data/articles/input",
+        "data_dir": "data",
+        "data_models_dir": "data/models",
+        "data_downloads_dir": "data/downloads",
+        "data_downloads_videos_dir": "data/downloads/videos",
+        "data_downloads_transcripts_dir": "data/downloads/transcripts",
+        "data_downloads_transcripts_hallucinations_dir": "data/downloads/transcripts-hallucinations",
+        "data_downloads_transcripts_cleaned_dir": "data/downloads/transcripts_cleaned",
+        "data_transcripts_topics_dir": "data/downloads/transcripts-topics",
+        "data_downloads_audio_dir": "data/downloads/audio",
+        "data_downloads_metadata_dir": "data/downloads/metadata",
+        "data_output_dir": "data/output",
+        "data_input_dir": "data/input",
+        "data_temp_dir": "data/temp",
+        "data_archive_dir": "data/archive",
+        "data_archive_videos_dir": "data/archive/videos",
+        "data_logs_dir": "logs",
+        "data_output_articles_dir": "data/output/articles",
+        "data_articles_input_dir": "data/articles/input",
         "reports_dir": "reports",
     }
 
@@ -42,21 +42,21 @@ class TestPathsConfig:
         """Test that a valid paths configuration passes validation."""
         paths_data = get_valid_paths_config()
         paths = PathsConfig.model_validate(paths_data)
-        assert paths.data_dir == "./data/"
-        assert paths.data_downloads_dir == "./data/downloads"
-        assert paths.data_archive_videos_dir == "./data/archive/videos"
+        assert paths.data_dir == "data"
+        assert paths.data_downloads_dir == "data/downloads"
+        assert paths.data_archive_videos_dir == "data/archive/videos"
 
     def test_data_logs_dir_field_exists(self) -> None:
         """Test that data_logs_dir field is present and valid."""
         paths_data = get_valid_paths_config()
         paths = PathsConfig.model_validate(paths_data)
-        assert paths.data_logs_dir == "./logs"
+        assert paths.data_logs_dir == "logs"
 
     def test_data_transcripts_topics_dir_field_exists(self) -> None:
         """Test that data_transcripts_topics_dir field is present and valid."""
         paths_data = get_valid_paths_config()
         paths = PathsConfig.model_validate(paths_data)
-        assert paths.data_transcripts_topics_dir == "./data/downloads/transcripts-topics"
+        assert paths.data_transcripts_topics_dir == "data/downloads/transcripts-topics"
 
     def test_missing_required_path(self) -> None:
         """Test that missing required paths raise ValidationError."""
@@ -101,9 +101,10 @@ class TestConfigPaths:
 
         try:
             config = Config(temp_path)
-            assert config.getDataDir() == Path("./data/")
-            assert config.getDataDownloadsDir() == Path("./data/downloads")
-            assert config.getDataArchiveVideosDir() == Path("./data/archive/videos")
+            expected_root = temp_path.parent.parent
+            assert config.getDataDir() == expected_root / "data"
+            assert config.getDataDownloadsDir() == expected_root / "data" / "downloads"
+            assert config.getDataArchiveVideosDir() == expected_root / "data" / "archive" / "videos"
         finally:
             temp_path.unlink()
 
@@ -204,22 +205,24 @@ class TestConfigPaths:
 
         try:
             config = Config(temp_path)
-            # Path normalizes paths, so "./data/" becomes "data"
-            assert config.getDataDir() == Path("./data/")
-            assert config.getDataModelsDir() == Path("./data/models/")
-            assert config.getDataDownloadsDir() == Path("./data/downloads")
-            assert config.getDataDownloadsVideosDir() == Path("./data/downloads/videos/")
-            assert config.getDataDownloadsTranscriptsDir() == Path("./data/downloads/transcripts")
-            assert config.getDataDownloadsTranscriptsHallucinationsDir() == Path("./data/downloads/transcripts-hallucinations")
-            assert config.getDataTranscriptsTopicsDir() == Path("./data/downloads/transcripts-topics")
-            assert config.getDataDownloadsAudioDir() == Path("./data/downloads/audio")
-            assert config.getDataDownloadsMetadataDir() == Path("./data/downloads/metadata")
-            assert config.getDataOutputDir() == Path("./data/output/")
-            assert config.getDataInputDir() == Path("./data/input/")
-            assert config.getDataTempDir() == Path("./data/temp")
-            assert config.getDataArchiveDir() == Path("./data/archive")
-            assert config.getDataArchiveVideosDir() == Path("./data/archive/videos")
-            assert config.getDataLogsDir() == Path("./logs")
+            expected_root = temp_path.parent.parent
+            assert config.getDataDir() == expected_root / "data"
+            assert config.getDataModelsDir() == expected_root / "data" / "models"
+            assert config.getDataDownloadsDir() == expected_root / "data" / "downloads"
+            assert config.getDataDownloadsVideosDir() == expected_root / "data" / "downloads" / "videos"
+            assert config.getDataDownloadsTranscriptsDir() == expected_root / "data" / "downloads" / "transcripts"
+            assert config.getDataDownloadsTranscriptsHallucinationsDir() == (
+                expected_root / "data" / "downloads" / "transcripts-hallucinations"
+            )
+            assert config.getDataTranscriptsTopicsDir() == expected_root / "data" / "downloads" / "transcripts-topics"
+            assert config.getDataDownloadsAudioDir() == expected_root / "data" / "downloads" / "audio"
+            assert config.getDataDownloadsMetadataDir() == expected_root / "data" / "downloads" / "metadata"
+            assert config.getDataOutputDir() == expected_root / "data" / "output"
+            assert config.getDataInputDir() == expected_root / "data" / "input"
+            assert config.getDataTempDir() == expected_root / "data" / "temp"
+            assert config.getDataArchiveDir() == expected_root / "data" / "archive"
+            assert config.getDataArchiveVideosDir() == expected_root / "data" / "archive" / "videos"
+            assert config.getDataLogsDir() == expected_root / "logs"
         finally:
             temp_path.unlink()
 
@@ -255,7 +258,8 @@ class TestConfigPaths:
             config = Config(temp_path)
             logs_dir = config.getDataLogsDir()
             assert isinstance(logs_dir, Path)
-            assert logs_dir == Path("./logs")
+            expected_root = temp_path.parent.parent
+            assert logs_dir == expected_root / "logs"
         finally:
             temp_path.unlink()
 
@@ -273,6 +277,7 @@ class TestConfigPaths:
             config = Config(temp_path)
             topics_dir = config.getDataTranscriptsTopicsDir()
             assert isinstance(topics_dir, Path)
-            assert topics_dir == Path("./data/downloads/transcripts-topics")
+            expected_root = temp_path.parent.parent
+            assert topics_dir == expected_root / "data" / "downloads" / "transcripts-topics"
         finally:
             temp_path.unlink()
