@@ -373,6 +373,7 @@ class TopicDetectionKeyBERTKeyphrasesConfig(BaseModel):
     keyphrase_ngram_range_max: int = Field(..., ge=1, description="Maximum n-gram length for keyphrases")
     use_mmr: bool = Field(..., description="Use Maximal Marginal Relevance for diverse keyphrases")
     mmr_diversity: float = Field(..., ge=0.0, le=1.0, description="MMR diversity parameter (0=most similar, 1=most diverse)")
+    min_score: float = Field(..., ge=-1.0, le=1.0, description="Minimum KeyBERT similarity score required to keep a keyphrase")
     stop_words: str | None = Field(..., description="Stop word list name (e.g., 'english') or None")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -521,6 +522,7 @@ class Config:
 
         # Validate paths section (required)
         self._paths = self._validate_paths()
+        self._project_root = self.config_path.parent.parent
 
         # Validate topic_segmentation section if present
         if "topic_segmentation" in self._data:
@@ -828,13 +830,27 @@ class Config:
         """Get the path to config.yaml."""
         return self.config_path
 
+    def _resolve_path(self, raw: str) -> Path:
+        """Resolve a config path value to an absolute Path.
+
+        If the value starts with '/', it is treated as absolute.
+        Otherwise, it is resolved relative to the project root
+        (config_path.parent.parent).
+        """
+        stripped = raw.rstrip("/")
+        if stripped == "":
+            stripped = "/"
+        if stripped.startswith("/"):
+            return Path(stripped)
+        return self._project_root / stripped
+
     def getDataDir(self) -> Path:
         """Get the data directory path.
 
         Returns:
             Path object pointing to the data directory (relative or absolute).
         """
-        return Path(self._paths.data_dir)
+        return self._resolve_path(self._paths.data_dir)
 
     def getDataModelsDir(self) -> Path:
         """Get the data models directory path.
@@ -842,7 +858,7 @@ class Config:
         Returns:
             Path object for the models directory (e.g., ./data/models/).
         """
-        return Path(self._paths.data_models_dir)
+        return self._resolve_path(self._paths.data_models_dir)
 
     def getDataDownloadsDir(self) -> Path:
         """Get the data downloads directory path.
@@ -850,7 +866,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads directory.
         """
-        return Path(self._paths.data_downloads_dir)
+        return self._resolve_path(self._paths.data_downloads_dir)
 
     def getDataDownloadsVideosDir(self) -> Path:
         """Get the data downloads videos directory path.
@@ -858,7 +874,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/videos directory.
         """
-        return Path(self._paths.data_downloads_videos_dir)
+        return self._resolve_path(self._paths.data_downloads_videos_dir)
 
     def getDataDownloadsTranscriptsDir(self) -> Path:
         """Get the data downloads transcripts directory path.
@@ -866,7 +882,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/transcripts directory.
         """
-        return Path(self._paths.data_downloads_transcripts_dir)
+        return self._resolve_path(self._paths.data_downloads_transcripts_dir)
 
     def getDataDownloadsTranscriptsHallucinationsDir(self) -> Path:
         """Get the data downloads transcripts hallucinations directory path.
@@ -874,7 +890,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/transcripts-hallucinations directory.
         """
-        return Path(self._paths.data_downloads_transcripts_hallucinations_dir)
+        return self._resolve_path(self._paths.data_downloads_transcripts_hallucinations_dir)
 
     def getDataDownloadsTranscriptsCleanedDir(self) -> Path:
         """Get the data downloads cleaned transcripts directory path.
@@ -882,7 +898,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/transcripts_cleaned directory.
         """
-        return Path(self._paths.data_downloads_transcripts_cleaned_dir)
+        return self._resolve_path(self._paths.data_downloads_transcripts_cleaned_dir)
 
     def getDataTranscriptsTopicsDir(self) -> Path:
         """Get the transcripts split by topics directory path.
@@ -890,7 +906,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/transcripts-topics directory.
         """
-        return Path(self._paths.data_transcripts_topics_dir)
+        return self._resolve_path(self._paths.data_transcripts_topics_dir)
 
     def getDataDownloadsAudioDir(self) -> Path:
         """Get the data downloads audio directory path.
@@ -898,7 +914,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/audio directory.
         """
-        return Path(self._paths.data_downloads_audio_dir)
+        return self._resolve_path(self._paths.data_downloads_audio_dir)
 
     def getDataDownloadsMetadataDir(self) -> Path:
         """Get the data downloads metadata directory path.
@@ -906,7 +922,7 @@ class Config:
         Returns:
             Path object pointing to the data/downloads/metadata directory.
         """
-        return Path(self._paths.data_downloads_metadata_dir)
+        return self._resolve_path(self._paths.data_downloads_metadata_dir)
 
     def getDataOutputDir(self) -> Path:
         """Get the data output directory path.
@@ -914,7 +930,7 @@ class Config:
         Returns:
             Path object pointing to the data/output directory.
         """
-        return Path(self._paths.data_output_dir)
+        return self._resolve_path(self._paths.data_output_dir)
 
     def getDataInputDir(self) -> Path:
         """Get the data input directory path.
@@ -922,7 +938,7 @@ class Config:
         Returns:
             Path object pointing to the data/input directory.
         """
-        return Path(self._paths.data_input_dir)
+        return self._resolve_path(self._paths.data_input_dir)
 
     def getDataTempDir(self) -> Path:
         """Get the data temp directory path.
@@ -930,7 +946,7 @@ class Config:
         Returns:
             Path object pointing to the data/temp directory.
         """
-        return Path(self._paths.data_temp_dir)
+        return self._resolve_path(self._paths.data_temp_dir)
 
     def getDataArchiveDir(self) -> Path:
         """Get the data archive directory path.
@@ -938,7 +954,7 @@ class Config:
         Returns:
             Path object pointing to the data/archive directory.
         """
-        return Path(self._paths.data_archive_dir)
+        return self._resolve_path(self._paths.data_archive_dir)
 
     def getDataArchiveVideosDir(self) -> Path:
         """Get the data archive videos directory path.
@@ -946,7 +962,7 @@ class Config:
         Returns:
             Path object pointing to the data/archive/videos directory.
         """
-        return Path(self._paths.data_archive_videos_dir)
+        return self._resolve_path(self._paths.data_archive_videos_dir)
 
     def getDataLogsDir(self) -> Path:
         """Get the logs directory path.
@@ -954,7 +970,7 @@ class Config:
         Returns:
             Path object pointing to the logs directory.
         """
-        return Path(self._paths.data_logs_dir)
+        return self._resolve_path(self._paths.data_logs_dir)
 
     def getDataOutputArticlesDir(self) -> Path:
         """Get the generated articles directory path.
@@ -962,11 +978,11 @@ class Config:
         Returns:
             Path object pointing to the data/output/articles directory.
         """
-        return Path(self._paths.data_output_articles_dir)
+        return self._resolve_path(self._paths.data_output_articles_dir)
 
     def getDataArticlesInputDir(self) -> Path:
         """Get the article generation input bundles directory path."""
-        return Path(self._paths.data_articles_input_dir)
+        return self._resolve_path(self._paths.data_articles_input_dir)
 
     def getReportsDir(self) -> Path:
         """Get the reports directory path.
@@ -974,7 +990,7 @@ class Config:
         Returns:
             Path object pointing to the reports directory.
         """
-        return Path(self._paths.reports_dir)
+        return self._resolve_path(self._paths.reports_dir)
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.
