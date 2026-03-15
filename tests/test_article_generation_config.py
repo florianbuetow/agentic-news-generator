@@ -73,12 +73,7 @@ def get_valid_article_generation_config_dict() -> dict[str, object]:
     return {
         "editor": {
             "editor_max_rounds": 3,
-            "output": {
-                "final_articles_dir": "./data/output/articles",
-                "run_artifacts_dir": "./data/output/article_editor_runs",
-            },
             "prompts": {
-                "root_dir": "./prompts/article_editor",
                 "writer_prompt_file": "writer.md",
                 "revision_prompt_file": "revision.md",
                 "article_review_prompt_file": "article_review.md",
@@ -104,8 +99,6 @@ def get_valid_article_generation_config_dict() -> dict[str, object]:
             },
         },
         "knowledge_base": {
-            "data_dir": "./data/knowledgebase",
-            "index_dir": "./data/knowledgebase_index",
             "chunk_size_tokens": 512,
             "chunk_overlap_tokens": 50,
             "timeout_seconds": 30,
@@ -124,7 +117,6 @@ def get_valid_article_generation_config_dict() -> dict[str, object]:
             "timeout_seconds": 45,
         },
         "institutional_memory": {
-            "data_dir": "./data/institutional_memory",
             "fact_checking_subdir": "fact_checking",
             "evidence_finding_subdir": "evidence_finding",
         },

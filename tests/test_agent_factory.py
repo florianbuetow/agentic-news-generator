@@ -100,12 +100,7 @@ def _write_test_config(
         "article_generation": {
             "editor": {
                 "editor_max_rounds": 3,
-                "output": {
-                    "final_articles_dir": str(tmp_dir / "output" / "articles"),
-                    "run_artifacts_dir": str(tmp_dir / "output" / "article_editor_runs"),
-                },
                 "prompts": {
-                    "root_dir": "./prompts/article_editor",
                     "writer_prompt_file": "writer.md",
                     "revision_prompt_file": "revision.md",
                     "article_review_prompt_file": "article_review.md",
@@ -131,8 +126,6 @@ def _write_test_config(
                 },
             },
             "knowledge_base": {
-                "data_dir": str(tmp_dir / "knowledgebase"),
-                "index_dir": str(tmp_dir / "knowledgebase_index"),
                 "chunk_size_tokens": 512,
                 "chunk_overlap_tokens": 50,
                 "timeout_seconds": 30,
@@ -151,7 +144,6 @@ def _write_test_config(
                 "timeout_seconds": 45,
             },
             "institutional_memory": {
-                "data_dir": str(tmp_dir / "institutional_memory"),
                 "fact_checking_subdir": "fact_checking",
                 "evidence_finding_subdir": "evidence_finding",
             },

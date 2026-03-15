@@ -1,9 +1,13 @@
 """Factory utilities for building the article-generation orchestrator."""
 
-from pathlib import Path
-
 from src.agents.article_generation.article_review.agent import ArticleReviewAgent
 from src.agents.article_generation.article_review.mock_agent import MockArticleReviewAgent
+from src.agents.article_generation.base import (
+    ArticleReviewAgentProtocol,
+    ConcernMappingAgentProtocol,
+    SpecialistAgentProtocol,
+    WriterAgentProtocol,
+)
 from src.agents.article_generation.chief_editor.bullet_parser import ArticleReviewBulletParser
 from src.agents.article_generation.chief_editor.institutional_memory import InstitutionalMemoryStore
 from src.agents.article_generation.chief_editor.orchestrator import ChiefEditorOrchestrator
@@ -30,83 +34,83 @@ from src.agents.article_generation.writer.mock_agent import MockWriterAgent
 from src.config import Config
 
 
+def _check_agent_name(agent_name: str, label: str) -> None:
+    """Validate that agent_name is 'mock' or 'default'."""
+    if agent_name not in ("mock", "default"):
+        raise ValueError(f"Unknown {label} agent_name: '{agent_name}'")
+
+
 def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrator:
     """Build a fully wired chief editor orchestrator from configuration."""
     article_generation_config = config.get_article_generation_config()
 
-    prompt_root_dir = Path(article_generation_config.editor.prompts.root_dir)
-    prompt_loader = PromptLoader(root_dir=prompt_root_dir)
+    prompts_config = article_generation_config.editor.prompts
+    prompt_loader = PromptLoader(root_dir=config.getArticleGenerationPromptsDir())
     llm_client = LiteLLMClient()
 
     institutional_memory = InstitutionalMemoryStore(
-        data_dir=Path(article_generation_config.institutional_memory.data_dir),
+        data_dir=config.getArticleGenerationInstitutionalMemoryDir(),
         fact_checking_subdir=article_generation_config.institutional_memory.fact_checking_subdir,
         evidence_finding_subdir=article_generation_config.institutional_memory.evidence_finding_subdir,
     )
 
     output_handler = OutputHandler(
-        final_articles_dir=Path(article_generation_config.editor.output.final_articles_dir),
-        run_artifacts_dir=Path(article_generation_config.editor.output.run_artifacts_dir),
+        final_articles_dir=config.getArticleGenerationOutputDir(),
+        run_artifacts_dir=config.getArticleGenerationArtifactsDir(),
     )
 
     agents_config = article_generation_config.agents
     specialists_config = agents_config.specialists
 
-    # --- Writer (default or mock) ---
-    writer_impl = agents_config.writer.agent_name
-    if writer_impl == "mock":
-        writer_agent = MockWriterAgent()
-    elif writer_impl == "default":
+    # --- Writer ---
+    _check_agent_name(agents_config.writer.agent_name, "writer")
+    if agents_config.writer.agent_name == "mock":
+        writer_agent: WriterAgentProtocol = MockWriterAgent()
+    else:
         writer_agent = WriterAgent(
             llm_config=agents_config.writer.llm,
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            writer_prompt_file=article_generation_config.editor.prompts.writer_prompt_file,
-            revision_prompt_file=article_generation_config.editor.prompts.revision_prompt_file,
+            writer_prompt_file=prompts_config.writer_prompt_file,
+            revision_prompt_file=prompts_config.revision_prompt_file,
         )
-    else:
-        raise ValueError(f"Unknown writer agent_name: '{writer_impl}'")
 
-    # --- Article review (default or mock) ---
-    article_review_impl = agents_config.article_review.agent_name
-    if article_review_impl == "mock":
-        article_review_agent = MockArticleReviewAgent()
-    elif article_review_impl == "default":
+    # --- Article review ---
+    _check_agent_name(agents_config.article_review.agent_name, "article_review")
+    if agents_config.article_review.agent_name == "mock":
+        article_review_agent: ArticleReviewAgentProtocol = MockArticleReviewAgent()
+    else:
         article_review_agent = ArticleReviewAgent(
             llm_config=agents_config.article_review.llm,
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            prompt_file=article_generation_config.editor.prompts.article_review_prompt_file,
+            prompt_file=prompts_config.article_review_prompt_file,
         )
-    else:
-        raise ValueError(f"Unknown article_review agent_name: '{article_review_impl}'")
 
-    # --- Concern mapping (default or mock) ---
-    concern_mapping_impl = agents_config.concern_mapping.agent_name
-    if concern_mapping_impl == "mock":
-        concern_mapping_agent = MockConcernMappingAgent()
-    elif concern_mapping_impl == "default":
+    # --- Concern mapping ---
+    _check_agent_name(agents_config.concern_mapping.agent_name, "concern_mapping")
+    if agents_config.concern_mapping.agent_name == "mock":
+        concern_mapping_agent: ConcernMappingAgentProtocol = MockConcernMappingAgent()
+    else:
         concern_mapping_agent = ConcernMappingAgent(
             llm_config=agents_config.concern_mapping.llm,
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            prompt_file=article_generation_config.editor.prompts.concern_mapping_prompt_file,
+            prompt_file=prompts_config.concern_mapping_prompt_file,
         )
-    else:
-        raise ValueError(f"Unknown concern_mapping agent_name: '{concern_mapping_impl}'")
 
-    # --- Fact check (default or mock) ---
-    fact_check_impl = specialists_config.fact_check.agent_name
-    if fact_check_impl == "mock":
-        fact_check_agent = MockFactCheckAgent()
-    elif fact_check_impl == "default":
+    # --- Fact check ---
+    _check_agent_name(specialists_config.fact_check.agent_name, "fact_check")
+    if specialists_config.fact_check.agent_name == "mock":
+        fact_check_agent: SpecialistAgentProtocol = MockFactCheckAgent()
+    else:
         kb_config = article_generation_config.knowledge_base
         kb_indexer = KnowledgeBaseIndexer(
-            data_dir=Path(kb_config.data_dir),
-            index_dir=Path(kb_config.index_dir),
+            data_dir=config.getArticleGenerationKbDir(),
+            index_dir=config.getArticleGenerationKbIndexDir(),
             chunk_size_tokens=kb_config.chunk_size_tokens,
             chunk_overlap_tokens=kb_config.chunk_overlap_tokens,
             embedding_provider=kb_config.embedding.provider,
@@ -118,7 +122,7 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
         )
         kb_index_version = kb_indexer.ensure_index()
         kb_retriever = HaystackKnowledgeBaseRetriever(
-            index_dir=Path(kb_config.index_dir),
+            index_dir=config.getArticleGenerationKbIndexDir(),
             embedding_provider=kb_config.embedding.provider,
             embedding_model_name=kb_config.embedding.model_name,
             embedding_api_base=kb_config.embedding.api_base,
@@ -130,21 +134,19 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file=article_generation_config.editor.prompts.fact_check_prompt_file,
+            specialists_dir=prompts_config.specialists_dir,
+            prompt_file=prompts_config.fact_check_prompt_file,
             knowledge_base_retriever=kb_retriever,
             institutional_memory=institutional_memory,
             kb_index_version=kb_index_version,
             kb_timeout_seconds=kb_config.timeout_seconds,
         )
-    else:
-        raise ValueError(f"Unknown fact_check agent_name: '{fact_check_impl}'")
 
-    # --- Evidence finding (default or mock) ---
-    evidence_finding_impl = specialists_config.evidence_finding.agent_name
-    if evidence_finding_impl == "mock":
-        evidence_finding_agent = MockEvidenceFindingAgent()
-    elif evidence_finding_impl == "default":
+    # --- Evidence finding ---
+    _check_agent_name(specialists_config.evidence_finding.agent_name, "evidence_finding")
+    if specialists_config.evidence_finding.agent_name == "mock":
+        evidence_finding_agent: SpecialistAgentProtocol = MockEvidenceFindingAgent()
+    else:
         perplexity_client = PerplexityHTTPClient(
             api_base=article_generation_config.perplexity.api_base,
             api_key=article_generation_config.perplexity.api_key,
@@ -154,62 +156,54 @@ def build_chief_editor_orchestrator(*, config: Config) -> ChiefEditorOrchestrato
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file=article_generation_config.editor.prompts.evidence_finding_prompt_file,
+            specialists_dir=prompts_config.specialists_dir,
+            prompt_file=prompts_config.evidence_finding_prompt_file,
             perplexity_client=perplexity_client,
             perplexity_model=article_generation_config.perplexity.model,
             institutional_memory=institutional_memory,
         )
-    else:
-        raise ValueError(f"Unknown evidence_finding agent_name: '{evidence_finding_impl}'")
 
-    # --- Opinion (default or mock) ---
-    opinion_impl = specialists_config.opinion.agent_name
-    if opinion_impl == "mock":
-        opinion_agent = MockOpinionAgent()
-    elif opinion_impl == "default":
+    # --- Opinion ---
+    _check_agent_name(specialists_config.opinion.agent_name, "opinion")
+    if specialists_config.opinion.agent_name == "mock":
+        opinion_agent: SpecialistAgentProtocol = MockOpinionAgent()
+    else:
         opinion_agent = OpinionAgent(
             llm_config=specialists_config.opinion.llm,
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file=article_generation_config.editor.prompts.opinion_prompt_file,
+            specialists_dir=prompts_config.specialists_dir,
+            prompt_file=prompts_config.opinion_prompt_file,
         )
-    else:
-        raise ValueError(f"Unknown opinion agent_name: '{opinion_impl}'")
 
-    # --- Attribution (default or mock) ---
-    attribution_impl = specialists_config.attribution.agent_name
-    if attribution_impl == "mock":
-        attribution_agent = MockAttributionAgent()
-    elif attribution_impl == "default":
+    # --- Attribution ---
+    _check_agent_name(specialists_config.attribution.agent_name, "attribution")
+    if specialists_config.attribution.agent_name == "mock":
+        attribution_agent: SpecialistAgentProtocol = MockAttributionAgent()
+    else:
         attribution_agent = AttributionAgent(
             llm_config=specialists_config.attribution.llm,
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file=article_generation_config.editor.prompts.attribution_prompt_file,
+            specialists_dir=prompts_config.specialists_dir,
+            prompt_file=prompts_config.attribution_prompt_file,
         )
-    else:
-        raise ValueError(f"Unknown attribution agent_name: '{attribution_impl}'")
 
-    # --- Style review (default or mock) ---
-    style_review_impl = specialists_config.style_review.agent_name
-    if style_review_impl == "mock":
-        style_review_agent = MockStyleReviewAgent()
-    elif style_review_impl == "default":
+    # --- Style review ---
+    _check_agent_name(specialists_config.style_review.agent_name, "style_review")
+    if specialists_config.style_review.agent_name == "mock":
+        style_review_agent: SpecialistAgentProtocol = MockStyleReviewAgent()
+    else:
         style_review_agent = StyleReviewAgent(
             llm_config=specialists_config.style_review.llm,
             config=config,
             llm_client=llm_client,
             prompt_loader=prompt_loader,
-            specialists_dir=article_generation_config.editor.prompts.specialists_dir,
-            prompt_file=article_generation_config.editor.prompts.style_review_prompt_file,
+            specialists_dir=prompts_config.specialists_dir,
+            prompt_file=prompts_config.style_review_prompt_file,
         )
-    else:
-        raise ValueError(f"Unknown style_review agent_name: '{style_review_impl}'")
 
     return ChiefEditorOrchestrator(
         config=config,

@@ -134,19 +134,9 @@ class TopicSegmentationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class ArticleGenerationOutputConfig(BaseModel):
-    """Output paths for canonical and run artifacts."""
-
-    final_articles_dir: str = Field(..., min_length=1, description="Canonical output root directory")
-    run_artifacts_dir: str = Field(..., min_length=1, description="Run artifacts root directory")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
 class ArticleGenerationPromptConfig(BaseModel):
     """Prompt file configuration for editor system."""
 
-    root_dir: str = Field(..., min_length=1, description="Prompt templates root directory")
     writer_prompt_file: str = Field(..., min_length=1, description="Writer prompt filename")
     revision_prompt_file: str = Field(..., min_length=1, description="Revision prompt filename")
     article_review_prompt_file: str = Field(..., min_length=1, description="Article-review prompt filename")
@@ -165,7 +155,6 @@ class ArticleGenerationEditorConfig(BaseModel):
     """Chief editor settings."""
 
     editor_max_rounds: int = Field(..., gt=0, description="Maximum editor feedback rounds")
-    output: ArticleGenerationOutputConfig = Field(..., description="Output handling configuration")
     prompts: ArticleGenerationPromptConfig = Field(..., description="Prompt file configuration")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -218,8 +207,6 @@ class KnowledgeBaseEmbeddingConfig(BaseModel):
 class KnowledgeBaseConfig(BaseModel):
     """Knowledge base indexing and retrieval settings."""
 
-    data_dir: str = Field(..., min_length=1, description="Knowledge base source docs directory")
-    index_dir: str = Field(..., min_length=1, description="Persisted index directory")
     chunk_size_tokens: int = Field(..., gt=0, description="Chunk size in tokens")
     chunk_overlap_tokens: int = Field(..., ge=0, description="Chunk overlap in tokens")
     timeout_seconds: int = Field(..., gt=0, description="Knowledge base search timeout in seconds")
@@ -242,7 +229,6 @@ class PerplexityConfig(BaseModel):
 class InstitutionalMemoryConfig(BaseModel):
     """Institutional memory storage settings."""
 
-    data_dir: str = Field(..., min_length=1, description="Institutional memory root directory")
     fact_checking_subdir: str = Field(..., min_length=1, description="Fact-check cache subdirectory")
     evidence_finding_subdir: str = Field(..., min_length=1, description="Evidence-finding cache subdirectory")
 
