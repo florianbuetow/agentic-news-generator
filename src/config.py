@@ -38,8 +38,6 @@ class LinkConfig(BaseModel):
 class ArticleCompilerConfig(BaseModel):
     """Configuration for article compilation."""
 
-    input_dir: str = Field(..., description="Input directory for markdown articles")
-    output_file: str = Field(..., description="Output path for articles.js")
     min_articles: int = Field(..., gt=0, description="Minimum articles required")
     date_format: str = Field(..., description="Date format in YAML frontmatter")
     paragraphs: ParagraphConfig
@@ -491,6 +489,9 @@ class PathsConfig(BaseModel):
     data_topic_detection_output_dir: str = Field(..., description="Topic detection output directory", min_length=1)
     data_topic_detection_taxonomies_dir: str = Field(..., description="Topic detection taxonomies directory", min_length=1)
     data_topic_detection_taxonomy_cache_dir: str = Field(..., description="Topic detection taxonomy cache directory", min_length=1)
+    data_hallucination_detection_output_dir: str = Field(..., description="Hallucination detection output directory", min_length=1)
+    data_article_compiler_input_dir: str = Field(..., description="Article compiler input directory", min_length=1)
+    data_article_compiler_output_file: str = Field(..., description="Article compiler output file path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -1018,6 +1019,18 @@ class Config:
     def getTopicDetectionTaxonomyCacheDir(self) -> Path:
         """Get topic detection taxonomy cache directory."""
         return self._resolve_path(self._paths.data_topic_detection_taxonomy_cache_dir)
+
+    def getHallucinationDetectionOutputDir(self) -> Path:
+        """Get hallucination detection output directory."""
+        return self._resolve_path(self._paths.data_hallucination_detection_output_dir)
+
+    def getArticleCompilerInputDir(self) -> Path:
+        """Get article compiler input directory."""
+        return self._resolve_path(self._paths.data_article_compiler_input_dir)
+
+    def getArticleCompilerOutputFile(self) -> Path:
+        """Get article compiler output file path."""
+        return self._resolve_path(self._paths.data_article_compiler_output_file)
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.

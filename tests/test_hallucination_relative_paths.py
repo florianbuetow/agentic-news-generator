@@ -260,13 +260,15 @@ paths:
   data_topic_detection_output_dir: {data_dir / "output" / "topics"}
   data_topic_detection_taxonomies_dir: {data_dir / "input" / "taxonomies"}
   data_topic_detection_taxonomy_cache_dir: {data_dir / "input" / "taxonomies" / "cache"}
+  data_hallucination_detection_output_dir: {data_dir / "downloads" / "transcripts-hallucinations"}
+  data_article_compiler_input_dir: data/input/newspaper/articles
+  data_article_compiler_output_file: data/input/newspaper/articles.js
 
 channels: []
 
 hallucination_detection:
   min_window_size: 500
   overlap_percent: 25.0
-  output_dir: downloads/transcripts-hallucinations
   coef_repetitions: 0.8888460000
   coef_sequence_length: 0.6665380000
   intercept: -6.7770510000

@@ -40,6 +40,9 @@ def _default_paths(overrides: dict[str, str] | None = None) -> dict[str, str]:
         "data_topic_detection_output_dir": "data/output/topics",
         "data_topic_detection_taxonomies_dir": "data/input/taxonomies",
         "data_topic_detection_taxonomy_cache_dir": "data/input/taxonomies/cache",
+        "data_hallucination_detection_output_dir": "data/downloads/transcripts-hallucinations",
+        "data_article_compiler_input_dir": "data/input/newspaper/articles",
+        "data_article_compiler_output_file": "data/input/newspaper/articles.js",
     }
     if overrides:
         base.update(overrides)
@@ -102,6 +105,9 @@ GETTER_REGISTRY: list[tuple[str, str]] = [
     ("getTopicDetectionOutputDir", "data_topic_detection_output_dir"),
     ("getTopicDetectionTaxonomiesDir", "data_topic_detection_taxonomies_dir"),
     ("getTopicDetectionTaxonomyCacheDir", "data_topic_detection_taxonomy_cache_dir"),
+    ("getHallucinationDetectionOutputDir", "data_hallucination_detection_output_dir"),
+    ("getArticleCompilerInputDir", "data_article_compiler_input_dir"),
+    ("getArticleCompilerOutputFile", "data_article_compiler_output_file"),
 ]
 
 
@@ -315,3 +321,39 @@ class TestDomainSpecificGetters:
         config = _write_config(tmp_path, {"data_topic_detection_taxonomies_dir": "data/input/taxonomies"})
         result = config.getTopicDetectionTaxonomiesDir()
         assert result == tmp_path / "data" / "input" / "taxonomies"
+
+
+class TestRemainingDomainGetters:
+    """TS-1 through TS-5: Hallucination detection and article compiler getters."""
+
+    def test_hallucination_detection_output_dir_absolute(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_hallucination_detection_output_dir": "/Volumes/data/hallucinations"})
+        result = config.getHallucinationDetectionOutputDir()
+        assert result == Path("/Volumes/data/hallucinations")
+        assert result.is_absolute()
+
+    def test_hallucination_detection_output_dir_relative(self, tmp_path: Path) -> None:
+        config = _write_config(
+            tmp_path,
+            {"data_hallucination_detection_output_dir": "data/downloads/transcripts-hallucinations"},
+        )
+        result = config.getHallucinationDetectionOutputDir()
+        assert result == tmp_path / "data" / "downloads" / "transcripts-hallucinations"
+        assert result.is_absolute()
+
+    def test_article_compiler_input_dir_relative(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_article_compiler_input_dir": "data/input/newspaper/articles"})
+        result = config.getArticleCompilerInputDir()
+        assert result == tmp_path / "data" / "input" / "newspaper" / "articles"
+        assert result.is_absolute()
+
+    def test_article_compiler_output_file_relative(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_article_compiler_output_file": "data/input/newspaper/articles.js"})
+        result = config.getArticleCompilerOutputFile()
+        assert result == tmp_path / "data" / "input" / "newspaper" / "articles.js"
+        assert result.is_absolute()
+
+    def test_article_compiler_output_file_absolute(self, tmp_path: Path) -> None:
+        config = _write_config(tmp_path, {"data_article_compiler_output_file": "/Volumes/data/newspaper/articles.js"})
+        result = config.getArticleCompilerOutputFile()
+        assert result == Path("/Volumes/data/newspaper/articles.js")

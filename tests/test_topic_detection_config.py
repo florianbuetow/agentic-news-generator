@@ -51,6 +51,9 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_topic_detection_output_dir": "data/output/topics",
         "data_topic_detection_taxonomies_dir": "data/input/taxonomies",
         "data_topic_detection_taxonomy_cache_dir": "data/input/taxonomies/cache",
+        "data_hallucination_detection_output_dir": "data/downloads/transcripts-hallucinations",
+        "data_article_compiler_input_dir": "data/input/newspaper/articles",
+        "data_article_compiler_output_file": "data/input/newspaper/articles.js",
     }
 
 

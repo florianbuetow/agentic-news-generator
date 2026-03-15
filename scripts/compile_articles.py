@@ -49,7 +49,7 @@ def main() -> None:
         logger.info("Starting article compilation")
 
         # Parse articles
-        input_dir = Path(compiler_config.input_dir)
+        input_dir = config.getArticleCompilerInputDir()
         parser = ArticleParser(compiler_config)
         articles = parser.parse_directory(input_dir)
 
@@ -65,7 +65,7 @@ def main() -> None:
         js_output = generate_javascript_output(compiled_data)
 
         # Write output file
-        output_path = Path(compiler_config.output_file)
+        output_path = config.getArticleCompilerOutputFile()
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(js_output, encoding="utf-8")
 

@@ -240,18 +240,10 @@ def main() -> int:  # noqa: C901
     hallucination_config = config_data.get("hallucination_detection", {})
     config_min_window_size = hallucination_config.get("min_window_size")
     config_overlap_percent = hallucination_config.get("overlap_percent")
-    config_output_dir = hallucination_config.get("output_dir")
 
     if config_min_window_size is None or config_overlap_percent is None:
         print(
             "Error: hallucination_detection.min_window_size and overlap_percent must be configured in config.yaml",
-            file=sys.stderr,
-        )
-        return 1
-
-    if config_output_dir is None:
-        print(
-            "Error: hallucination_detection.output_dir must be configured in config.yaml",
             file=sys.stderr,
         )
         return 1
@@ -300,7 +292,7 @@ Examples:
         return 1
 
     # Hallucination detection output directory from config
-    transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
+    transcripts_hallucinations_dir = config.getHallucinationDetectionOutputDir()
 
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
 

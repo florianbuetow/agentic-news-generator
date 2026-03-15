@@ -38,6 +38,17 @@ class TestConfigYamlPathFormatting:
                 violations.append(k)
         assert violations == [], f"Paths with invalid prefix: {violations}"
 
+    def test_no_directory_paths_in_domain_sections(self) -> None:
+        with open(CONFIG_PATH) as f:
+            config = cast(dict[str, Any], yaml.safe_load(f))
+
+        hallucination_detection = cast(dict[str, Any], config["hallucination_detection"])
+        article_compiler = cast(dict[str, Any], config["article_compiler"])
+
+        assert "output_dir" not in hallucination_detection
+        assert "input_dir" not in article_compiler
+        assert "output_file" not in article_compiler
+
 
 class TestScriptsUseConfigGetters:
     """TS-16: Scripts use Config getters without manual path construction."""
@@ -57,6 +68,12 @@ class TestScriptsUseConfigGetters:
             if re.search(r"config\.getDataDir\(\)\s*/\s*td_config\.", content):
                 violations.append(py_file.name)
             if re.search(r"data_dir\s*/\s*td_config\.", content):
+                violations.append(py_file.name)
+            if re.search(r"hallucination_config(?:\.get\(|\[).*output_dir", content):
+                violations.append(py_file.name)
+            if re.search(r"compiler_config\.input_dir", content):
+                violations.append(py_file.name)
+            if re.search(r"compiler_config\.output_file", content):
                 violations.append(py_file.name)
         assert violations == [], f"Scripts with manual data_dir / td_config joins: {violations}"
 

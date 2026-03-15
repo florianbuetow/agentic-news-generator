@@ -42,6 +42,9 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_topic_detection_output_dir": "data/output/topics",
         "data_topic_detection_taxonomies_dir": "data/input/taxonomies",
         "data_topic_detection_taxonomy_cache_dir": "data/input/taxonomies/cache",
+        "data_hallucination_detection_output_dir": "data/downloads/transcripts-hallucinations",
+        "data_article_compiler_input_dir": "data/input/newspaper/articles",
+        "data_article_compiler_output_file": "data/input/newspaper/articles.js",
     }
 
 
@@ -1047,5 +1050,51 @@ class TestChannelConfigLanguage:
             with pytest.raises(KeyError) as exc_info:
                 config.get_article_compiler_config()
             assert "article_compiler" in str(exc_info.value)
+        finally:
+            temp_path.unlink()
+
+    def test_article_compiler_config_has_no_path_fields(self) -> None:
+        """Test article compiler config excludes input/output path fields."""
+        config_data = {
+            "paths": get_valid_paths_config(),
+            "channels": [
+                {
+                    "url": "https://www.youtube.com/@test",
+                    "name": "Test Channel",
+                    "category": "test",
+                    "description": "Test",
+                    "download-limiter": 20,
+                    "language": "en",
+                }
+            ],
+            "article_compiler": {
+                "min_articles": 21,
+                "date_format": "%Y-%m-%d",
+                "paragraphs": {
+                    "hero_count": 2,
+                    "secondary_count": 2,
+                    "featured_count": 1,
+                },
+                "images": {
+                    "extract_first": True,
+                    "fallback_url": None,
+                },
+                "links": {
+                    "base_path": "/articles/",
+                    "slug_from_filename": True,
+                },
+            },
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            article_compiler_config = config.get_article_compiler_config()
+            assert article_compiler_config.min_articles == 21
+            assert article_compiler_config.date_format == "%Y-%m-%d"
+            assert not hasattr(article_compiler_config, "input_dir")
+            assert not hasattr(article_compiler_config, "output_file")
         finally:
             temp_path.unlink()

@@ -89,6 +89,9 @@ def _write_test_config(
             "data_topic_detection_output_dir": str(tmp_dir / "output" / "topics"),
             "data_topic_detection_taxonomies_dir": str(tmp_dir / "input" / "taxonomies"),
             "data_topic_detection_taxonomy_cache_dir": str(tmp_dir / "input" / "taxonomies" / "cache"),
+            "data_hallucination_detection_output_dir": str(tmp_dir / "downloads" / "transcripts-hallucinations"),
+            "data_article_compiler_input_dir": str(tmp_dir / "input" / "newspaper" / "articles"),
+            "data_article_compiler_output_file": str(tmp_dir / "input" / "newspaper" / "articles.js"),
         },
         "channels": [],
         "defaults": {
