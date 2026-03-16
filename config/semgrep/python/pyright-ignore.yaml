@@ -1,0 +1,17 @@
+rules:
+  - id: pyright-ignore
+    message: >-
+      Do not use `# pyright: ignore[...]` to suppress type checker diagnostics.
+      Fix the underlying type error instead of silencing it. If accessing private
+      members in tests, expose them through a proper interface or use a test helper.
+    languages: [python]
+    severity: ERROR
+    metadata:
+      category: code-quality
+      subcategory:
+        - audit
+      confidence: HIGH
+      likelihood: HIGH
+      impact: MEDIUM
+      description: "Disallow pyright ignore comments that suppress type checking diagnostics"
+    pattern-regex: "#\\s*pyright:\\s*ignore"

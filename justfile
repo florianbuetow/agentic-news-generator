@@ -597,7 +597,7 @@ code-audit:
 code-semgrep:
     @echo ""
     @printf "\033[0;34m=== Running Semgrep Static Analysis ===\033[0m\n"
-    @uv run semgrep --config config/semgrep/ --error src
+    @uv run semgrep --config config/semgrep/ --error src tests
     @echo ""
     @printf "\033[0;32m✓ Semgrep checks passed\033[0m\n"
     @echo ""
