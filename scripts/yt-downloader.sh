@@ -36,11 +36,15 @@ mkdir -p "$OUTPUT_DIR"
 # Create download archive file in the output directory
 ARCHIVE_FILE="$OUTPUT_DIR/downloaded.txt"
 
-# Run yt-dlp, piping stderr through a monitor for bot detection
-# We use a named pipe so we can both display stderr and scan it for fatal cookie errors
-STDERR_LOG=$(mktemp)
-trap 'rm -f "$STDERR_LOG"' EXIT
+# Run yt-dlp with real-time output monitoring.
+# A background watcher kills yt-dlp immediately if YouTube reports expired cookies
+# or bot detection, instead of waiting for all items to fail.
+# We merge stdout+stderr since yt-dlp may write warnings to either stream.
+OUTPUT_FIFO=$(mktemp -u)
+mkfifo "$OUTPUT_FIFO"
+trap 'rm -f "$OUTPUT_FIFO"' EXIT
 
+# Start yt-dlp in background, merging stdout+stderr into the FIFO
 yt-dlp --cookies-from-browser $BROWSER \
        --download-archive "$ARCHIVE_FILE" \
        --no-abort-on-error \
@@ -54,12 +58,28 @@ yt-dlp --cookies-from-browser $BROWSER \
        --write-info-json \
        -f "b" \
        -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
-       "$URL" 2> >(tee "$STDERR_LOG" >&2)
+       "$URL" >"$OUTPUT_FIFO" 2>&1 &
+YT_PID=$!
 
+# Monitor output in real-time: display it and kill yt-dlp on fatal cookie/bot errors
+COOKIE_ERROR=0
+while IFS= read -r line; do
+    echo "$line"
+    case "$line" in
+        *"cookies are no longer valid"*|*"Sign in to confirm you're not a bot"*)
+            COOKIE_ERROR=1
+            kill "$YT_PID" 2>/dev/null
+            # Drain remaining output so yt-dlp doesn't block on the FIFO
+            cat >/dev/null &
+            break
+            ;;
+    esac
+done <"$OUTPUT_FIFO"
+
+wait "$YT_PID" 2>/dev/null
 exit_code=$?
 
-# Abort if YouTube is rejecting us due to expired cookies / bot detection
-if grep -q "Sign in to confirm you're not a bot" "$STDERR_LOG"; then
+if [ "$COOKIE_ERROR" -eq 1 ]; then
     echo ""
     echo "ERROR: YouTube cookies are expired or invalid. Aborting."
     echo "Re-export cookies from your browser to fix this."
