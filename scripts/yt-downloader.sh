@@ -36,7 +36,11 @@ mkdir -p "$OUTPUT_DIR"
 # Create download archive file in the output directory
 ARCHIVE_FILE="$OUTPUT_DIR/downloaded.txt"
 
-# Run yt-dlp and capture exit code
+# Run yt-dlp, piping stderr through a monitor for bot detection
+# We use a named pipe so we can both display stderr and scan it for fatal cookie errors
+STDERR_LOG=$(mktemp)
+trap 'rm -f "$STDERR_LOG"' EXIT
+
 yt-dlp --cookies-from-browser $BROWSER \
        --download-archive "$ARCHIVE_FILE" \
        --no-abort-on-error \
@@ -50,9 +54,17 @@ yt-dlp --cookies-from-browser $BROWSER \
        --write-info-json \
        -f "b" \
        -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
-       "$URL"
+       "$URL" 2> >(tee "$STDERR_LOG" >&2)
 
 exit_code=$?
+
+# Abort if YouTube is rejecting us due to expired cookies / bot detection
+if grep -q "Sign in to confirm you're not a bot" "$STDERR_LOG"; then
+    echo ""
+    echo "ERROR: YouTube cookies are expired or invalid. Aborting."
+    echo "Re-export cookies from your browser to fix this."
+    exit 1
+fi
 
 # Exit code 0: All videos succeeded
 # Exit code 1: Some videos failed (private, members-only, deleted, etc.)
