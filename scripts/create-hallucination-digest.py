@@ -78,8 +78,8 @@ def main() -> int:  # noqa: C901
                 continue
 
     if not hallucinations_by_file:
-        print("No hallucinations found to digest.", file=sys.stderr)
-        return 1
+        print("No hallucinations found to digest.")
+        return 0
 
     # Generate markdown digest
     output_file = config.getDataOutputDir() / "hallucination_digest.md"

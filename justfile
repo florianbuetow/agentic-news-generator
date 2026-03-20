@@ -267,8 +267,6 @@ analyze-transcripts-hallucinations:
     @printf "\033[0;34m=== Creating Transcript Hallucination Digest ===\033[0m\n"
     @uv run scripts/create-hallucination-digest.py
     @echo ""
-    @printf "\033[0;32m✓ Digest created: data/output/hallucination_digest.md\033[0m\n"
-    @echo ""
 
 # Remove hallucinations from transcripts using LLM cleaning
 transcripts-remove-hallucinations:
