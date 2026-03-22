@@ -312,12 +312,10 @@ class TestCreateManifest:
             video_url="https://www.youtube.com/watch?v=ABC",
         )
 
-        refs_raw = result["references"]
-        assert isinstance(refs_raw, list)
-        assert len(refs_raw) == 1  # pyright: ignore[reportUnknownArgumentType]
-        ref_raw = refs_raw[0]  # pyright: ignore[reportUnknownVariableType]
-        assert isinstance(ref_raw, dict)
-        ref: dict[str, str] = ref_raw  # pyright: ignore[reportUnknownVariableType]
+        refs_json = json.dumps(result["references"])
+        refs: list[dict[str, str]] = json.loads(refs_json)
+        assert len(refs) == 1
+        ref = refs[0]
         assert ref["type"] == "video"
         assert ref["title"] == "My Video"
         assert ref["url"] == "https://www.youtube.com/watch?v=ABC"

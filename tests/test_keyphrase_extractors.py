@@ -121,8 +121,8 @@ class TestKeyBERTKeyphraseExtractor:
     def test_extract_filters_scores_below_min_score(self):
         generator = _MockEmbeddingGenerator()
         extractor = KeyBERTKeyphraseExtractor(config=self._make_config(), embedding_generator=generator)
-        extractor._model = MagicMock()  # pyright: ignore[reportPrivateUsage]
-        extractor._model.extract_keywords.return_value = [  # pyright: ignore[reportPrivateUsage]
+        extractor.model = MagicMock()
+        extractor.model.extract_keywords.return_value = [
             ("relevant phrase", 0.4321),
             ("negative phrase", -0.0504),
             ("edge phrase", 0.0),

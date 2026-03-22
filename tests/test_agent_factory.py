@@ -176,8 +176,8 @@ class TestAgentFactory:
         config = Config(config_path)
         orchestrator = build_chief_editor_orchestrator(config=config)
 
-        assert isinstance(orchestrator._fact_check_agent, MockFactCheckAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._evidence_finding_agent, MockEvidenceFindingAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator.fact_check_agent, MockFactCheckAgent)
+        assert isinstance(orchestrator.evidence_finding_agent, MockEvidenceFindingAgent)
 
     def test_all_mock_agents_selected_by_config(self, tmp_path: Path) -> None:
         """When all agents are set to mock, factory returns all Mock* agents."""
@@ -199,14 +199,14 @@ class TestAgentFactory:
         config = Config(config_path)
         orchestrator = build_chief_editor_orchestrator(config=config)
 
-        assert isinstance(orchestrator._writer_agent, MockWriterAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._article_review_agent, MockArticleReviewAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._concern_mapping_agent, MockConcernMappingAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._fact_check_agent, MockFactCheckAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._evidence_finding_agent, MockEvidenceFindingAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._opinion_agent, MockOpinionAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._attribution_agent, MockAttributionAgent)  # pyright: ignore[reportPrivateUsage]
-        assert isinstance(orchestrator._style_review_agent, MockStyleReviewAgent)  # pyright: ignore[reportPrivateUsage]
+        assert isinstance(orchestrator.writer_agent, MockWriterAgent)
+        assert isinstance(orchestrator.article_review_agent, MockArticleReviewAgent)
+        assert isinstance(orchestrator.concern_mapping_agent, MockConcernMappingAgent)
+        assert isinstance(orchestrator.fact_check_agent, MockFactCheckAgent)
+        assert isinstance(orchestrator.evidence_finding_agent, MockEvidenceFindingAgent)
+        assert isinstance(orchestrator.opinion_agent, MockOpinionAgent)
+        assert isinstance(orchestrator.attribution_agent, MockAttributionAgent)
+        assert isinstance(orchestrator.style_review_agent, MockStyleReviewAgent)
 
     def test_unknown_fact_check_agent_name_raises(self, tmp_path: Path) -> None:
         """Unknown agent_name value raises ValueError."""
