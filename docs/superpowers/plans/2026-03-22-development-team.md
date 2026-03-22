@@ -1062,14 +1062,15 @@ Verify each of these responds correctly:
 
 Check that `/build-feature` appears as an available command.
 
-- [ ] **Step 5: Commit any settings changes**
+- [ ] **Step 5: Verify no uncommitted plugin files remain**
 
-Stage only the files that were modified during installation (e.g., settings file):
+The settings file (`settings.local.json`) is gitignored and should NOT be committed — it contains local-only configuration. Verify with:
 
 ```bash
-git add .claude/settings.local.json
-git commit -m "feat(dev-team): register dev-team plugin in settings"
+git status
 ```
+
+All plugin agent and command files should already be committed from previous tasks. If any plugin files are unstaged, commit them explicitly by filename.
 
 ---
 
