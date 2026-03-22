@@ -190,7 +190,7 @@ The plan review is the consensus step where all agents evaluate the implementati
 **When an agent blocks:**
 1. The blocking agent states the specific issue and why it blocks from their perspective.
 2. The Architect addresses the objection — either by explaining why the plan is correct or by revising the plan.
-3. If revised, only the agents that blocked re-review the revised plan. Agents that already approved do not re-review unless the revision materially changed an area they reviewed.
+3. If revised, only the agents that blocked re-review the revised plan. If the revision changes any section of the plan, all agents who reviewed that section also re-review. The Tech Lead determines which sections are affected by the revision.
 4. If the Architect disagrees with a block:
    - Technical dispute between two non-Architect agents: Tech Lead arbitrates.
    - Dispute between an agent and the Architect's plan: escalates to the user.
