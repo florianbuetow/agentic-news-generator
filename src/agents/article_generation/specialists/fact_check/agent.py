@@ -52,7 +52,7 @@ class FactCheckAgent(BaseSpecialistAgent):
     ) -> AgentResult[Verdict]:
         """Evaluate factual accuracy with cache-aware KB retrieval."""
         logger.info("Evaluating concern #%d: excerpt=%r", concern.concern_id, concern.excerpt[:80])
-        normalized_query = self._normalize_query(concern.review_note)
+        normalized_query = self.normalize_query(concern.review_note)
         cached_record = self._institutional_memory.lookup_fact_check(
             agent_name="fact_check",
             normalized_query=normalized_query,
@@ -89,7 +89,7 @@ class FactCheckAgent(BaseSpecialistAgent):
         verdict = self._parse_json_response(response=response, model_class=Verdict)
         logger.info("Fact-check verdict: concern_id=%d status=%s misleading=%s", verdict.concern_id, verdict.status, verdict.misleading)
 
-        article_id = self._build_article_id(source_metadata)
+        article_id = self.build_article_id(source_metadata)
         cache_key_hash = self._institutional_memory.build_fact_check_cache_key_hash(
             agent_name="fact_check",
             normalized_query=normalized_query,

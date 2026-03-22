@@ -193,11 +193,11 @@ class BaseSpecialistAgent(BaseAgent, ABC):
     ) -> AgentResult[Verdict]:
         """Evaluate a concern and return a verdict."""
 
-    def _normalize_query(self, query: str) -> str:
+    def normalize_query(self, query: str) -> str:
         """Normalize query for stable cache keys."""
         return re.sub(r"\s+", " ", query.strip().lower())
 
-    def _build_article_id(self, source_metadata: dict[str, str | None]) -> str:
+    def build_article_id(self, source_metadata: dict[str, str | None]) -> str:
         """Build deterministic article identifier."""
         source_file = source_metadata.get("source_file")
         topic_slug = source_metadata.get("topic_slug")

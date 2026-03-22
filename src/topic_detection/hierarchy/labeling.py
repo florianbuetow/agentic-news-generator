@@ -269,7 +269,7 @@ class KeyBERTKeyphraseExtractor:
         embedding_generator: EmbeddingGenerator,
     ) -> None:
         self._cfg = config
-        self._model = KeyBERT(model=_EmbeddingGeneratorBackend(embedding_generator=embedding_generator))
+        self.model = KeyBERT(model=_EmbeddingGeneratorBackend(embedding_generator=embedding_generator))
 
     def extract(self, *, text: str) -> list[Keyphrase]:
         """Extract top-k KeyBERT keyphrases for a single text."""
@@ -279,7 +279,7 @@ class KeyBERTKeyphraseExtractor:
         if not text.strip():
             return []
 
-        keywords: list[tuple[str, float]] = self._model.extract_keywords(
+        keywords: list[tuple[str, float]] = self.model.extract_keywords(
             text,
             keyphrase_ngram_range=(self._cfg.keyphrase_ngram_range_min, self._cfg.keyphrase_ngram_range_max),
             stop_words=self._cfg.stop_words,

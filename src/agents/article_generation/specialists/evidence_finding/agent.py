@@ -51,7 +51,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
     ) -> AgentResult[Verdict]:
         """Evaluate evidence support with cached external search."""
         logger.info("Evaluating concern #%d: excerpt=%r", concern.concern_id, concern.excerpt[:80])
-        normalized_query = self._normalize_query(concern.review_note)
+        normalized_query = self.normalize_query(concern.review_note)
         cached_record = self._institutional_memory.lookup_evidence(
             agent_name="evidence_finding",
             normalized_query=normalized_query,
@@ -67,7 +67,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
             model=self._perplexity_model,
             timeout_seconds=self._llm_config.timeout_seconds,
         )
-        citations = self._extract_citations(search_response=search_response)
+        citations = self.extract_citations(search_response=search_response)
         search_payload = json.dumps(search_response, ensure_ascii=False)
         logger.info("Perplexity returned %d citations, payload=%d chars", len(citations), len(search_payload))
 
@@ -88,7 +88,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
         verdict = self._parse_json_response(response=response, model_class=Verdict)
         logger.info("Evidence verdict: concern_id=%d status=%s misleading=%s", verdict.concern_id, verdict.status, verdict.misleading)
 
-        article_id = self._build_article_id(source_metadata)
+        article_id = self.build_article_id(source_metadata)
         cache_key_hash = self._institutional_memory.build_evidence_cache_key_hash(
             agent_name="evidence_finding",
             normalized_query=normalized_query,
@@ -112,7 +112,7 @@ class EvidenceFindingAgent(BaseSpecialistAgent):
 
         return AgentResult(prompt=user_prompt, output=verdict)
 
-    def _extract_citations(self, *, search_response: dict[str, object]) -> list[str]:
+    def extract_citations(self, *, search_response: dict[str, object]) -> list[str]:
         """Extract citations from a Perplexity-compatible response payload."""
         citations_value = search_response.get("citations")
         if isinstance(citations_value, list):

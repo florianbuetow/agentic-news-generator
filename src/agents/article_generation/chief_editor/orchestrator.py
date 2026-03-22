@@ -54,18 +54,18 @@ class ChiefEditorOrchestrator:
         institutional_memory: InstitutionalMemoryStore,
         output_handler: OutputHandler,
     ) -> None:
-        self._config = config
-        self._writer_agent = writer_agent
-        self._article_review_agent = article_review_agent
-        self._concern_mapping_agent = concern_mapping_agent
-        self._fact_check_agent = fact_check_agent
-        self._evidence_finding_agent = evidence_finding_agent
-        self._opinion_agent = opinion_agent
-        self._attribution_agent = attribution_agent
-        self._style_review_agent = style_review_agent
-        self._bullet_parser = bullet_parser
-        self._institutional_memory = institutional_memory
-        self._output_handler = output_handler
+        self.config = config
+        self.writer_agent = writer_agent
+        self.article_review_agent = article_review_agent
+        self.concern_mapping_agent = concern_mapping_agent
+        self.fact_check_agent = fact_check_agent
+        self.evidence_finding_agent = evidence_finding_agent
+        self.opinion_agent = opinion_agent
+        self.attribution_agent = attribution_agent
+        self.style_review_agent = style_review_agent
+        self.bullet_parser = bullet_parser
+        self.institutional_memory = institutional_memory
+        self.output_handler = output_handler
 
     def generate_article(
         self,
@@ -81,7 +81,7 @@ class ChiefEditorOrchestrator:
         source_file = self._require_metadata_value(source_metadata, "source_file")
         run_label = f"{channel_name}/{slug}"
 
-        artifacts_dir = self._output_handler.initialize_run_artifacts_dir(
+        artifacts_dir = self.output_handler.initialize_run_artifacts_dir(
             channel_name=channel_name,
             slug=slug,
             source_file=source_file,
@@ -99,7 +99,7 @@ class ChiefEditorOrchestrator:
         iteration_reports: list[IterationReport] = []
 
         self._progress(run_label=run_label, message="Generating initial writer draft")
-        writer_result = self._writer_agent.generate(
+        writer_result = self.writer_agent.generate(
             source_text=source_text,
             source_metadata=source_metadata,
             style_mode=style_mode,
@@ -111,12 +111,12 @@ class ChiefEditorOrchestrator:
         current_article = writer_result.output
         self._progress(run_label=run_label, message=f"Initial draft stored in {artifacts_dir}")
 
-        editor_max_rounds = self._config.get_article_editor_max_rounds()
+        editor_max_rounds = self.config.get_article_editor_max_rounds()
         self._progress(run_label=run_label, message=f"Starting editor loop with max rounds={editor_max_rounds}")
 
         for iteration in range(1, editor_max_rounds + 1):
             self._progress(run_label=run_label, message=f"Round {iteration}: Article review")
-            review_result = self._article_review_agent.review(
+            review_result = self.article_review_agent.review(
                 article=current_article,
                 source_text=source_text,
                 source_metadata=source_metadata,
@@ -125,7 +125,7 @@ class ChiefEditorOrchestrator:
             ctx.log(agent_name="article_review", step="output", content=review_result.output.markdown_bullets, fmt="md")
             review_raw = review_result.output
 
-            parsed_review = self._bullet_parser.parse(markdown_bullets=review_raw.markdown_bullets)
+            parsed_review = self.bullet_parser.parse(markdown_bullets=review_raw.markdown_bullets)
             ctx.log(agent_name="article_review", step="parsed", content=parsed_review.model_dump(), fmt="json")
             self._progress(
                 run_label=run_label,
@@ -147,12 +147,12 @@ class ChiefEditorOrchestrator:
                     artifacts_dir=artifacts_dir,
                 )
                 self._log_final_artifacts(ctx=ctx, result=result, editor_report=editor_report)
-                self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
+                self.output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
                 self._progress(run_label=run_label, message=f"Completed successfully in round {iteration}")
                 return result
 
             self._progress(run_label=run_label, message=f"Round {iteration}: Concern mapping")
-            mapping_agent_result = self._concern_mapping_agent.map_concerns(
+            mapping_agent_result = self.concern_mapping_agent.map_concerns(
                 style_requirements=style_mode,
                 source_text=source_text,
                 generated_article_json=current_article.model_dump_json(),
@@ -212,7 +212,7 @@ class ChiefEditorOrchestrator:
                     artifacts_dir=artifacts_dir,
                 )
                 self._log_final_artifacts(ctx=ctx, result=result, editor_report=editor_report)
-                self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
+                self.output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
                 self._progress(run_label=run_label, message=f"Completed successfully in round {iteration}")
                 return result
 
@@ -246,12 +246,12 @@ class ChiefEditorOrchestrator:
                     error="Unresolved misleading concerns after editor_max_rounds",
                 )
                 self._log_final_artifacts(ctx=ctx, result=result, editor_report=editor_report)
-                self._output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
+                self.output_handler.write_canonical_output(channel_name=channel_name, slug=slug, result=result)
                 self._progress(run_label=run_label, message=f"Failed after {editor_max_rounds} rounds with unresolved concerns")
                 return result
 
             self._progress(run_label=run_label, message=f"Round {iteration}: Compiling writer feedback")
-            feedback = self._compile_feedback(iteration=iteration, verdicts=verdicts)
+            feedback = self.compile_feedback(iteration=iteration, verdicts=verdicts)
             ctx.log(agent_name="feedback", step="output", content=feedback.model_dump(), fmt="json")
 
             iteration_reports.append(
@@ -273,7 +273,7 @@ class ChiefEditorOrchestrator:
                 current_article=current_article,
             )
             self._progress(run_label=run_label, message=f"Round {iteration}: Requesting writer revision")
-            revision_result = self._writer_agent.revise(context=revision_context, feedback=feedback)
+            revision_result = self.writer_agent.revise(context=revision_context, feedback=feedback)
             ctx.log(agent_name="writer", step="prompt", content=revision_result.prompt, fmt="md")
             ctx.log(agent_name="writer", step="output", content=revision_result.output.model_dump(), fmt="json")
             ctx.log(agent_name="writer", step="output", content=revision_result.output.article_body, fmt="md")
@@ -311,11 +311,11 @@ class ChiefEditorOrchestrator:
     ) -> AgentResult[Verdict]:
         """Route a concern to the selected specialist and return its full AgentResult."""
         agents = {
-            "fact_check": self._fact_check_agent,
-            "evidence_finding": self._evidence_finding_agent,
-            "opinion": self._opinion_agent,
-            "attribution": self._attribution_agent,
-            "style_review": self._style_review_agent,
+            "fact_check": self.fact_check_agent,
+            "evidence_finding": self.evidence_finding_agent,
+            "opinion": self.opinion_agent,
+            "attribution": self.attribution_agent,
+            "style_review": self.style_review_agent,
         }
         agent = agents.get(mapping.selected_agent)
         if agent is None:
@@ -328,7 +328,7 @@ class ChiefEditorOrchestrator:
             style_requirements=style_requirements,
         )
 
-    def _compile_feedback(self, *, iteration: int, verdicts: list[Verdict]) -> WriterFeedback:
+    def compile_feedback(self, *, iteration: int, verdicts: list[Verdict]) -> WriterFeedback:
         """Compile deterministic feedback without additional model calls."""
         sorted_verdicts = sorted(verdicts, key=lambda verdict: verdict.concern_id)
 
