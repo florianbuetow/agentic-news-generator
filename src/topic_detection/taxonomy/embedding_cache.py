@@ -41,11 +41,11 @@ def sanitize_filename_component(value: str) -> str:
     return sanitized if sanitized else "unnamed"
 
 
-def get_cache_path(*, data_dir: Path, taxonomy_name: str, embedding_model: str, cache_dir: str) -> Path:
+def get_cache_path(*, cache_dir: Path, taxonomy_name: str, embedding_model: str) -> Path:
     """Compute the cache file path for a taxonomy+embedding model."""
     model_part = sanitize_filename_component(embedding_model)
     taxonomy_part = sanitize_filename_component(taxonomy_name)
-    return data_dir / cache_dir / f"{taxonomy_part}.{model_part}.json"
+    return cache_dir / f"{taxonomy_part}.{model_part}.json"
 
 
 def load_cache(*, cache_path: Path) -> TaxonomyEmbeddingCacheFile:

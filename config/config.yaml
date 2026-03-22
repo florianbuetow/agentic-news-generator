@@ -45,7 +45,7 @@ channels:
     name: Nate B Jones
     category: ai_news_and_strategy
     description: "Clear, actionable AI strategy for builders & execs—daily news, frameworks, and workflows you can apply at work."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -53,7 +53,7 @@ channels:
     name: AI Engineer
     category: ai_engineering_talks_and_training
     description: "Talks, workshops, events, and training for AI engineers—conference-style sessions and practitioner deep dives."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -61,7 +61,7 @@ channels:
     name: AI Explained
     category: ai_news_and_explanations
     description: "Frontier AI news + analysis focused on progress toward AGI; frequent model/benchmark breakdowns (incl. Simple Bench)."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -69,7 +69,7 @@ channels:
     name: Anthropic
     category: official_ai_lab
     description: "Official lab channel: AI safety/research context plus product updates and demos related to Claude."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -77,7 +77,7 @@ channels:
     name: bycloudAI
     category: frontier_research_explainers
     description: "Simplifying frontier AI: accessible explainers of new research, models, and techniques (with occasional news)."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -85,7 +85,7 @@ channels:
     name: Hamel Husain
     category: applied_ml_and_llm_engineering
     description: "Veteran ML engineer (20+ yrs; ex-Airbnb/GitHub) sharing applied LLM engineering: evals, fine-tuning, and production practice."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -93,7 +93,7 @@ channels:
     name: Jason Liu (jxnlco)
     category: applied_llm_apps_and_consulting
     description: "ML engineer + AI consultant sharing practical guidance for improving real product applications with LLMs."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -101,7 +101,7 @@ channels:
     name: Discover AI (code4AI)
     category: technical_ai_roundups_and_frontiers
     description: "Technical, high-volume coverage of frontier AI research and new papers—'scientific frontiers' style explainers."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -109,7 +109,7 @@ channels:
     name: Yannic Kilcher
     category: research_paper_deep_dives
     description: "Research paper deep dives and programming, plus commentary on the AI community and AI's societal impact."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -117,7 +117,7 @@ channels:
     name: Dwarkesh Patel
     category: long_form_interviews_broad_tech
     description: "Deeply researched long-form interviews—often AI, plus broader tech/econ/history conversations."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -125,7 +125,7 @@ channels:
     name: Machine Learning Street Talk
     category: highly_technical_ai_podcast
     description: "Highly technical AI podcast/interviews covering advanced ML research plus cognitive science/philosophy, with hype-minimized analysis."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -133,7 +133,7 @@ channels:
     name: Two Minute Papers
     category: research_summaries_graphics_physics_heavy
     description: "Short, energetic explainers of the latest research—especially ML + graphics/simulation/physics—made accessible to everyone."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -141,7 +141,7 @@ channels:
     url: https://www.youtube.com/@LatentSpaceTV/videos
     category: ai_engineering_talks_and_training
     description: "Home for Latent Space community livestreams, including Paper Club sessions for AI engineering."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -149,7 +149,7 @@ channels:
     url: https://www.youtube.com/@MLOps/videos
     category: ai_engineering_talks_and_training
     description: "Practitioner talks and best practices on real-world MLOps/production ML from engineers in the field."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -157,7 +157,7 @@ channels:
     url: https://www.youtube.com/c/deeplearningai/videos
     category: ai_engineering_talks_and_training
     description: "Official DeepLearning.AI channel with course videos (e.g., Coursera) and recorded events."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -165,7 +165,7 @@ channels:
     url: https://www.youtube.com/HuggingFace/videos
     category: ai_engineering_talks_and_training
     description: "Official Hugging Face channel: open-source/open-science ML content around models, datasets, papers, and applications."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -173,7 +173,7 @@ channels:
     url: https://www.youtube.com/@CohereAI/videos
     category: ai_engineering_talks_and_training
     description: "Cohere Labs fireside chats and community talks with ML researchers discussing their work and research journeys."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -181,7 +181,7 @@ channels:
     name: Marina Wyss - AI & Machine Learning
     category: ai_careers_and_ml_learning
     description: "Senior Applied ML Scientist (Twitch/Amazon) helping you with your AI/ML/data science career."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -189,7 +189,7 @@ channels:
     name: Wes Roth
     category: ai_news_and_analysis
     description: "AI news and commentary (DeepMind/OpenAI/Anthropic, etc.) with an emphasis on helping viewers understand AI and its implications."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -197,7 +197,7 @@ channels:
     name: Latent Space
     category: ai_engineering_podcast_and_community
     description: "AI engineering community/podcast channel—models, tools, and practical updates aimed at working AI engineers."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -205,7 +205,7 @@ channels:
     name: The Serious CTO
     category: engineering_leadership_and_career
     description: "Practical technical leadership and developer-to-CTO mindset content from a long-tenured CTO (career, decision-making, and working sustainably)."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -213,7 +213,7 @@ channels:
     name: Farah Sharghi
     category: tech_careers_and_recruiting
     description: "Ex-big-tech recruiter (Google/Lyft/Uber/TikTok/NYT) sharing resume/interview/job-search strategy and how hiring really works."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -221,7 +221,7 @@ channels:
     name: Eric Tech
     category: ai_automation_and_fullstack_dev
     description: "Hands-on tutorials to master AI, automation, and full-stack development—project-driven and practical."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -229,7 +229,7 @@ channels:
     name: Roy Osherove
     category: software_testing_tdd_and_leadership
     description: "Software testing and engineering leadership: unit testing/TDD plus broader engineering practices and team leadership."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -237,7 +237,7 @@ channels:
     name: Rick Mulready
     category: ai_for_online_business
     description: "Simplified AI guidance for online business: practical ways to leverage AI to streamline workflows and grow."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -245,7 +245,7 @@ channels:
     name: GritAI Studio
     category: practical_genai_building_and_consulting
     description: "Applied AI tutorials and build-focused content from a founder/AI engineer—making AI practical and accessible for builders."
-    download-limiter: 10
+    download-limiter: 99
     language: "en"
 
 
@@ -253,7 +253,15 @@ channels:
     name: The Morpheus
     category: german_tech_analysis_cybersecurity_ai
     description: "German-language tech channel with regular analysis, tests, and practical explainers on cybersecurity, AI, open source, and digitalization—aimed at making complex IT topics accessible for everyone."
-    download-limiter: 10
+    download-limiter: 0
+    language: "de"
+
+
+  - url: https://www.youtube.com/@ioobpodcast/videos
+    name: Index out of bounds
+    category: german_developer_podcast
+    description: "German-language developer podcast where Thomas and Christian share personal experiences from software development, web, and apps—a podcast by programmers for programmers."
+    download-limiter: 99
     language: "de"
 
 
@@ -261,7 +269,71 @@ channels:
     name: Vanishing Gradients
     category: ai_research_and_engineering_conversations
     description: "Long-form conversations and deep dives on AI/ML systems, especially around AI agents, LLM engineering, context engineering, and practical challenges in building reliable AI products, hosted by Hugo Bowne-Anderson with expert guests."
-    download-limiter: 10
+    download-limiter: 99
+    language: "en"
+
+
+  - url: https://www.youtube.com/@TheDataEntrepreneurs/videos
+    name: The Data Entrepreneurs
+    category: data_entrepreneurship_and_ai_products
+    description: "Community for data entrepreneurs covering freelancing, consulting, AI product development, production LLM engineering, and business growth strategies for data professionals."
+    download-limiter: 99
+    language: "en"
+
+
+  - url: https://www.youtube.com/@theAIsearch/videos
+    name: The AI Search
+    category: ai_tools_tutorials_and_news
+    description: "Making AI easy to understand for everyone—tutorials, reviews, and news covering open-source AI tools for image, video, audio, and 3D generation."
+    download-limiter: 99
+    language: "en"
+
+
+  - url: https://www.youtube.com/@lexfridman/videos
+    name: Lex Fridman
+    category: long_form_interviews_broad_tech
+    description: "Long-form podcast interviews spanning AI advancements (Claude, DeepSeek), philosophy and ethics (truth, infinity, free will), plus space, biology, politics, and human potential."
+    download-limiter: 1
+    language: "en"
+
+
+  - url: https://www.youtube.com/@JoVanEyck/videos
+    name: Jo Van Eyck
+    category: software_engineering_and_programming
+    description: "Programming tips and tricks covering simple design, refactoring, testing, new technologies, and new programming languages."
+    download-limiter: 99
+    language: "en"
+
+
+  - url: https://www.youtube.com/@ycombinator/videos
+    name: Y Combinator
+    category: startup_advice_and_founder_stories
+    description: "Startup advice, founder stories, and a look inside Y Combinator—investing in and mentoring early-stage startups through intensive programs and community."
+    download-limiter: 1
+    language: "en"
+
+
+  - url: https://www.youtube.com/@jaymin-west/videos
+    name: Jaymin West
+    category: agentic_engineering_and_rapid_development
+    description: "Helping developers build in days what used to take months—practical agentic engineering tutorials, workflows, and strategies."
+    download-limiter: -1
+    language: "en"
+
+
+  - url: https://www.youtube.com/@IBMTechnology/videos
+    name: IBM Technology
+    category: enterprise_tech_education
+    description: "Educational content on AI, automation, cybersecurity, data science, DevOps, and quantum computing—expert-driven explainers and trend coverage from IBM."
+    download-limiter: 1
+    language: "en"
+
+
+  - url: https://www.youtube.com/@RAmjad/videos
+    name: Ray Amjad
+    category: agentic_engineering_and_rapid_development
+    description: "I make videos about agentic engineering."
+    download-limiter: 1
     language: "en"
 
 
@@ -269,7 +341,7 @@ channels:
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio
   agent_llm:
-    model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+    model: openai/qwen3.5-35b-a3b@4bit
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -282,7 +354,7 @@ topic_segmentation:
 
   # Critic Agent LLM - using same LM Studio instance
   critic_llm:
-    model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+    model: openai/qwen3.5-35b-a3b@4bit
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -317,7 +389,7 @@ article_generation:
     writer:
       agent_name: default
       llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        model: openai/qwen3.5-35b-a3b@4bit
         api_base: http://127.0.0.1:1234/v1
         api_key: lm-studio
         context_window: 262144
@@ -331,7 +403,7 @@ article_generation:
     article_review:
       agent_name: mock
       llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        model: openai/qwen3.5-35b-a3b@4bit
         api_base: http://127.0.0.1:1234/v1
         api_key: lm-studio
         context_window: 262144
@@ -345,7 +417,7 @@ article_generation:
     concern_mapping:
       agent_name: mock
       llm:
-        model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+        model: openai/qwen3.5-35b-a3b@4bit
         api_base: http://127.0.0.1:1234/v1
         api_key: lm-studio
         context_window: 262144
@@ -360,7 +432,7 @@ article_generation:
       fact_check:
         agent_name: mock
         llm:
-          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          model: openai/qwen3.5-35b-a3b@4bit
           api_base: http://127.0.0.1:1234/v1
           api_key: lm-studio
           context_window: 262144
@@ -374,7 +446,7 @@ article_generation:
       evidence_finding:
         agent_name: mock
         llm:
-          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          model: openai/qwen3.5-35b-a3b@4bit
           api_base: http://127.0.0.1:1234/v1
           api_key: lm-studio
           context_window: 262144
@@ -388,7 +460,7 @@ article_generation:
       opinion:
         agent_name: mock
         llm:
-          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          model: openai/qwen3.5-35b-a3b@4bit
           api_base: http://127.0.0.1:1234/v1
           api_key: lm-studio
           context_window: 262144
@@ -402,7 +474,7 @@ article_generation:
       attribution:
         agent_name: mock
         llm:
-          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          model: openai/qwen3.5-35b-a3b@4bit
           api_base: http://127.0.0.1:1234/v1
           api_key: lm-studio
           context_window: 262144
@@ -416,7 +488,7 @@ article_generation:
       style_review:
         agent_name: mock
         llm:
-          model: openai/qwen3-30b-a3b-thinking-2507-mlx@8bit
+          model: openai/qwen3.5-35b-a3b@4bit
           api_base: http://127.0.0.1:1234/v1
           api_key: lm-studio
           context_window: 262144
@@ -475,7 +547,7 @@ topic_detection:
   # Topic detection agent LLM
   # Note: Thinking models need high max_tokens to accommodate reasoning AND response
   topic_detection_llm:
-    model: openai/qwen/qwen3.5-35b-a3b
+    model: openai/qwen3.5-35b-a3b@4bit
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144
@@ -537,7 +609,7 @@ topic_detection:
   llm_label:
     enabled: true
     llm:
-      model: openai/qwen/qwen3.5-35b-a3b
+      model: openai/qwen3.5-35b-a3b@4bit
       api_base: http://127.0.0.1:1234/v1
       api_key: lm-studio
       context_window: 262144

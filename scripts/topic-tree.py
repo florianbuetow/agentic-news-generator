@@ -159,7 +159,8 @@ def validate_taxonomy_name(taxonomy_name: str) -> None:
 
 def build_taxonomy_matcher(
     *,
-    data_dir: Path,
+    taxonomies_dir: Path,
+    taxonomy_cache_dir: Path,
     taxonomy_cfg: TopicDetectionTaxonomyConfig,
     embedding_model: str,
     embedding_generator: EmbeddingGenerator,
@@ -170,14 +171,13 @@ def build_taxonomy_matcher(
 
     validate_taxonomy_name(taxonomy_cfg.taxonomy_name)
 
-    taxonomy_xml_path = data_dir / taxonomy_cfg.acm_ccs_2012_xml_path
+    taxonomy_xml_path = taxonomies_dir / taxonomy_cfg.acm_ccs_2012_xml_file
     concepts = ACMCCS2012Loader().load(xml_path=taxonomy_xml_path)
 
     cache_path = get_cache_path(
-        data_dir=data_dir,
+        cache_dir=taxonomy_cache_dir,
         taxonomy_name=taxonomy_cfg.taxonomy_name,
         embedding_model=embedding_model,
-        cache_dir=taxonomy_cfg.cache_dir,
     )
 
     cache = load_cache(cache_path=cache_path) if cache_path.exists() else None
@@ -382,10 +382,14 @@ def main() -> int:
         print("Error: topic_detection.hierarchical_segmentation.enabled is false; cannot build topic trees.", file=sys.stderr)
         return 1
 
+    taxonomies_dir = config.getTopicDetectionTaxonomiesDir()
+    taxonomy_cache_dir = config.getTopicDetectionTaxonomyCacheDir()
+
     embedding_generator = EmbeddingGeneratorFactory.create(td_config.embedding)
     try:
         matcher = build_taxonomy_matcher(
-            data_dir=data_dir,
+            taxonomies_dir=taxonomies_dir,
+            taxonomy_cache_dir=taxonomy_cache_dir,
             taxonomy_cfg=taxonomy_cfg,
             embedding_model=td_config.embedding.model_name,
             embedding_generator=embedding_generator,
