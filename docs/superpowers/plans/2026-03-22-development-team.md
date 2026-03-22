@@ -4,7 +4,7 @@
 
 **Goal:** Create a 9-agent development team plugin for orchestrating feature development with independent validation at every pipeline stage.
 
-**Architecture:** A Claude Code plugin containing 9 agent definitions (markdown files with YAML frontmatter + system prompts), a pipeline orchestration command, and a shared principles reference document. Agents are spawned as teammates via TeamCreate, coordinating through TaskList and SendMessage.
+**Architecture:** A Claude Code plugin containing 9 agent definitions (markdown files with YAML frontmatter + system prompts) and a pipeline orchestration command. Agents are spawned as teammates via TeamCreate, coordinating through TaskList and SendMessage. Core principles and decision protocol are embedded directly in each agent's system prompt for self-containment.
 
 **Tech Stack:** Claude Code plugin system (`.claude-plugin/plugin.json` manifest, `agents/*.md` definitions, `commands/*.md` slash commands)
 
@@ -118,7 +118,7 @@ You are the Architect for the development team. You are the single entry point �
 
 ## Decision Protocol
 
-When facing a decision: check intent briefing first. If intent is clear, proceed. If ambiguous, confirm with team-tech-lead. If unresolvable, escalate to the user. You may proactively confirm alignment before taking significant actions.
+You receive intent directly from the user. When the user's intent is unclear, ask the user clarifying questions — do not guess. When facing a technical decision: consult bidirectionally with team-tech-lead. If unresolvable between you and team-tech-lead, escalate to the user. You may proactively confirm alignment before taking significant actions.
 
 ## Pipeline Responsibilities
 
@@ -427,6 +427,7 @@ model: inherit
 color: cyan
 emoji: "\U0001F4BB"
 vibe: Writes clean, test-driven code from specs
+tools: Glob, Grep, LS, Read, Write, Edit, Bash, BashOutput, KillShell
 ---
 
 # Implementer
@@ -1020,15 +1021,23 @@ Look for how plugins are registered.
 
 - [ ] **Step 2: Register the local plugin**
 
-The plugin needs to be registered so Claude Code discovers it. Add the plugin path to the appropriate settings file. The exact mechanism depends on what's found in Step 1 — check for a `plugins` or `pluginDirs` field.
-
-If no existing plugin registration pattern is found, check Claude Code documentation for local plugin installation:
+Register the plugin using the Claude CLI:
 
 ```bash
-claude plugins add .claude/dev-team-plugin
+claude plugin add /Users/flo/Developer/github/agentic-news-generator.git/florian-article-generator/.claude/dev-team-plugin
 ```
 
-Or add to settings manually if needed.
+If the CLI command is not available or fails, add the plugin path manually to `~/.claude/settings.local.json` under a `pluginDirs` array:
+
+```json
+{
+  "pluginDirs": [
+    "/Users/flo/Developer/github/agentic-news-generator.git/florian-article-generator/.claude/dev-team-plugin"
+  ]
+}
+```
+
+Verify registration by checking that the settings file contains the plugin path.
 
 - [ ] **Step 3: Verify agents are discoverable**
 
@@ -1055,9 +1064,11 @@ Check that `/build-feature` appears as an available command.
 
 - [ ] **Step 5: Commit any settings changes**
 
+Stage only the files that were modified during installation (e.g., settings file):
+
 ```bash
-git add .claude/dev-team-plugin/
-git commit -m "feat(dev-team): complete plugin installation and verification"
+git add .claude/settings.local.json
+git commit -m "feat(dev-team): register dev-team plugin in settings"
 ```
 
 ---
