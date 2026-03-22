@@ -26,6 +26,10 @@
 ## Testing
 - After **every change** to the code, the tests must be executed
 - Always verify the program runs correctly with `just run` after modifications
+- **NEVER claim a code change is complete without running `just ci` first**
+  - Unit tests passing alone is insufficient — `just ci` includes type checking, linting, security checks, and full test suite
+  - If the change affects a specific pipeline (e.g., topic detection), also run the relevant `just` target (e.g., `just topics-all`) to verify end-to-end
+  - Do not state "all tests pass" or "fix is complete" until CI actually passes
 
 ## Jupyter Notebook Validation
 When modifying Jupyter notebook (.ipynb) files, validate changes using these methods:
