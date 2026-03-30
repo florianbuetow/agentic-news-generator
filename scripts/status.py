@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Display processing status of downloaded content."""
 
+from __future__ import annotations
+
+import json
 import sys
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -150,6 +154,53 @@ def print_two_row_header(columns: list[tuple[str, str, int]]) -> tuple[str, str]
     return " ".join(row1_parts), " ".join(row2_parts)
 
 
+STAT_KEYS = [
+    "videos_active",
+    "videos_archived",
+    "audio",
+    "transcripts",
+    "hall_analysis",
+    "cleaned_transcripts",
+    "topics_embeddings",
+    "topics_segmentations",
+    "topics_extracted",
+    "topics_visualizations",
+]
+
+
+def _fmt_cell(value: int, prev: int | None, num_width: int) -> str:
+    """Format number right-aligned to num_width + fixed 3-char delta suffix (always 3 chars)."""
+    num = f"{value:>{num_width}}"
+    if prev is None or value == prev:
+        return num + "   "
+    diff = value - prev
+    if diff > 0:
+        tag = "+99" if diff > 99 else f"+{diff}"
+        return num + f"\033[0;32m{tag:<3}\033[0m"
+    tag = "-99" if diff < -99 else str(diff)
+    return num + f"\033[0;31m{tag:<3}\033[0m"
+
+
+def _print_stat_row(
+    label: str,
+    stats: dict[str, int | float],
+    prev: dict[str, int] | None,
+    completion_pct: float,
+    size_gb: float,
+    channel_width: int,
+    col_width: int,
+) -> None:
+    """Print a single stats row (channel or TOTAL) with optional inline deltas."""
+    num_w = col_width - 3
+    parts = [f"{label:<{channel_width}}"]
+    for key in STAT_KEYS:
+        prev_val = prev.get(key) if prev else None
+        parts.append(_fmt_cell(int(stats[key]), prev_val, num_w))
+    parts.append(f"{completion_pct:>{col_width - 1}.1f}%")
+    parts.append(f"{size_gb:>{col_width}.1f}")
+    print(" ".join(parts))
+
+
 def main() -> int:
     """Main entry point."""
     # Load configuration
@@ -216,8 +267,12 @@ def main() -> int:
         print(f"Overall Pipeline Completion: {overall_pct:.1f}%")
         print()
 
-    # Define column structure: (row1, row2, width)
-    # Channel column is left-aligned, others are right-aligned
+    # Load previous stats from cache
+    cache_file = project_root / ".cache" / "stats_previous.json"
+    previous: dict[str, Any] | None = None
+    if cache_file.exists():
+        previous = json.loads(cache_file.read_text())
+
     col_width = 8
     channel_width = 40
 
@@ -254,55 +309,31 @@ def main() -> int:
     print(f"{'Channel':<{channel_width}} {header_row2}")
     print("-" * line_width)
 
+    prev_channels: dict[str, dict[str, int]] = previous.get("channels", {}) if previous else {}
+
     for channel_name in sorted(channel_stats.keys()):
         s = channel_stats[channel_name]
         videos_total = s["videos_active"] + s["videos_archived"]
-
-        # Calculate completion percentage: topics extracted / total videos
         completion_pct = (s["topics_extracted"] / videos_total * 100) if videos_total > 0 else 0.0
-
-        # Calculate size in GB
         size_gb = float(s["total_size_bytes"]) / (1024**3)
-
-        # Truncate channel name if too long
         display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
-
-        print(
-            f"{display_name:<{channel_width}} "
-            f"{s['videos_active']:>{col_width}} "
-            f"{s['videos_archived']:>{col_width}} "
-            f"{s['audio']:>{col_width}} "
-            f"{s['transcripts']:>{col_width}} "
-            f"{s['hall_analysis']:>{col_width}} "
-            f"{s['cleaned_transcripts']:>{col_width}} "
-            f"{s['topics_embeddings']:>{col_width}} "
-            f"{s['topics_segmentations']:>{col_width}} "
-            f"{s['topics_extracted']:>{col_width}} "
-            f"{s['topics_visualizations']:>{col_width}} "
-            f"{completion_pct:>{col_width - 1}.1f}%"
-            f"{size_gb:>{col_width}.1f}"
-        )
+        prev_ch: dict[str, int] | None = prev_channels.get(channel_name)
+        _print_stat_row(display_name, s, prev_ch, completion_pct, size_gb, channel_width, col_width)
 
     # Print totals row
     print("-" * line_width)
     overall_pct = (totals["topics_extracted"] / total_videos * 100) if total_videos > 0 else 0.0
     total_size_gb = float(totals["total_size_bytes"]) / (1024**3)
+    prev_totals: dict[str, int] | None = previous.get("totals") if previous else None
+    _print_stat_row("TOTAL", totals, prev_totals, overall_pct, total_size_gb, channel_width, col_width)
 
-    print(
-        f"{'TOTAL':<{channel_width}} "
-        f"{totals['videos_active']:>{col_width}} "
-        f"{totals['videos_archived']:>{col_width}} "
-        f"{totals['audio']:>{col_width}} "
-        f"{totals['transcripts']:>{col_width}} "
-        f"{totals['hall_analysis']:>{col_width}} "
-        f"{totals['cleaned_transcripts']:>{col_width}} "
-        f"{totals['topics_embeddings']:>{col_width}} "
-        f"{totals['topics_segmentations']:>{col_width}} "
-        f"{totals['topics_extracted']:>{col_width}} "
-        f"{totals['topics_visualizations']:>{col_width}} "
-        f"{overall_pct:>{col_width - 1}.1f}%"
-        f"{total_size_gb:>{col_width}.1f}"
-    )
+    # Save current stats for next run
+    cache_data = {
+        "totals": {k: int(totals[k]) for k in STAT_KEYS},
+        "channels": {name: {k: int(s[k]) for k in STAT_KEYS} for name, s in channel_stats.items()},
+    }
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    cache_file.write_text(json.dumps(cache_data, indent=2) + "\n")
 
     print()
     return 0
