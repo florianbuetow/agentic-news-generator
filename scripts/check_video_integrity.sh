@@ -37,6 +37,8 @@ while IFS= read -r channel_dir; do
     channel_corrupt=0
     channel_scanned=0
 
+    echo "Processing channel: $channel_name"
+
     # Process all video files matching the whitelist
     while IFS= read -r -d '' input_file; do
 
@@ -76,6 +78,11 @@ while IFS= read -r channel_dir; do
 
         channel_scanned=$((channel_scanned + 1))
         total_scanned=$((total_scanned + 1))
+
+        # Print progress every 100 files
+        if [ $((total_scanned % 100)) -eq 0 ]; then
+            printf "  ... checked %d files so far (%d corrupt)\n" "$total_scanned" "$total_corrupt"
+        fi
 
         file_size=$(stat -f %z "$input_file" 2>/dev/null || stat -c %s "$input_file" 2>/dev/null)
 
