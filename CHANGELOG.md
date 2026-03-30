@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- File progress counter for audio extraction and video integrity checking
 - YouTube video download pipeline with configurable channels and format options
 - Configuration system with YAML loading, validation, and template support
 - AI-powered fake test detector for identifying placeholder tests (#2)
@@ -30,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rewrote video integrity checker from bash to Python with result caching
 - Replaced bash transcription orchestrator with Python implementation
 - Replaced simplified SRT timestamp format with plain text output
 - Redesigned pipeline status display as a unified table layout
@@ -42,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Filtered out near-zero duration speech segments during audio extraction
 - Escaped single quotes in ffmpeg concat file paths
 - Extracted speech segments individually to avoid aselect memory errors
 - Video integrity check now runs before audio extraction in all pipelines
