@@ -268,19 +268,56 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                     echo "    ⚠️  Warning: No speech detected (entire audio is silence)"
                     ffmpeg -f lavfi -i anullsrc=r=16000:cl=mono -t 0.1 -ar 16000 -ac 1 -c:a pcm_s16le "$output_wav" -loglevel error </dev/null
                 else
-                    # Build select filter expression
-                    select_expr=$(build_select_filter "$speech_intervals")
+                    # Extract each speech segment individually, then concatenate.
+                    # This avoids the "Cannot allocate memory" error that occurs
+                    # when aselect expressions have too many segments.
+                    segments_dir="$AUDIO_DIR/$channel_name/.$base_name.segments"
+                    concat_list="$segments_dir/concat.txt"
+                    mkdir -p "$segments_dir"
+                    > "$concat_list"
 
-                    # Use aselect + asetpts to extract and concatenate speech segments
-                    ffmpeg -threads "$NUM_THREADS" -y -i "$temp_wav" \
-                        -af "aselect='${select_expr}',asetpts=N/SR/TB" \
-                        -ar 16000 -ac 1 -c:a pcm_s16le \
-                        -loglevel error -stats \
+                    segment_index=0
+                    segment_failed=false
+
+                    while IFS= read -r segment; do
+                        seg_start=$(echo "$segment" | jq -r '.start_seconds')
+                        seg_duration=$(echo "$segment" | jq -r '.duration_seconds')
+                        segment_file="$segments_dir/seg_$(printf '%04d' $segment_index).wav"
+
+                        ffmpeg -y -i "$temp_wav" \
+                            -ss "$seg_start" -t "$seg_duration" \
+                            -ar 16000 -ac 1 -c:a pcm_s16le \
+                            -loglevel error \
+                            "$segment_file" </dev/null
+                        ffmpeg_exit=$?
+
+                        if [ $ffmpeg_exit -ne 0 ]; then
+                            echo "    🚨 FAILED to extract segment $segment_index (start=$seg_start, duration=$seg_duration)"
+                            segment_failed=true
+                            break
+                        fi
+
+                        echo "file '$segment_file'" >> "$concat_list"
+                        segment_index=$((segment_index + 1))
+                    done < <(echo "$speech_intervals" | jq -c '.[]')
+
+                    if [ "$segment_failed" = true ]; then
+                        rm -rf "$segments_dir" "$temp_wav" "$silence_log"
+                        exit 1
+                    fi
+
+                    # Concatenate all segments into the final output
+                    ffmpeg -y -f concat -safe 0 -i "$concat_list" \
+                        -c copy \
+                        -loglevel error \
                         "$output_wav" </dev/null
                     ffmpeg_exit=$?
 
+                    # Clean up segment files
+                    rm -rf "$segments_dir"
+
                     if [ $ffmpeg_exit -ne 0 ]; then
-                        echo "    🚨 FAILED to extract speech segments from $filename (pass 2)"
+                        echo "    🚨 FAILED to concatenate speech segments from $filename"
                         rm -f "$temp_wav" "$silence_log" "$output_wav"
                         exit 1
                     fi
