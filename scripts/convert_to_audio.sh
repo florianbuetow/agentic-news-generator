@@ -147,11 +147,15 @@ echo ""
 find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
     channel_name=$(basename "$channel_dir")
 
-    echo "Processing channel: $channel_name"
-    echo "---"
-
     # Create output directory for this channel
     mkdir -p "$AUDIO_DIR/$channel_name"
+
+    # Count total files to process in this channel
+    total_files=$(find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -not -name "._*" | wc -l | tr -d ' ')
+    file_index=0
+
+    echo "Processing channel: $channel_name ($total_files files)"
+    echo "---"
 
     # Counter for skipped files in this channel
     skipped_count=0
@@ -183,6 +187,8 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
             continue
         fi
 
+        file_index=$((file_index + 1))
+
         # Skip files modified within the last 60 seconds (likely still downloading)
         current_time=$(date +%s)
         file_modified_time=$(stat -f %m "$input_file" 2>/dev/null || stat -c %Y "$input_file" 2>/dev/null)
@@ -190,7 +196,7 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
 
         if [ $time_since_modification -lt 60 ]; then
             if [ "$VERBOSE" = "true" ]; then
-                echo "  ⏸️  Skipping: $filename (modified ${time_since_modification}s ago, waiting for download to complete)"
+                echo "  [$file_index/$total_files] ⏸️  Skipping: $filename (modified ${time_since_modification}s ago, waiting for download to complete)"
             fi
             continue
         fi
@@ -208,18 +214,18 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
         if [ -f "$output_wav" ] && { [ "$ENABLE_SILENCE_REMOVAL" = "false" ] || [ -f "$output_json" ]; }; then
             skipped_count=$((skipped_count + 1))
             if [ "$VERBOSE" = "true" ]; then
-                echo "  ⏭️  Skipping: $filename"
+                echo "  [$file_index/$total_files] ⏭️  Skipping: $filename"
                 echo "  ---"
             fi
         else
-            echo "  Processing: $filename"
+            echo "  [$file_index/$total_files] Processing: $filename"
 
             # Check if file has an audio stream before processing
             has_audio=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_type \
                 -of default=noprint_wrappers=1:nokey=1 "$input_file" 2>/dev/null)
 
             if [ -z "$has_audio" ]; then
-                echo "    ⚠️  Skipping: No audio stream found (video-only file)"
+                echo "  [$file_index/$total_files] ⚠️  Skipping: No audio stream found (video-only file)"
                 echo "  ---"
                 continue
             fi
