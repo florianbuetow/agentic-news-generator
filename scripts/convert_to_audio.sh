@@ -297,7 +297,9 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                             break
                         fi
 
-                        echo "file '$segment_file'" >> "$concat_list"
+                        # Escape single quotes for FFmpeg concat demuxer (shell-style: ' → '\'')
+                        safe_file=$(printf '%s' "$segment_file" | sed "s|'|'\\\\''|g")
+                        echo "file '$safe_file'" >> "$concat_list"
                         segment_index=$((segment_index + 1))
                     done < <(echo "$speech_intervals" | jq -c '.[]')
 
