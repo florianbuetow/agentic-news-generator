@@ -98,7 +98,7 @@ compute_speech_intervals() {
                         }]
                     else . end
                 end
-            ) | .intervals;
+            ) | .intervals | [.[] | select(.duration_seconds >= 0.01)];
         compute_speech($total)'
 }
 
