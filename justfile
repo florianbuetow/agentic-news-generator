@@ -65,8 +65,8 @@ help:
     @echo ""
     @printf "\033[0;33mData Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
-    @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
     @printf "  %-38s %s\n" "check-video-integrity" "Check video files for corruption"
+    @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
     @printf "  %-38s %s\n" "transcribe" "Transcribe audio files to text"
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
     @printf "  %-38s %s\n" "analyze-transcripts-hallucinations" "Analyze transcripts for hallucinations"
@@ -179,8 +179,8 @@ run:
 all:
     @just ci-quiet
     -@just download-videos
-    @just extract-audio
     @just check-video-integrity
+    @just extract-audio
     @just transcribe
     @just archive-videos
     @just analyze-transcripts-hallucinations
@@ -191,8 +191,8 @@ all:
 all-ingestion:
     @just ci-quiet
     -@just download-videos
-    @just extract-audio
     @just check-video-integrity
+    @just extract-audio
     @just transcribe
     @just archive-videos
     @just analyze-transcripts-hallucinations
@@ -745,13 +745,13 @@ all-quiet:
 
     set -e  # Exit on error for remaining steps
 
-    printf "🚀 Starting extract-audio...\n"
-    just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed extract-audio\n"
-
     printf "🚀 Starting check-video-integrity...\n"
     just check-video-integrity > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Check-video-integrity failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed check-video-integrity\n"
+
+    printf "🚀 Starting extract-audio...\n"
+    just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed extract-audio\n"
 
     printf "🚀 Starting transcribe...\n"
     just transcribe > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcribe failed\033[0m\n"; cat $TMPFILE; exit 1; }
