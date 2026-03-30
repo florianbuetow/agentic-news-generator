@@ -227,7 +227,7 @@ extract-audio:
 check-video-integrity:
     @echo ""
     @printf "\033[0;34m=== Checking Video File Integrity ===\033[0m\n"
-    @bash scripts/check_video_integrity.sh
+    @uv run python scripts/check_video_integrity.py
     @echo ""
 
 # Transcribe audio files to text
