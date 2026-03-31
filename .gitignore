@@ -240,3 +240,6 @@ data/
 # Debug scripts (temporary)
 debug/
 .guardfile
+
+# Dolt (beads issue tracker)
+.doltcfg/
