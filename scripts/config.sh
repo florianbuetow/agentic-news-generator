@@ -68,7 +68,7 @@ SILENCE_THRESHOLD_DB="${SILENCE_THRESHOLD_DB:--40}"
 # Minimum silence duration in seconds
 # Only silence longer than this duration will be removed
 # Common values: 0.5 (aggressive), 1.0-2.0 (moderate), 3.0+ (conservative)
-SILENCE_MIN_DURATION="${SILENCE_MIN_DURATION:-1}"
+SILENCE_MIN_DURATION="${SILENCE_MIN_DURATION:-2}"
 
 # Enable or disable silence removal entirely
 # Set to "false" to only convert audio without silence processing
