@@ -126,6 +126,24 @@ detect_cpu_cores() {
     fi
 }
 
+# Format seconds into human-readable duration (e.g. "13m 40.2s", "1h 5m 30.0s")
+format_duration() {
+    local total_seconds="$1"
+    local hours minutes seconds
+
+    hours=$(echo "$total_seconds" | awk '{printf "%d", $1 / 3600}')
+    minutes=$(echo "$total_seconds $hours" | awk '{printf "%d", ($1 - $2 * 3600) / 60}')
+    seconds=$(echo "$total_seconds $hours $minutes" | awk '{printf "%.1f", $1 - $2 * 3600 - $3 * 60}')
+
+    if [ "$hours" -gt 0 ]; then
+        echo "${hours}h ${minutes}m ${seconds}s"
+    elif [ "$minutes" -gt 0 ]; then
+        echo "${minutes}m ${seconds}s"
+    else
+        echo "${seconds}s"
+    fi
+}
+
 # ============================================================================
 # Validation
 # ============================================================================

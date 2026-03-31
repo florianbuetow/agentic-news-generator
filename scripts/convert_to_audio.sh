@@ -375,7 +375,7 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                 # Clean up temp files
                 rm -f "$temp_wav" "$silence_log"
 
-                echo "    ✅ Done: $base_name.wav (removed ${total_silence}s of silence)"
+                echo "    ✅ Done: $base_name.wav (removed $(format_duration "$total_silence") of silence)"
             else
                 # === SIMPLE CONVERSION (Silence removal disabled) ===
                 echo "    Converting to audio/$channel_name/$base_name.wav (using $NUM_THREADS threads)..."
