@@ -36,7 +36,15 @@ mkdir -p "$OUTPUT_DIR"
 # Create download archive file in the output directory
 ARCHIVE_FILE="$OUTPUT_DIR/downloaded.txt"
 
-# Run yt-dlp and capture exit code
+# Run yt-dlp with real-time output monitoring.
+# A background watcher kills yt-dlp immediately if YouTube reports expired cookies
+# or bot detection, instead of waiting for all items to fail.
+# We merge stdout+stderr since yt-dlp may write warnings to either stream.
+OUTPUT_FIFO=$(mktemp -u)
+mkfifo "$OUTPUT_FIFO"
+trap 'rm -f "$OUTPUT_FIFO"' EXIT
+
+# Start yt-dlp in background, merging stdout+stderr into the FIFO
 yt-dlp --cookies-from-browser $BROWSER \
        --download-archive "$ARCHIVE_FILE" \
        --no-abort-on-error \
@@ -48,11 +56,35 @@ yt-dlp --cookies-from-browser $BROWSER \
        --min-sleep-interval 1 \
        --max-sleep-interval 5 \
        --write-info-json \
-       -f "best" \
+       -f "b" \
        -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
-       "$URL"
+       "$URL" >"$OUTPUT_FIFO" 2>&1 &
+YT_PID=$!
 
+# Monitor output in real-time: display it and kill yt-dlp on fatal cookie/bot errors
+COOKIE_ERROR=0
+while IFS= read -r line; do
+    echo "$line"
+    case "$line" in
+        *"cookies are no longer valid"*|*"Sign in to confirm you're not a bot"*)
+            COOKIE_ERROR=1
+            kill "$YT_PID" 2>/dev/null
+            # Drain remaining output so yt-dlp doesn't block on the FIFO
+            cat >/dev/null &
+            break
+            ;;
+    esac
+done <"$OUTPUT_FIFO"
+
+wait "$YT_PID" 2>/dev/null
 exit_code=$?
+
+if [ "$COOKIE_ERROR" -eq 1 ]; then
+    echo ""
+    echo "ERROR: YouTube cookies are expired or invalid. Aborting."
+    echo "Re-export cookies from your browser to fix this."
+    exit 1
+fi
 
 # Exit code 0: All videos succeeded
 # Exit code 1: Some videos failed (private, members-only, deleted, etc.)

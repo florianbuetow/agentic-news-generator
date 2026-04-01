@@ -74,7 +74,7 @@ SILENCE_THRESHOLD_DB="${SILENCE_THRESHOLD_DB:--40}"
 # Minimum silence duration in seconds
 # Only silence longer than this duration will be removed
 # Common values: 0.5 (aggressive), 1.0-2.0 (moderate), 3.0+ (conservative)
-SILENCE_MIN_DURATION="${SILENCE_MIN_DURATION:-1}"
+SILENCE_MIN_DURATION="${SILENCE_MIN_DURATION:-2}"
 
 # Enable or disable silence removal entirely
 # Set to "false" to only convert audio without silence processing
@@ -129,6 +129,24 @@ detect_cpu_cores() {
     else
         # Linux
         nproc
+    fi
+}
+
+# Format seconds into human-readable duration (e.g. "13m 40.2s", "1h 5m 30.0s")
+format_duration() {
+    local total_seconds="$1"
+    local hours minutes seconds
+
+    hours=$(echo "$total_seconds" | awk '{printf "%d", $1 / 3600}')
+    minutes=$(echo "$total_seconds $hours" | awk '{printf "%d", ($1 - $2 * 3600) / 60}')
+    seconds=$(echo "$total_seconds $hours $minutes" | awk '{printf "%.1f", $1 - $2 * 3600 - $3 * 60}')
+
+    if [ "$hours" -gt 0 ]; then
+        echo "${hours}h ${minutes}m ${seconds}s"
+    elif [ "$minutes" -gt 0 ]; then
+        echo "${minutes}m ${seconds}s"
+    else
+        echo "${seconds}s"
     fi
 }
 

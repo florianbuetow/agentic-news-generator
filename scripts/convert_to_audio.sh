@@ -98,7 +98,7 @@ compute_speech_intervals() {
                         }]
                     else . end
                 end
-            ) | .intervals;
+            ) | .intervals | [.[] | select(.duration_seconds >= 0.01)];
         compute_speech($total)'
 }
 
@@ -147,11 +147,49 @@ echo ""
 find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
     channel_name=$(basename "$channel_dir")
 
-    echo "Processing channel: $channel_name"
-    echo "---"
-
     # Create output directory for this channel
     mkdir -p "$AUDIO_DIR/$channel_name"
+
+    # Count total files and files needing processing in this channel
+    total_files=0
+    to_process=0
+    current_time_prescan=$(date +%s)
+
+    while IFS= read -r -d '' prescan_file; do
+        prescan_filename=$(basename "$prescan_file")
+        prescan_ext="${prescan_filename##*.}"
+        prescan_base="${prescan_filename%.*}"
+        prescan_ext_lower=$(echo "$prescan_ext" | tr '[:upper:]' '[:lower:]')
+
+        # Skip macOS metadata files
+        [[ "$prescan_filename" == ._* ]] && continue
+
+        # Validate extension
+        prescan_valid=false
+        for allowed_ext in "${ALLOWED_EXTENSIONS[@]}"; do
+            if [[ "$prescan_ext_lower" == "$allowed_ext" ]]; then
+                prescan_valid=true
+                break
+            fi
+        done
+        [[ "$prescan_valid" == false ]] && continue
+
+        total_files=$((total_files + 1))
+
+        # Check if output already exists
+        prescan_wav="$AUDIO_DIR/$channel_name/$prescan_base.wav"
+        prescan_json="$METADATA_DIR/$channel_name/$METADATA_AUDIO_SUBDIR/$prescan_base.silence_map.json"
+        if [ -f "$prescan_wav" ] && { [ "$ENABLE_SILENCE_REMOVAL" = "false" ] || [ -f "$prescan_json" ]; }; then
+            continue
+        fi
+
+        to_process=$((to_process + 1))
+    done < <(find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -print0)
+
+    process_index=0
+
+    echo "Processing channel: $channel_name ($to_process to process, $total_files total)"
+    echo "---"
 
     # Counter for skipped files in this channel
     skipped_count=0
@@ -212,14 +250,15 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                 echo "  ---"
             fi
         else
-            echo "  Processing: $filename"
+            process_index=$((process_index + 1))
+            echo "  [$process_index/$to_process] Processing: $filename"
 
             # Check if file has an audio stream before processing
             has_audio=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_type \
                 -of default=noprint_wrappers=1:nokey=1 "$input_file" 2>/dev/null)
 
             if [ -z "$has_audio" ]; then
-                echo "    ⚠️  Skipping: No audio stream found (video-only file)"
+                echo "  [$process_index/$to_process] ⚠️  Skipping: No audio stream found (video-only file)"
                 echo "  ---"
                 continue
             fi
@@ -268,19 +307,58 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                     echo "    ⚠️  Warning: No speech detected (entire audio is silence)"
                     ffmpeg -f lavfi -i anullsrc=r=16000:cl=mono -t 0.1 -ar 16000 -ac 1 -c:a pcm_s16le "$output_wav" -loglevel error </dev/null
                 else
-                    # Build select filter expression
-                    select_expr=$(build_select_filter "$speech_intervals")
+                    # Extract each speech segment individually, then concatenate.
+                    # This avoids the "Cannot allocate memory" error that occurs
+                    # when aselect expressions have too many segments.
+                    segments_dir="$AUDIO_DIR/$channel_name/.$base_name.segments"
+                    concat_list="$segments_dir/concat.txt"
+                    mkdir -p "$segments_dir"
+                    > "$concat_list"
 
-                    # Use aselect + asetpts to extract and concatenate speech segments
-                    ffmpeg -threads "$NUM_THREADS" -y -i "$temp_wav" \
-                        -af "aselect='${select_expr}',asetpts=N/SR/TB" \
-                        -ar 16000 -ac 1 -c:a pcm_s16le \
-                        -loglevel error -stats \
+                    segment_index=0
+                    segment_failed=false
+
+                    while IFS= read -r segment; do
+                        seg_start=$(echo "$segment" | jq -r '.start_seconds')
+                        seg_duration=$(echo "$segment" | jq -r '.duration_seconds')
+                        segment_file="$segments_dir/seg_$(printf '%04d' $segment_index).wav"
+
+                        ffmpeg -y -i "$temp_wav" \
+                            -ss "$seg_start" -t "$seg_duration" \
+                            -ar 16000 -ac 1 -c:a pcm_s16le \
+                            -loglevel error \
+                            "$segment_file" </dev/null
+                        ffmpeg_exit=$?
+
+                        if [ $ffmpeg_exit -ne 0 ]; then
+                            echo "    🚨 FAILED to extract segment $segment_index (start=$seg_start, duration=$seg_duration)"
+                            segment_failed=true
+                            break
+                        fi
+
+                        # Escape single quotes for FFmpeg concat demuxer (shell-style: ' → '\'')
+                        safe_file=$(printf '%s' "$segment_file" | sed "s|'|'\\\\''|g")
+                        echo "file '$safe_file'" >> "$concat_list"
+                        segment_index=$((segment_index + 1))
+                    done < <(echo "$speech_intervals" | jq -c '.[]')
+
+                    if [ "$segment_failed" = true ]; then
+                        rm -rf "$segments_dir" "$temp_wav" "$silence_log"
+                        exit 1
+                    fi
+
+                    # Concatenate all segments into the final output
+                    ffmpeg -y -f concat -safe 0 -i "$concat_list" \
+                        -c copy \
+                        -loglevel error \
                         "$output_wav" </dev/null
                     ffmpeg_exit=$?
 
+                    # Clean up segment files
+                    rm -rf "$segments_dir"
+
                     if [ $ffmpeg_exit -ne 0 ]; then
-                        echo "    🚨 FAILED to extract speech segments from $filename (pass 2)"
+                        echo "    🚨 FAILED to concatenate speech segments from $filename"
                         rm -f "$temp_wav" "$silence_log" "$output_wav"
                         exit 1
                     fi
@@ -330,7 +408,7 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                 # Clean up temp files
                 rm -f "$temp_wav" "$silence_log"
 
-                echo "    ✅ Done: $base_name.wav (removed ${total_silence}s of silence)"
+                echo "    ✅ Done: $base_name.wav (removed $(format_duration "$total_silence") of silence)"
             else
                 # === SIMPLE CONVERSION (Silence removal disabled) ===
                 echo "    Converting to audio/$channel_name/$base_name.wav (using $NUM_THREADS threads)..."

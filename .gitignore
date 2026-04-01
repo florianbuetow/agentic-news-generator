@@ -1,3 +1,6 @@
+# Claude Code
+.claude/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -245,3 +248,6 @@ logs/
 
 # Guard file
 .guardfile
+
+# Dolt (beads issue tracker)
+.doltcfg/

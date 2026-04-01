@@ -65,6 +65,7 @@ help:
     @echo ""
     @printf "\033[0;33mData Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
+    @printf "  %-38s %s\n" "check-video-integrity" "Check video files for corruption"
     @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
     @printf "  %-38s %s\n" "transcribe" "Transcribe audio files to text"
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
@@ -178,6 +179,7 @@ run:
 all:
     @just ci-quiet
     -@just download-videos
+    @just check-video-integrity
     @just extract-audio
     @just transcribe
     @just archive-videos
@@ -190,6 +192,7 @@ all:
 all-ingestion:
     @just ci-quiet
     -@just download-videos
+    @just check-video-integrity
     @just extract-audio
     @just transcribe
     @just archive-videos
@@ -219,6 +222,13 @@ extract-audio:
     @echo ""
     @printf "\033[0;34m=== Converting Videos to Audio ===\033[0m\n"
     @bash scripts/convert_to_audio.sh
+    @echo ""
+
+# Check video files for corruption
+check-video-integrity:
+    @echo ""
+    @printf "\033[0;34m=== Checking Video File Integrity ===\033[0m\n"
+    @uv run python scripts/check_video_integrity.py
     @echo ""
 
 # Transcribe audio files to text
@@ -267,8 +277,6 @@ analyze-transcripts-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Creating Transcript Hallucination Digest ===\033[0m\n"
     @uv run scripts/create-hallucination-digest.py
-    @echo ""
-    @printf "\033[0;32m✓ Digest created: data/output/hallucination_digest.md\033[0m\n"
     @echo ""
 
 # Remove hallucinations from transcripts using LLM cleaning
@@ -588,7 +596,7 @@ code-spell:
 code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
-    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf --ignore-vuln GHSA-7gcm-g887-7qv7  # TODO(2026-04-24): Review protobuf GHSA-7gcm-g887-7qv7 for upstream fix
+    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf --ignore-vuln GHSA-7gcm-g887-7qv7 --ignore-vuln GHSA-5239-wwwm-4pmq  # TODO(2026-04-24): Review protobuf GHSA-7gcm-g887-7qv7 and pygments GHSA-5239-wwwm-4pmq for upstream fix
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""
@@ -799,6 +807,10 @@ all-quiet:
     fi
 
     set -e  # Exit on error for remaining steps
+
+    printf "🚀 Starting check-video-integrity...\n"
+    just check-video-integrity > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Check-video-integrity failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed check-video-integrity\n"
 
     printf "🚀 Starting extract-audio...\n"
     just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
