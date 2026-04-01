@@ -253,6 +253,15 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
             process_index=$((process_index + 1))
             echo "  [$process_index/$to_process] Processing: $filename"
 
+            # Check available disk space on target device (require >= 2 GB)
+            available_kb=$(df -k "$AUDIO_DIR" | awk 'NR==2 {print $4}')
+            required_kb=$((2 * 1024 * 1024))
+            if [ "$available_kb" -lt "$required_kb" ]; then
+                available_mb=$((available_kb / 1024))
+                echo "  🚨 ERROR: Less than 2 GB disk space remaining on target device (${available_mb} MB available)"
+                exit 1
+            fi
+
             # Check if file has an audio stream before processing
             has_audio=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_type \
                 -of default=noprint_wrappers=1:nokey=1 "$input_file" 2>/dev/null)
