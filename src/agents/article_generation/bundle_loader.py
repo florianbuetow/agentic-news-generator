@@ -6,6 +6,7 @@ and loads referenced files (transcript, topics) from the same directory.
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -129,11 +130,13 @@ def bundle_to_source_metadata(bundle: LoadedBundle) -> dict[str, str | None]:
         [ref.model_dump() for ref in bundle.manifest.references],
         ensure_ascii=False,
     )
+    topic_slug = _topic_slug_from_manifest(bundle.manifest)
     return {
         "source_file": bundle.manifest.source_text_file,
         "channel_name": _channel_from_references(bundle.manifest.references),
         "video_id": bundle.manifest.slug,
         "article_title": bundle.manifest.article_title,
+        "topic_slug": topic_slug,
         "slug": bundle.manifest.slug,
         "publish_date": bundle.manifest.publish_date,
         "references": references_json,
@@ -146,3 +149,16 @@ def _channel_from_references(references: list[ManifestReference]) -> str:
         if ref.channel:
             return ref.channel
     raise ValueError("No channel name found in manifest references")
+
+
+def _topic_slug_from_manifest(manifest: Manifest) -> str:
+    """Derive a deterministic topic slug from manifest topic information."""
+    topic_title = manifest.article_title.strip()
+    if topic_title == "":
+        raise ValueError("Manifest article_title is required to derive topic_slug")
+
+    topic_slug = re.sub(r"[^a-z0-9]+", "-", topic_title.lower()).strip("-")
+    if topic_slug == "":
+        raise ValueError(f"Manifest article_title {manifest.article_title!r} cannot be normalized into topic_slug")
+
+    return topic_slug

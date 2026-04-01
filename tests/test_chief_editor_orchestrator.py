@@ -115,6 +115,7 @@ def make_source_metadata(**overrides: Any) -> dict[str, str | None]:
         "source_file": "transcript.txt",
         "video_id": "video-123",
         "article_title": "Test Article",
+        "topic_slug": "test-article",
         "publish_date": "2025-01-01",
         "references": "[]",
     }

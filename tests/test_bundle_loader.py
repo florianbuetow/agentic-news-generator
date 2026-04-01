@@ -254,6 +254,7 @@ class TestBundleToSourceMetadata:
         assert metadata["channel_name"] == "TestChannel"
         assert metadata["video_id"] == "TEST123"
         assert metadata["article_title"] == "Test Article Title"
+        assert metadata["topic_slug"] == "test-article-title"
         assert metadata["slug"] == "TEST123"
         assert metadata["publish_date"] == "2026-02-05"
         assert isinstance(metadata["references"], str)
@@ -319,3 +320,32 @@ class TestBundleToSourceMetadata:
         bundle = load_bundle(bundle_dir)
         metadata = bundle_to_source_metadata(bundle)
         assert metadata["channel_name"] == "FirstChannel"
+        assert metadata["topic_slug"] == "test-article-title"
+
+    def test_missing_topic_info_in_manifest_raises(self) -> None:
+        manifest = Manifest(
+            article_title="   ",
+            slug="SLUG",
+            publish_date="2026-01-01",
+            source_text_file="transcript.txt",
+            topics_file="topics.json",
+            references=[
+                ManifestReference(
+                    type="video",
+                    title="Test",
+                    url="https://example.com",
+                    author="Author",
+                    channel="Channel",
+                    date="2026-01-01",
+                )
+            ],
+        )
+        bundle = LoadedBundle(
+            manifest=manifest,
+            source_text="content",
+            topics={},
+            bundle_dir="/tmp/test",
+        )
+
+        with pytest.raises(ValueError, match="article_title is required to derive topic_slug"):
+            bundle_to_source_metadata(bundle)
