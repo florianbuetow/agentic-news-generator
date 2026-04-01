@@ -37,7 +37,7 @@ Evidence standards:
 - Do not invent citations. Return `null` unless a directly relevant citation already exists in provided context.
 
 Return strict JSON matching:
-{
+{{
   "concern_id": <int>,
   "misleading": <bool>,
   "status": "KEEP|REWRITE|REMOVE",
@@ -45,7 +45,7 @@ Return strict JSON matching:
   "suggested_fix": "... or null",
   "evidence": "... or null",
   "citations": ["..."] or null
-}
+}}
 
 STYLE_REQUIREMENTS:
 {style_requirements}

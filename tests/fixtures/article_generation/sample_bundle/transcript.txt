@@ -1,0 +1,5 @@
+In the demo, the speaker argues that many internal AI tools do not need the largest possible model.
+
+They say a smaller seven-billion-parameter model can often run on a single GPU, respond faster, and cost less to operate. The speaker presents this as a practical deployment tradeoff rather than a universal rule. They also say teams should benchmark their own tasks, because larger models still perform better on some broad reasoning workloads.
+
+The speaker does not claim that smaller labs will overtake the biggest companies. They frame the point more narrowly: smaller models can be enough for targeted workflows when latency and hardware budgets matter.

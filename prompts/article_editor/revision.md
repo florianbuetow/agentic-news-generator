@@ -62,12 +62,12 @@ Revision policy:
 - Keep the article coherent after revisions; do not leave dangling references or broken structure.
 
 Return strict JSON matching this schema:
-{
+{{
   "headline": "Primary headline",
   "alternative_headline": "Secondary headline or subtitle",
   "article_body": "Full markdown article with \\n line breaks",
   "description": "Short teaser summary in 1-2 sentences"
-}
+}}
 
 Checklist before responding:
 1. Read CONTEXT and SPECIALIST VERDICTS.

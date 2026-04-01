@@ -1,0 +1,6 @@
+[
+  {
+    "title": "Smaller Models, Lower Power: A Practical Shift in LLM Deployment",
+    "summary": "A practical case for using smaller language models when teams care about latency, hardware footprint, and deployment cost."
+  }
+]
