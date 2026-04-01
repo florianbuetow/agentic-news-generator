@@ -20,9 +20,8 @@ ID_RE = re.compile(r"\[([A-Za-z0-9_-]{11})\]")
 
 
 def collect_ids_from_find(directory: str) -> set[str]:
-    result = subprocess.run(
-        ["find", directory, "-type", "f"], capture_output=True, text=True
-    )
+    """Collect bracketed video IDs from all file paths under a directory."""
+    result = subprocess.run(["find", directory, "-type", "f"], capture_output=True, text=True)
     ids: set[str] = set()
     for line in result.stdout.splitlines():
         match = ID_RE.search(line)
@@ -36,7 +35,8 @@ def build_title_to_id_map(metadata_dir: Path) -> dict[str, str]:
     title_map: dict[str, str] = {}
     result = subprocess.run(
         ["find", str(metadata_dir), "-path", "*/video/*.info.json", "-type", "f"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     for filepath in result.stdout.splitlines():
         if not filepath:
@@ -60,14 +60,13 @@ def normalize_title(title: str) -> str:
     return re.sub(r"\s+", " ", title).strip()
 
 
-def collect_transcript_ids_by_title(
-    transcripts_dir: Path, title_map: dict[str, str]
-) -> set[str]:
+def collect_transcript_ids_by_title(transcripts_dir: Path, title_map: dict[str, str]) -> set[str]:
     """Match transcript files without [ID] in name to IDs via title lookup."""
     ids: set[str] = set()
     result = subprocess.run(
         ["find", str(transcripts_dir), "-type", "f"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     for line in result.stdout.splitlines():
         if not line:
@@ -83,6 +82,7 @@ def collect_transcript_ids_by_title(
 
 
 def main() -> None:
+    """Report archived download IDs that no longer have matching files on disk."""
     project_root = Path(__file__).parent.parent
     config = Config(project_root / "config" / "config.yaml")
     videos_dir = config.getDataDownloadsVideosDir()

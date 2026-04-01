@@ -14,13 +14,15 @@ ID_RE = re.compile(r"\[([A-Za-z0-9_-]{11})\]")
 
 
 def main() -> None:
+    """List transcript filenames and whether each filename includes a video ID."""
     project_root = Path(__file__).parent.parent
     config = Config(project_root / "config" / "config.yaml")
     transcripts_dir = config.getDataDownloadsTranscriptsDir()
 
     all_files = subprocess.run(
         ["find", str(transcripts_dir), "-type", "f"],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     ).stdout
 
     with_id = 0
