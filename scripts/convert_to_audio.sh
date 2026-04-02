@@ -143,8 +143,10 @@ echo "Converting videos to audio files"
 echo "=========================================="
 echo ""
 
+total_fail_count=0
+
 # Iterate over all channel folders in videos directory
-find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
+while read -r channel_dir; do
     channel_name=$(basename "$channel_dir")
 
     # Create output directory for this channel
@@ -191,8 +193,9 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
     echo "Processing channel: $channel_name ($to_process to process, $total_files total)"
     echo "---"
 
-    # Counter for skipped files in this channel
+    # Counters for this channel
     skipped_count=0
+    fail_count=0
 
     # Process all video files matching the whitelist
     while IFS= read -r -d '' input_file; do
@@ -267,8 +270,9 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
                 -of default=noprint_wrappers=1:nokey=1 "$input_file" 2>/dev/null)
 
             if [ -z "$has_audio" ]; then
-                echo "  [$process_index/$to_process] ⚠️  Skipping: No audio stream found (video-only file)"
+                echo "  [$process_index/$to_process] ❌ FAILED: No audio stream found (video-only file)"
                 echo "  ---"
+                fail_count=$((fail_count + 1))
                 continue
             fi
 
@@ -445,7 +449,17 @@ find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; 
         echo "⏭️  Skipped $skipped_count file(s) (WAV already exists)"
     fi
 
+    if [ $fail_count -gt 0 ]; then
+        echo "❌ $fail_count file(s) failed in channel $channel_name"
+        total_fail_count=$((total_fail_count + fail_count))
+    fi
+
     echo ""
-done
+done < <(find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d)
+
+if [ $total_fail_count -gt 0 ]; then
+    echo "Audio conversion finished with $total_fail_count failure(s)."
+    exit 1
+fi
 
 echo "Audio conversion complete."

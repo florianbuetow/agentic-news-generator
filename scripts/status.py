@@ -170,10 +170,7 @@ STAT_KEYS = [
 
 def _fmt_cell(value: int, prev: int | None, num_width: int) -> str:
     """Format number right-aligned to num_width + fixed 3-char delta suffix (always 3 chars)."""
-    if value == 0:
-        num = f"\033[90m{'-':>{num_width}}\033[0m"
-    else:
-        num = f"{value:>{num_width}}"
+    num = f"\033[90m{'-':>{num_width}}\033[0m" if value == 0 else f"{value:>{num_width}}"
     if prev is None or value == prev:
         return num + "   "
     diff = value - prev
