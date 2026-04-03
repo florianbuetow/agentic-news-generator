@@ -56,7 +56,7 @@ yt-dlp --cookies-from-browser $BROWSER \
        --min-sleep-interval 1 \
        --max-sleep-interval 5 \
        --write-info-json \
-       -f "b" \
+       --merge-output-format mp4 \
        -o "$OUTPUT_DIR/%(title)s [%(id)s].%(ext)s" \
        "$URL" >"$OUTPUT_FIFO" 2>&1 &
 YT_PID=$!
