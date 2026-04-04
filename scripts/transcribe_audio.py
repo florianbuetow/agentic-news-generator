@@ -233,6 +233,12 @@ def process_single_wav_file(  # noqa: C901
         )
 
         if success:
+            # Check if whisper produced actual content (not just empty files)
+            srt_file = next(temp_output_dir.glob("*.srt"), None)
+            if srt_file and srt_file.stat().st_size == 0:
+                print(f"      ⏭️  Skipping: {base_name}.wav (no speech detected - empty transcript)")
+                return (True, 0)
+
             # Move generated files from temp to transcripts directory
             moved = 0
             for ext in ["txt", "srt", "vtt", "tsv", "json"]:

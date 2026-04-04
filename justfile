@@ -239,6 +239,10 @@ transcribe:
     uv run python scripts/transcribe_audio.py
     transcribe_exit_code=$?
     echo ""
+    printf "\033[0;34m=== Cleaning Up Empty Transcripts ===\033[0m\n"
+    transcripts_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(Path('.') / c.getDataDownloadsTranscriptsDir())")
+    bash scripts/cleanup-empty-transcripts.sh "$transcripts_dir"
+    echo ""
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
     bash scripts/move-transcript-metadata.sh
     echo ""
