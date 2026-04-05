@@ -75,6 +75,14 @@ class ProgressTracker:
         return f"[{self.current_index}/{self.total_files}] ({pct:.0f}%){eta_str}"
 
 
+def channels_by_pending_count(
+    channels: list[dict[str, str]],
+    pending_counts: dict[str, int],
+) -> list[dict[str, str]]:
+    """Return channels ordered by number of pending (untranscribed) audio files, fewest first."""
+    return sorted(channels, key=lambda ch: pending_counts.get(ch["sanitized_name"], 0))
+
+
 def sanitize_channel_name(name: str) -> str:
     """Sanitize channel name for filesystem use.
 
@@ -339,8 +347,11 @@ def main() -> int:  # noqa: C901
                 1 for wav_file in wav_files if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
             )
 
-    for lang in groups:
-        groups[lang].sort(key=lambda ch: pending_count_by_channel.get(ch["sanitized_name"], 0))
+    # Order channels by fewest pending files first
+    all_channels = channels_by_pending_count(
+        [ch for channels in groups.values() for ch in channels],
+        pending_count_by_channel,
+    )
 
     # Create progress tracker
     progress = ProgressTracker(total_files=len(files_to_transcribe))
@@ -363,14 +374,17 @@ def main() -> int:  # noqa: C901
     total_processed = 0
     total_failed = 0
 
-    # Process each language group
-    for lang in sorted(groups.keys()):
-        print()
-        print("=" * 56)
-        print(f"  Processing Language Group: {lang}")
-        print("=" * 56)
+    # Process channels in order of fewest pending files first
+    for channel_info in all_channels:
+        channel_name = channel_info["sanitized_name"]
+        lang = channel_info["language"]
+        channel_audio_dir = audio_dir / channel_name
 
-        # Determine model and task for this language
+        if not channel_audio_dir.exists():
+            print(f"⚠️  Channel directory not found: {channel_audio_dir} (skipping)")
+            continue
+
+        # Determine model and task for this channel's language
         if lang == "en":
             model_repo = model_en_repo
             task = "transcribe"
@@ -380,76 +394,62 @@ def main() -> int:  # noqa: C901
 
         language_name = supported_languages.get(lang, lang)
 
-        print(f"  Model: {config.getTranscriptionModelEnName() if lang == 'en' else config.getTranscriptionModelMultiName()}")
-        print(f"  Task: {task}")
-        print(f"  Language: {lang}")
+        pending = pending_count_by_channel.get(channel_name, 0)
+        print(f"  📁 Channel: {channel_name} ({pending} pending, lang={lang})")
+        print("  ---")
+
+        # Create transcripts directory for this channel
+        channel_transcripts_dir = transcripts_dir / channel_name
+        FSUtil.ensure_directory_exists(channel_transcripts_dir)
+
+        # Counter for skipped files in this channel
+        skipped_count = 0
+
+        # Find WAV files (filter out macOS ._ files)
+        wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
+        wav_files = [f for f in wav_files if not f.name.startswith("._")]
+
+        for wav_file in wav_files:
+            # Check if this file needs transcription (for progress tracking)
+            needs_transcription = not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+            if needs_transcription:
+                progress.next_file()
+
+            success, moved_count = process_single_wav_file(
+                wav_file,
+                channel_name,
+                channel_transcripts_dir,
+                metadata_dir,
+                lang,
+                language_name,
+                model_repo,
+                task,
+                use_youtube_metadata,
+                description_max_length,
+                metadata_video_subdir,
+                hallucination_silence_threshold,
+                compression_ratio_threshold,
+                sleep_between_files,
+                min_duration,
+                verbose,
+                progress=progress if needs_transcription else None,
+            )
+
+            if moved_count == 0 and success:
+                # File was skipped (already exists)
+                skipped_count += 1
+            elif success:
+                # File was processed successfully
+                total_processed += 1
+            else:
+                # File processing failed
+                total_failed += 1
+
+        # Print skip summary if any files were skipped
+        if skipped_count > 0:
+            print(f"  ⏭️  Skipped {skipped_count} file(s) (transcript already exists)")
+
         print()
-
-        # Process each channel in this language group
-        for channel_info in groups[lang]:
-            channel_name = channel_info["sanitized_name"]
-            channel_audio_dir = audio_dir / channel_name
-
-            if not channel_audio_dir.exists():
-                print(f"⚠️  Channel directory not found: {channel_audio_dir} (skipping)")
-                continue
-
-            pending = pending_count_by_channel.get(channel_name, 0)
-            print(f"  📁 Channel: {channel_name} ({pending} pending)")
-            print("  ---")
-
-            # Create transcripts directory for this channel
-            channel_transcripts_dir = transcripts_dir / channel_name
-            FSUtil.ensure_directory_exists(channel_transcripts_dir)
-
-            # Counter for skipped files in this channel
-            skipped_count = 0
-
-            # Find WAV files (filter out macOS ._ files)
-            wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
-            wav_files = [f for f in wav_files if not f.name.startswith("._")]
-
-            for wav_file in wav_files:
-                # Check if this file needs transcription (for progress tracking)
-                needs_transcription = not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
-                if needs_transcription:
-                    progress.next_file()
-
-                success, moved_count = process_single_wav_file(
-                    wav_file,
-                    channel_name,
-                    channel_transcripts_dir,
-                    metadata_dir,
-                    lang,
-                    language_name,
-                    model_repo,
-                    task,
-                    use_youtube_metadata,
-                    description_max_length,
-                    metadata_video_subdir,
-                    hallucination_silence_threshold,
-                    compression_ratio_threshold,
-                    sleep_between_files,
-                    min_duration,
-                    verbose,
-                    progress=progress if needs_transcription else None,
-                )
-
-                if moved_count == 0 and success:
-                    # File was skipped (already exists)
-                    skipped_count += 1
-                elif success:
-                    # File was processed successfully
-                    total_processed += 1
-                else:
-                    # File processing failed
-                    total_failed += 1
-
-            # Print skip summary if any files were skipped
-            if skipped_count > 0:
-                print(f"  ⏭️  Skipped {skipped_count} file(s) (transcript already exists)")
-
-            print()
 
     # Final summary with elapsed time
     total_elapsed = time.time() - progress.start_time
