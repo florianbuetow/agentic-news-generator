@@ -316,6 +316,7 @@ def main() -> int:  # noqa: C901
 
     # Pre-scan all files to count those needing transcription
     files_to_transcribe: list[tuple[Path, str, Path]] = []  # (wav_file, channel_name, transcripts_dir)
+    pending_count_by_channel: dict[str, int] = {}
     for lang in groups:
         for channel_info in groups[lang]:
             channel_name = channel_info["sanitized_name"]
@@ -334,6 +335,12 @@ def main() -> int:  # noqa: C901
                 for wav_file in wav_files
                 if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
             )
+            pending_count_by_channel[channel_name] = sum(
+                1 for wav_file in wav_files if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+            )
+
+    for lang in groups:
+        groups[lang].sort(key=lambda ch: pending_count_by_channel.get(ch["sanitized_name"], 0))
 
     # Create progress tracker
     progress = ProgressTracker(total_files=len(files_to_transcribe))
