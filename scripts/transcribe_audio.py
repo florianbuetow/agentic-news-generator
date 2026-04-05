@@ -394,7 +394,8 @@ def main() -> int:  # noqa: C901
                 print(f"⚠️  Channel directory not found: {channel_audio_dir} (skipping)")
                 continue
 
-            print(f"  📁 Channel: {channel_name}")
+            pending = pending_count_by_channel.get(channel_name, 0)
+            print(f"  📁 Channel: {channel_name} ({pending} pending)")
             print("  ---")
 
             # Create transcripts directory for this channel
