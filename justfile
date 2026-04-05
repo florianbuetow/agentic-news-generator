@@ -62,6 +62,7 @@ help:
     @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @printf "  %-38s %s\n" "stats" "Show processing status of downloads"
+    @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
     @echo ""
     @printf "\033[0;33mData Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
@@ -349,6 +350,12 @@ status:
 stats:
     @echo ""
     @uv run scripts/status.py
+    @echo ""
+
+# Count total audio hours from transcript timestamps
+audio-hours:
+    @echo ""
+    @uv run scripts/audio-hours.py
     @echo ""
 
 # Launch Jupyter notebook server
