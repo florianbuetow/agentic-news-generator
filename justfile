@@ -52,6 +52,7 @@ help:
     @printf "  %-38s %s\n" "destroy" "Destroy the virtual environment and frontend artifacts"
     @printf "  %-38s %s\n" "newspaper-destroy" "Clean up generated newspaper files"
     @printf "  %-38s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
+    @printf "  %-38s %s\n" "clean-video-files" "Delete all files for a YouTube video ID (interactive). Requires: VIDEO_ID"
     @printf "  %-38s %s\n" "check" "Check if all required tools and prerequisites are available"
     @printf "  %-38s %s\n" "help" "Show this help information"
     @echo ""
@@ -272,6 +273,20 @@ archive-videos:
 # Scan for and remove empty files in data folder
 clean-empty-files:
     @uv run python scripts/find-and-clean-empty-data-files.py
+
+# Delete all files for a YouTube video ID and optionally clean the channel archive. Requires: VIDEO_ID
+clean-video-files VIDEO_ID:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Cleaning Video Files ===\033[0m\n"
+    if uv run python scripts/clean-video-files.py {{ VIDEO_ID }}; then
+        printf "\033[0;32m✓ clean-video-files completed successfully\033[0m\n"
+    else
+        printf "\033[0;31m✗ clean-video-files failed\033[0m\n"
+        exit 1
+    fi
+    echo ""
 
 # Analyze transcripts for hallucinations
 analyze-transcripts-hallucinations:

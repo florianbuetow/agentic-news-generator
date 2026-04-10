@@ -312,6 +312,7 @@ def main() -> int:  # noqa: C901
 
     # Group channels by language
     groups: dict[str, list[dict[str, str]]] = defaultdict(list)
+    transcription_limiter_by_channel: dict[str, int] = {}
 
     for channel in config.get_channels():
         groups[channel.language].append(
@@ -321,6 +322,7 @@ def main() -> int:  # noqa: C901
                 "language": channel.language,
             }
         )
+        transcription_limiter_by_channel[sanitize_channel_name(channel.name)] = channel.transcription_limiter
 
     # Pre-scan all files to count those needing transcription
     files_to_transcribe: list[tuple[Path, str, Path]] = []  # (wav_file, channel_name, transcripts_dir)
@@ -405,11 +407,19 @@ def main() -> int:  # noqa: C901
         # Counter for skipped files in this channel
         skipped_count = 0
 
+        channel_limiter = transcription_limiter_by_channel[channel_name]
+        transcribed_for_channel = 0
+
         # Find WAV files (filter out macOS ._ files)
         wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
         wav_files = [f for f in wav_files if not f.name.startswith("._")]
 
-        for wav_file in wav_files:
+        for i, wav_file in enumerate(wav_files):
+            if transcribed_for_channel >= channel_limiter:
+                remaining = sum(1 for w in wav_files[i:] if not (channel_transcripts_dir / f"{w.stem}.txt").exists())
+                print(f"  ⛔ Transcription limited to {transcribed_for_channel}/{channel_limiter} files. Skipping {remaining} files.")
+                break
+
             # Check if this file needs transcription (for progress tracking)
             needs_transcription = not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
             if needs_transcription:
@@ -441,6 +451,7 @@ def main() -> int:  # noqa: C901
             elif success:
                 # File was processed successfully
                 total_processed += 1
+                transcribed_for_channel += 1
             else:
                 # File processing failed
                 total_failed += 1

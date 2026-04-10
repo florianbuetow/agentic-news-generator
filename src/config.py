@@ -64,6 +64,12 @@ class ChannelConfig(BaseModel):
         alias="download-limiter",
         description="Max videos to download: 0=skip, -1=unlimited, >0=exact limit",
     )
+    transcription_limiter: int = Field(
+        ...,
+        alias="transcription-limiter",
+        ge=0,
+        description="Maximum number of new transcriptions to perform per run for this channel",
+    )
     language: str = Field(
         ...,
         description="ISO language code for channel content (e.g., 'en', 'de', 'ja').",

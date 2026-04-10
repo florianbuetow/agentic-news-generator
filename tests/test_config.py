@@ -43,6 +43,7 @@ class TestChannelConfig:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "en",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -63,9 +64,9 @@ class TestChannelConfig:
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 4  # category, description, download-limiter, language
+        assert len(errors) == 5  # category, description, download-limiter, transcription-limiter, language
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"category", "description", "download-limiter", "language"}
+        assert error_fields == {"category", "description", "download-limiter", "transcription-limiter", "language"}
 
     def test_extra_fields_forbidden(self) -> None:
         """Test that extra fields are forbidden due to extra='forbid'."""
@@ -75,6 +76,7 @@ class TestChannelConfig:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "en",
             "extra_field": "should not be allowed",
         }
@@ -91,6 +93,7 @@ class TestChannelConfig:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "en",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -109,9 +112,9 @@ class TestChannelConfig:
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 3
+        assert len(errors) == 4
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"description", "download-limiter", "language"}
+        assert error_fields == {"description", "download-limiter", "transcription-limiter", "language"}
 
     def test_empty_strings_allowed(self) -> None:
         """Test that empty strings are allowed (validation passes but may not be practical)."""
@@ -121,6 +124,7 @@ class TestChannelConfig:
             "category": "",
             "description": "",
             "download-limiter": 0,
+            "transcription-limiter": 20,
             "language": "en",
         }
         # Empty strings are valid str types, so validation passes
@@ -145,6 +149,7 @@ class TestConfig:
                     "category": "category1",
                     "description": "Content 1",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
                 {
@@ -153,6 +158,7 @@ class TestConfig:
                     "category": "category2",
                     "description": "Content 2",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
             ],
@@ -320,6 +326,7 @@ class TestConfig:
                     "category": "category1",
                     "description": "Content 1",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
                 {
@@ -328,6 +335,7 @@ class TestConfig:
                     "category": "category2",
                     "description": "Content 2",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
             ],
@@ -356,6 +364,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -383,6 +392,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -411,6 +421,7 @@ class TestConfig:
                     "category": "category1",
                     "description": "Content 1",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
                 {
@@ -419,6 +430,7 @@ class TestConfig:
                     "category": "category2",
                     "description": "Content 2",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
             ],
@@ -447,6 +459,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -474,6 +487,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -500,6 +514,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -526,6 +541,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                     "extra_field": "not allowed",
                 }
@@ -553,6 +569,7 @@ class TestConfig:
                     "category": "category",
                     "description": "Content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -593,6 +610,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 0,
+            "transcription-limiter": 20,
             "language": "en",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -606,6 +624,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": -1,
+            "transcription-limiter": 20,
             "language": "en",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -621,6 +640,7 @@ class TestChannelConfigDownloadLimiter:
                 "category": "test_category",
                 "description": "Test content",
                 "download-limiter": value,
+                "transcription-limiter": 20,
                 "language": "en",
             }
             channel = ChannelConfig.model_validate(channel_data)
@@ -633,14 +653,14 @@ class TestChannelConfigDownloadLimiter:
             "name": "Test Channel",
             "category": "test_category",
             "description": "Test content",
-            # Missing download_limiter and language
+            # Missing download_limiter, transcription_limiter, and language
         }
         with pytest.raises(ValidationError) as exc_info:
             ChannelConfig.model_validate(channel_data)
         errors = exc_info.value.errors()
-        assert len(errors) == 2
+        assert len(errors) == 3
         error_fields = {error["loc"][0] for error in errors}
-        assert error_fields == {"download-limiter", "language"}
+        assert error_fields == {"download-limiter", "transcription-limiter", "language"}
 
     def test_download_limiter_wrong_type_string(self) -> None:
         """Test that non-numeric string download_limiter raises ValidationError."""
@@ -650,6 +670,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": "unlimited",  # Should be int, not string
+            "transcription-limiter": 20,
             "language": "en",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -665,6 +686,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20.5,  # Should be int, not float
+            "transcription-limiter": 20,
             "language": "en",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -682,6 +704,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": -5,
+            "transcription-limiter": 20,
             "language": "en",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -695,6 +718,7 @@ class TestChannelConfigDownloadLimiter:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,  # Using hyphen as in actual YAML
+            "transcription-limiter": 20,
             "language": "en",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -712,6 +736,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "en",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -725,6 +750,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "xyz",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -741,6 +767,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "invalid",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -756,6 +783,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             # Missing language
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -771,6 +799,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "",
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -787,6 +816,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": ["en"],  # Old schema used list, new schema requires string
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -803,6 +833,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": 123,
         }
         with pytest.raises(ValidationError) as exc_info:
@@ -820,6 +851,7 @@ class TestChannelConfigLanguage:
                 "category": "test_category",
                 "description": "Test content",
                 "download-limiter": 20,
+                "transcription-limiter": 20,
                 "language": lang_code,
             }
             channel = ChannelConfig.model_validate(channel_data)
@@ -833,6 +865,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "de",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -846,6 +879,7 @@ class TestChannelConfigLanguage:
             "category": "test_category",
             "description": "Test content",
             "download-limiter": 20,
+            "transcription-limiter": 20,
             "language": "ja",
         }
         channel = ChannelConfig.model_validate(channel_data)
@@ -862,6 +896,7 @@ class TestChannelConfigLanguage:
                     "category": "test_category",
                     "description": "Test content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -888,6 +923,7 @@ class TestChannelConfigLanguage:
                     "category": "test",
                     "description": "Test",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -951,6 +987,7 @@ class TestChannelConfigLanguage:
                     "category": "test_category",
                     "description": "Test content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 },
                 {
@@ -959,6 +996,7 @@ class TestChannelConfigLanguage:
                     "category": "test_category",
                     "description": "Test content",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "ja",
                 },
             ],
@@ -989,6 +1027,7 @@ class TestChannelConfigLanguage:
                     "category": "test",
                     "description": "Test",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],
@@ -1017,6 +1056,7 @@ class TestChannelConfigLanguage:
                     "category": "test",
                     "description": "Test",
                     "download-limiter": 20,
+                    "transcription-limiter": 20,
                     "language": "en",
                 }
             ],

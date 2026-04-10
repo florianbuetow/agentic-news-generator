@@ -50,6 +50,7 @@ def get_valid_channels_config() -> list[dict[str, str | int]]:
             "category": "test",
             "description": "Test channel description",
             "download-limiter": 10,
+            "transcription-limiter": 20,
             "language": "en",
         }
     ]
