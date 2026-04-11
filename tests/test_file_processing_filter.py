@@ -26,6 +26,7 @@ def get_valid_paths_config(tmp_path: Path) -> dict[str, str]:
         "data_temp_dir": str(base_data_dir / "temp"),
         "data_archive_dir": str(base_data_dir / "archive"),
         "data_archive_videos_dir": str(base_data_dir / "archive" / "videos"),
+        "data_logs_dir": str(base_data_dir / "logs"),
         "reports_dir": str(tmp_path / "reports"),
     }
 
@@ -88,7 +89,7 @@ def test_load_filter_file_valid(tmp_path: Path) -> None:
     with filter_path.open("w", encoding="utf-8") as filter_file:
         json.dump(
             {
-                "data_downloads_audio_dir": ["channel_a/file_1.wav", "channel_a/file_2.wav"],
+                "data_downloads_audio_dir": ["channel_a/abc123", "channel_a/def456"],
                 "data_downloads_transcripts_dir": [],
             },
             filter_file,
@@ -97,14 +98,14 @@ def test_load_filter_file_valid(tmp_path: Path) -> None:
     loaded_filter = FileProcessingFilter.load_filter_file(filter_path)
 
     assert loaded_filter == {
-        "data_downloads_audio_dir": {"channel_a/file_1.wav", "channel_a/file_2.wav"},
+        "data_downloads_audio_dir": {"channel_a/abc123", "channel_a/def456"},
         "data_downloads_transcripts_dir": set(),
     }
 
 
 def test_load_filter_file_invalid_keys(tmp_path: Path) -> None:
     config_path = write_config_file(tmp_path)
-    write_filter_file(config_path, {"invalid_path_key": ["channel_a/file_1.wav"]})
+    write_filter_file(config_path, {"invalid_path_key": ["channel_a/abc123"]})
     config = Config(config_path)
 
     with pytest.raises(ValueError, match="invalid_path_key"):
@@ -117,7 +118,7 @@ def test_resolve_config_key_valid(tmp_path: Path) -> None:
     config = Config(config_path)
     file_filter = FileProcessingFilter(config)
     audio_dir = config.get_paths_config().data_downloads_audio_dir
-    file_path = Path(audio_dir) / "channel_a" / "file_1.wav"
+    file_path = Path(audio_dir) / "channel_a" / "Some Title [abc123].wav"
 
     assert file_filter.should_skip_file(str(file_path), audio_dir) is False
 
@@ -136,45 +137,45 @@ def test_resolve_config_key_invalid(tmp_path: Path) -> None:
 
 def test_should_skip_file_true(tmp_path: Path) -> None:
     config_path = write_config_file(tmp_path)
-    write_filter_file(config_path, {"data_downloads_audio_dir": ["channel_a/file_1.wav"]})
+    write_filter_file(config_path, {"data_downloads_audio_dir": ["channel_a/abc123"]})
     config = Config(config_path)
     file_filter = FileProcessingFilter(config)
     base_dir = config.get_paths_config().data_downloads_audio_dir
-    file_path = Path(base_dir) / "channel_a" / "file_1.wav"
+    file_path = Path(base_dir) / "channel_a" / "Some Title [abc123].wav"
 
     assert file_filter.should_skip_file(str(file_path), base_dir) is True
 
 
 def test_should_skip_file_false(tmp_path: Path) -> None:
     config_path = write_config_file(tmp_path)
-    write_filter_file(config_path, {"data_downloads_audio_dir": ["channel_a/file_1.wav"]})
+    write_filter_file(config_path, {"data_downloads_audio_dir": ["channel_a/abc123"]})
     config = Config(config_path)
     file_filter = FileProcessingFilter(config)
     base_dir = config.get_paths_config().data_downloads_audio_dir
-    file_path = Path(base_dir) / "channel_a" / "file_2.wav"
+    file_path = Path(base_dir) / "channel_a" / "Other Title [xyz789].wav"
 
     assert file_filter.should_skip_file(str(file_path), base_dir) is False
 
 
 def test_should_skip_file_no_entry_for_key(tmp_path: Path) -> None:
     config_path = write_config_file(tmp_path)
-    write_filter_file(config_path, {"data_downloads_transcripts_dir": ["channel_a/file_1.txt"]})
+    write_filter_file(config_path, {"data_downloads_transcripts_dir": ["channel_a/abc123"]})
     config = Config(config_path)
     file_filter = FileProcessingFilter(config)
     base_dir = config.get_paths_config().data_downloads_audio_dir
-    file_path = Path(base_dir) / "channel_a" / "file_1.wav"
+    file_path = Path(base_dir) / "channel_a" / "Some Title [abc123].wav"
 
     assert file_filter.should_skip_file(str(file_path), base_dir) is False
 
 
 def test_path_normalization_trailing_slash(tmp_path: Path) -> None:
     config_path = write_config_file(tmp_path)
-    write_filter_file(config_path, {"data_downloads_audio_dir": ["channel_a/file_1.wav"]})
+    write_filter_file(config_path, {"data_downloads_audio_dir": ["channel_a/abc123"]})
     config = Config(config_path)
     file_filter = FileProcessingFilter(config)
     base_dir_with_slash = config.get_paths_config().data_downloads_audio_dir
     base_dir_resolved = str(Path(base_dir_with_slash).resolve())
-    file_path = Path(base_dir_resolved) / "channel_a" / "file_1.wav"
+    file_path = Path(base_dir_resolved) / "channel_a" / "Some Title [abc123].wav"
 
     assert file_filter.should_skip_file(str(file_path), base_dir_resolved) is True
     assert file_filter.should_skip_file(str(file_path), base_dir_with_slash) is True

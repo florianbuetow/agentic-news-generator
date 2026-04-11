@@ -1,10 +1,18 @@
-"""Filter files for processing based on config-defined base directories."""
+"""Filter files for processing based on config-defined base directories.
+
+Filter entries use the format "channel/video_id" to avoid Unicode mismatches
+between yt-dlp filenames and JSON strings. The video ID is extracted from
+filenames matching the pattern "... [VIDEO_ID].ext".
+"""
 
 import json
+import re
 from pathlib import Path
 from typing import Any, cast
 
 from src.config import Config
+
+VIDEO_ID_PATTERN = re.compile(r"\[([^\]]+)\]\.[^.]+$")
 
 
 class FileProcessingFilter:
@@ -73,10 +81,25 @@ class FileProcessingFilter:
             raise ValueError(f"Unknown base_dir: {base_dir}. Known config paths: {known_paths}")
         return config_key
 
+    @staticmethod
+    def extract_video_id(filename: str) -> str | None:
+        """Extract video ID from a filename like 'Title [VIDEO_ID].ext'."""
+        match = VIDEO_ID_PATTERN.search(filename)
+        return match.group(1) if match else None
+
     def should_skip_file(self, file_path: str, base_dir: str) -> bool:
-        """Return whether the file path is listed for skipping under the base directory."""
+        """Return whether the file matches a channel/video_id filter entry."""
         config_key = self._resolve_config_key(base_dir)
-        relative_path = str(Path(file_path).resolve().relative_to(Path(base_dir).resolve()))
         if config_key not in self._filter:
             return False
-        return relative_path in self._filter[config_key]
+
+        resolved_path = Path(file_path).resolve()
+        resolved_base = Path(base_dir).resolve()
+        relative_path = resolved_path.relative_to(resolved_base)
+
+        channel = relative_path.parts[0] if relative_path.parts else ""
+        video_id = self.extract_video_id(relative_path.name)
+        if not video_id:
+            return False
+
+        return f"{channel}/{video_id}" in self._filter[config_key]

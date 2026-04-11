@@ -368,6 +368,7 @@ class PathsConfig(BaseModel):
     data_temp_dir: str = Field(..., description="Temporary files directory path", min_length=1)
     data_archive_dir: str = Field(..., description="Archive directory path", min_length=1)
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
+    data_logs_dir: str = Field(..., description="Log files directory path", min_length=1)
     reports_dir: str = Field(..., description="Model benchmark reports directory path", min_length=1)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -751,6 +752,14 @@ class Config:
             Path object pointing to the data/archive/videos directory.
         """
         return Path(self._paths.data_archive_videos_dir)
+
+    def getDataLogsDir(self) -> Path:
+        """Get the data logs directory path.
+
+        Returns:
+            Path object pointing to the data/logs directory.
+        """
+        return Path(self._paths.data_logs_dir)
 
     def getReportsDir(self) -> Path:
         """Get the reports directory path.

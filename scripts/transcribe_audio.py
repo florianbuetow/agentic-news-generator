@@ -168,6 +168,7 @@ def process_single_wav_file(  # noqa: C901
     min_duration: int,
     verbose: bool,
     progress: ProgressTracker | None = None,
+    empty_transcript_log: Path | None = None,
 ) -> tuple[bool, int]:
     """Process a single WAV file for transcription.
 
@@ -175,6 +176,11 @@ def process_single_wav_file(  # noqa: C901
         Tuple of (success, files_moved_count)
     """
     base_name = wav_file.stem
+
+    # Reject empty/corrupt wav files
+    if wav_file.stat().st_size == 0:
+        print(f"    🚨 ERROR: Empty wav file: {wav_file}")
+        return (False, 0)
 
     # Skip if transcript already exists (idempotent)
     if (channel_transcripts_dir / f"{base_name}.txt").exists():
@@ -221,7 +227,6 @@ def process_single_wav_file(  # noqa: C901
                 print(f"      ⚠️  Warning: Failed to parse metadata: {e}", file=sys.stderr)
         else:
             print(f"      🚨 ERROR: Metadata file not found: {metadata_file}")
-            print("      💡 Run 'bash scripts/move-metadata.sh' to move .info.json files")
             return (False, 0)
 
     # Create temp output directory
@@ -246,6 +251,9 @@ def process_single_wav_file(  # noqa: C901
             srt_file = next(temp_output_dir.glob("*.srt"), None)
             if srt_file and srt_file.stat().st_size == 0:
                 print(f"      ⏭️  Skipping: {base_name}.wav (no speech detected - empty transcript)")
+                if empty_transcript_log:
+                    with open(empty_transcript_log, "a", encoding="utf-8") as log:
+                        log.write(f"{channel_name}/{base_name}.wav\n")
                 return (True, 0)
 
             # Move generated files from temp to transcripts directory
@@ -297,6 +305,9 @@ def main() -> int:  # noqa: C901
     audio_dir = project_root / config.getDataDownloadsAudioDir()
     transcripts_dir = project_root / config.getDataDownloadsTranscriptsDir()
     metadata_dir = project_root / config.getDataDownloadsMetadataDir()
+    logs_dir = Path(config.getDataLogsDir())
+    FSUtil.ensure_directory_exists(logs_dir)
+    empty_transcript_log = logs_dir / "empty_transcripts.log"
 
     # Get transcription settings from config
     model_en_repo = config.getTranscriptionModelEnRepo()
@@ -379,9 +390,7 @@ def main() -> int:  # noqa: C901
     # Start progress tracking
     progress.start()
 
-    # Counters for final summary
     total_processed = 0
-    total_failed = 0
 
     # Process channels in order of fewest pending files first
     for channel_info in all_channels:
@@ -454,6 +463,7 @@ def main() -> int:  # noqa: C901
                 min_duration,
                 verbose,
                 progress=progress if needs_transcription else None,
+                empty_transcript_log=empty_transcript_log,
             )
 
             if moved_count == 0 and success:
@@ -464,8 +474,8 @@ def main() -> int:  # noqa: C901
                 total_processed += 1
                 transcribed_for_channel += 1
             else:
-                # File processing failed
-                total_failed += 1
+                print(f"\n  ✗ Aborting: transcription failed for {wav_file.name}")
+                return 1
 
         # Print skip summary if any files were skipped
         if skipped_count > 0:
@@ -480,11 +490,10 @@ def main() -> int:  # noqa: C901
     print("  Transcription Complete")
     print("=" * 56)
     print(f"  Processed: {total_processed}")
-    print(f"  Failed: {total_failed}")
     print(f"  Elapsed: {progress.format_duration(total_elapsed)}")
     print()
 
-    return 1 if total_failed > 0 else 0
+    return 0
 
 
 if __name__ == "__main__":

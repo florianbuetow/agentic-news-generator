@@ -239,11 +239,10 @@ check-video-integrity:
 # Transcribe audio files to text
 transcribe:
     #!/usr/bin/env bash
-    set +e  # Don't exit on error
+    set -e
     echo ""
     printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
     uv run python scripts/transcribe_audio.py
-    transcribe_exit_code=$?
     echo ""
     printf "\033[0;34m=== Cleaning Up Empty Transcripts ===\033[0m\n"
     transcripts_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(Path('.') / c.getDataDownloadsTranscriptsDir())")
@@ -254,18 +253,6 @@ transcribe:
     echo ""
     printf "\033[0;34m=== Analyzing Transcript Languages ===\033[0m\n"
     uv run scripts/transcript-language-analysis.py
-    language_exit_code=$?
-    echo ""
-    # Exit with error if transcription failed OR non-English detected
-    if [ $transcribe_exit_code -ne 0 ]; then
-        printf "\033[0;31m✗ Transcription failed\033[0m\n"
-        exit $transcribe_exit_code
-    fi
-    if [ $language_exit_code -ne 0 ]; then
-        printf "\033[0;31m✗ Non-English transcripts detected\033[0m\n"
-        exit $language_exit_code
-    fi
-    exit 0
 
 # Archive processed videos
 archive-videos:

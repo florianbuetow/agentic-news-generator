@@ -43,7 +43,7 @@ while IFS= read -r file; do
         video_id=$(echo "$filename" | sed 's/.*\[\([^]]*\)\]\.[^.]*$/\1/')
         printf "  [%s] %s bytes  %s\n" "$channel" "$size" "$filename"
     fi
-done < <(find "$transcripts_dir" -maxdepth 2 -type f -name "*.txt" | sort)
+done < <(find "$transcripts_dir" -maxdepth 2 -type f \( -name "*.txt" -o -name "*.vtt" -o -name "*.tsv" -o -name "*.srt" \) | sort)
 
 if [ "$found" -eq 0 ]; then
     printf "\033[0;32m✓ No empty transcripts found (threshold: %d bytes)\033[0m\n" "$THRESHOLD"
