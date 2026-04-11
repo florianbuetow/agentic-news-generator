@@ -162,6 +162,9 @@ just help
 - `just analyze-transcripts` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
+#### Tools
+- `just find-files <video-id>` - Find all files for a video ID across all data directories
+
 #### Development
 - `just init` - Initialize development environment
 - `just run` - Run the main application
@@ -236,6 +239,38 @@ USE_YOUTUBE_METADATA=true               # Use video metadata in prompts (default
 **Disable Metadata Prompting:**
 ```bash
 USE_YOUTUBE_METADATA=false just transcribe
+```
+
+### Skipping Specific Files During Transcription
+
+Individual files can be excluded from transcription without deleting them by adding them to `config/filefilter.json`.
+
+**Format:**
+```json
+{
+  "data_downloads_audio_dir": [
+    "channel-name/video-id.mp3",
+    "channel-name/another-video.mp4"
+  ]
+}
+```
+
+The key must match a field name from `PathsConfig` (e.g. `data_downloads_audio_dir`). The values are paths **relative to that config directory**.
+
+**Steps to skip a file:**
+1. Find the file using its video ID: `just find-files <video-id>`
+2. Note the channel folder and filename from the audio directory path
+3. Add `<channel>/<filename>.wav` to `config/filefilter.json` under `data_downloads_audio_dir`
+4. Run `just transcribe` — the file will be skipped
+
+**Example — skip two files:**
+```json
+{
+  "data_downloads_audio_dir": [
+    "AI_Explained/dQw4w9WgXcQ.wav",
+    "Lex_Fridman/someVideoId.wav"
+  ]
+}
 ```
 
 ### Multi-Language Transcription Support

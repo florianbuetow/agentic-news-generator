@@ -108,6 +108,10 @@ help:
     @printf "  %-38s %s\n" "ai-review-shell-scripts" "Run AI-powered shell script reviewer"
     @printf "  %-38s %s\n" "ai-review-shell-scripts-nocache" "Run AI-powered shell script reviewer (no cache)"
     @echo ""
+    @printf "\033[0;33mTools:\033[0m\n"
+    @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
+    @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
+    @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
     @printf "  %-38s %s\n" "test-coverage" "Run unit tests with coverage report"
@@ -674,6 +678,22 @@ test-coverage: init
     @echo ""
     @printf "\033[0;32m✓ Coverage threshold met\033[0m\n"
     @echo "  HTML: reports/coverage/html/index.html"
+    @echo ""
+
+# Find all files for a video ID across all data directories
+find-files VIDEO_ID:
+    @echo ""
+    @printf "\033[0;34m=== Finding Files for Video ID: {{ VIDEO_ID }} ===\033[0m\n"
+    @echo ""
+    @bash scripts/find-files.sh {{ VIDEO_ID }}
+    @echo ""
+
+# List transcript files that are 100 bytes or smaller
+find-empty-transcripts:
+    @echo ""
+    @printf "\033[0;34m=== Finding Empty Transcripts (≤100 bytes) ===\033[0m\n"
+    @echo ""
+    @bash scripts/find-empty-transcripts.sh
     @echo ""
 
 # Run ALL validation checks (verbose)
