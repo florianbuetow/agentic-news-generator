@@ -577,6 +577,10 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Paths configuration validation failed: {error_messages}") from e
 
+    def get_paths_config(self) -> PathsConfig:
+        """Get the validated paths configuration model."""
+        return self._paths
+
     def get_topic_segmentation_config(self) -> TopicSegmentationConfig:
         """Get topic segmentation configuration.
 
