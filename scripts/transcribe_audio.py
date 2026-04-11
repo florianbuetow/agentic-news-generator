@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config  # noqa: E402
+from src.file_processing_filter import FileProcessingFilter  # noqa: E402
 from src.transcription.argument_helper import TranscriptionArgumentHelper  # noqa: E402
 from src.util.fs_util import FSUtil  # noqa: E402
 from src.util.whisper_languages import WhisperLanguages  # noqa: E402
@@ -290,6 +291,8 @@ def main() -> int:  # noqa: C901
         print(f"Error loading config: {e}", file=sys.stderr)
         return 1
 
+    file_filter = FileProcessingFilter(config)
+
     # Get paths from config
     audio_dir = project_root / config.getDataDownloadsAudioDir()
     transcripts_dir = project_root / config.getDataDownloadsTranscriptsDir()
@@ -339,14 +342,18 @@ def main() -> int:  # noqa: C901
             wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
             wav_files = [f for f in wav_files if not f.name.startswith("._")]
 
-            # Add files that need transcription (no existing transcript)
+            # Add files that need transcription (no existing transcript, not filtered)
             files_to_transcribe.extend(
                 (wav_file, channel_name, channel_transcripts_dir)
                 for wav_file in wav_files
                 if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+                and not file_filter.should_skip_file(str(wav_file), str(audio_dir))
             )
             pending_count_by_channel[channel_name] = sum(
-                1 for wav_file in wav_files if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+                1
+                for wav_file in wav_files
+                if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+                and not file_filter.should_skip_file(str(wav_file), str(audio_dir))
             )
 
     # Order channels by fewest pending files first
@@ -419,6 +426,10 @@ def main() -> int:  # noqa: C901
                 remaining = sum(1 for w in wav_files[i:] if not (channel_transcripts_dir / f"{w.stem}.txt").exists())
                 print(f"  ⛔ Transcription limited to {transcribed_for_channel}/{channel_limiter} files. Skipping {remaining} files.")
                 break
+
+            if file_filter.should_skip_file(str(wav_file), str(audio_dir)):
+                skipped_count += 1
+                continue
 
             # Check if this file needs transcription (for progress tracking)
             needs_transcription = not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()

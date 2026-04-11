@@ -221,6 +221,7 @@ config/config.yaml
 **/settings.local.json
 
 # Documentation files
+docs/superpowers/
 
 # Frontend / Nuxt.js
 frontend/newspaper/node_modules/
