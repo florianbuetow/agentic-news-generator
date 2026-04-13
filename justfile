@@ -355,6 +355,7 @@ status:
 
 # Show processing status of downloads
 stats:
+    @clear
     @echo ""
     @uv run scripts/status.py
     @echo ""
@@ -682,6 +683,14 @@ find-files VIDEO_ID:
     @printf "\033[0;34m=== Finding Files for Video ID: {{ VIDEO_ID }} ===\033[0m\n"
     @echo ""
     @bash scripts/find-files.sh {{ VIDEO_ID }}
+    @echo ""
+
+# Check if a downloaded video has an audible, non-quiet audio track
+check-audio-track CHANNEL VIDEO_ID:
+    @echo ""
+    @printf "\033[0;34m=== Checking Audio Track: {{ CHANNEL }}/{{ VIDEO_ID }} ===\033[0m\n"
+    @echo ""
+    @bash scripts/check-audio-track.sh {{ CHANNEL }} {{ VIDEO_ID }}
     @echo ""
 
 # List transcript files that are 100 bytes or smaller

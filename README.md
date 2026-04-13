@@ -38,12 +38,18 @@ agentic-news-generator/
 │   └── util/             # Utility modules
 │       └── fs_util.py    # File system utilities
 ├── scripts/                # Utility scripts
-│   ├── yt-downloader.sh   # YouTube video downloader
+│   ├── yt-downloader.sh   # YouTube video downloader (filters out <120s)
 │   ├── convert_to_audio.sh  # Video to audio converter
 │   ├── transcribe_audio.sh  # Audio transcription (MLX Whisper)
 │   ├── transcript-hallucination-detection.py  # Hallucination detection
 │   ├── create-hallucination-digest.py  # Digest report generator
-│   └── archive-videos.sh  # Archive processed videos
+│   ├── archive-videos.sh  # Archive processed videos
+│   ├── find-files.sh     # Locate every file for a video ID
+│   ├── check-audio-track.sh  # Probe a video for audio stream + volume
+│   ├── filter-short-videos.py  # Add short / no-audio files to filefilter.json
+│   ├── remove-filtered-files.py  # Delete filtered files and upstream copies
+│   ├── fetch-video-metadata.py  # Backfill missing info.json for an ID
+│   └── find-empty-transcripts.py  # List transcripts that failed silently
 ├── tests/                  # Test suite
 ├── prompts/                # LLM prompt templates
 ├── frontend/               # Frontend applications
@@ -164,6 +170,9 @@ just help
 
 #### Tools
 - `just find-files <video-id>` - Find all files for a video ID across all data directories
+- `just check-audio-track <channel> <video-id>` - Probe a downloaded video for audio stream presence + mean/max volume (flags `LOW_VOLUME` below `LOW_VOLUME_THRESHOLD_DB`, default `-40 dB`)
+- `uv run scripts/filter-short-videos.py [--write]` - Scan videos + audio dirs and add any file `<120s` (or any video with no audio stream) to `config/filefilter.json`
+- `uv run scripts/remove-filtered-files.py [--execute]` - Delete every file referenced by `filefilter.json` together with its upstream copies (video → audio → transcript pipeline)
 
 #### Development
 - `just init` - Initialize development environment
@@ -243,35 +252,57 @@ USE_YOUTUBE_METADATA=false just transcribe
 
 ### Skipping Specific Files During Transcription
 
-Individual files can be excluded from transcription without deleting them by adding them to `config/filefilter.json`.
+Individual videos can be excluded from transcription by adding them to `config/filefilter.json`. The filter is matched on the 11-character YouTube video ID, so a single entry skips every on-disk file for that video (mp4, wav, info.json, silence_map.json, AppleDouble sidecars, etc.).
 
 **Format:**
 ```json
 {
-  "data_downloads_audio_dir": [
-    "channel-name/video-id.mp3",
-    "channel-name/another-video.mp4"
-  ]
+    "data_downloads_audio_dir": [
+        "Anthropic/56kq0VTkU4k",
+        "Lex_Fridman/XW0QZmtbjvs"
+    ]
 }
 ```
 
-The key must match a field name from `PathsConfig` (e.g. `data_downloads_audio_dir`). The values are paths **relative to that config directory**.
+- The top-level key must be a pipeline dir field from `PathsConfig`: `data_downloads_videos_dir`, `data_downloads_audio_dir`, or `data_downloads_transcripts_dir`. An entry under a downstream key also blocks the upstream stages.
+- Each value is `<Channel>/<video_id>` — **no file extension, no filename**. The channel is the subdirectory under the pipeline dir, the video ID is the 11-char YouTube ID from `[...]` in the filename.
 
-**Steps to skip a file:**
-1. Find the file using its video ID: `just find-files <video-id>`
-2. Note the channel folder and filename from the audio directory path
-3. Add `<channel>/<filename>.wav` to `config/filefilter.json` under `data_downloads_audio_dir`
-4. Run `just transcribe` — the file will be skipped
+**Add entries manually:**
+1. `just find-files <video-id>` — confirm the channel and ID
+2. Append `"<Channel>/<video_id>"` to the relevant key in `config/filefilter.json`
+3. Run `just transcribe` — matching files are skipped
 
-**Example — skip two files:**
-```json
-{
-  "data_downloads_audio_dir": [
-    "AI_Explained/dQw4w9WgXcQ.wav",
-    "Lex_Fridman/someVideoId.wav"
-  ]
-}
+**Add entries automatically (short + no-audio sweep):**
+```bash
+# Scan every channel for files <120s OR videos with no audio stream
+uv run scripts/filter-short-videos.py              # dry run
+uv run scripts/filter-short-videos.py --write      # update filefilter.json
+
+# Optional: run for one channel only
+uv run scripts/filter-short-videos.py --channel Anthropic --write
+
+# Optional: change the threshold
+uv run scripts/filter-short-videos.py --max-duration 60 --write
 ```
+The scan walks `data_downloads_videos_dir/<channel>/` **and** `data_downloads_audio_dir/<channel>/` so orphan wav files without a matching video are also caught. For each video it runs `ffprobe` to verify an audio stream is present; videos without audio are added regardless of duration.
+
+**Delete already-filtered files from disk (with upstream cleanup):**
+```bash
+uv run scripts/remove-filtered-files.py            # dry run — shows what would be removed
+uv run scripts/remove-filtered-files.py --execute  # actually unlink
+```
+This resolves every entry in `filefilter.json` to concrete paths and removes them together with their upstream copies. The pipeline order is `videos → audio → transcripts`, so an entry under `data_downloads_audio_dir` also removes the video file; an entry under `data_downloads_transcripts_dir` removes audio and video too. Matching is lexical on the `[<video_id>]` substring, so every sibling file (`.info.json`, `.silence_map.json`, `._*` sidecars) is swept up automatically.
+
+**Probe a single video for audio health:**
+```bash
+just check-audio-track <Channel> <video-id>
+# Statuses: HAS_AUDIO | LOW_VOLUME | NO_AUDIO_STREAM | EMPTY_AUDIO_STREAM | NOT_FOUND | AMBIGUOUS
+# Tune the low-volume threshold (default -40 dB):
+LOW_VOLUME_THRESHOLD_DB=-45 just check-audio-track Anthropic 56kq0VTkU4k
+```
+
+**Preventing future short-video downloads:**
+`scripts/yt-downloader.sh` passes `--match-filter "duration >= 120"` to `yt-dlp`, so YouTube Shorts and sub-120s clips are rejected at download time and never enter the pipeline.
 
 ### Multi-Language Transcription Support
 

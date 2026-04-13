@@ -51,7 +51,8 @@ yt-dlp --cookies-from-browser $BROWSER \
        --ignore-errors \
        --lazy-playlist \
        --match-filter "availability=public" \
-       --match-filters "!is_live" \
+       --match-filter "!is_live" \
+       --match-filter "duration >= 120" \
        --playlist-items 1-$MAX_DOWNLOADS \
        --min-sleep-interval 1 \
        --max-sleep-interval 5 \
