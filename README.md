@@ -637,6 +637,49 @@ If you need to use a different browser (Firefox, Safari, Edge, etc.), you can ov
 - If using a browser profile, cookies must be accessible from the default profile
 - On macOS, you may need to grant Terminal access to the browser's data in System Preferences → Security & Privacy
 
+### Missing Metadata Files (info.json)
+
+The transcription pipeline requires a `.info.json` metadata file for every audio file it processes. These files are normally downloaded by `yt-dlp` alongside the video and then moved into `data/downloads/metadata/<channel>/video/` by `scripts/move-metadata.sh`. If metadata is missing for a file, transcription fails with:
+
+```
+🚨 ERROR: Metadata file not found: <path>/<title> [<video_id>].info.json
+```
+
+**Diagnose which files are affected:**
+
+```bash
+# Scan a channel's audio directory and report any WAV files that have no matching info.json
+audio_dir="data/downloads/audio/<channel>"
+meta_dir="data/downloads/metadata/<channel>/video"
+for wav in "$audio_dir"/*.wav; do
+    base=$(basename "$wav" .wav)
+    [ -f "$meta_dir/$base.info.json" ] || echo "MISSING: $base"
+done
+```
+
+**Re-fetch missing metadata:**
+
+Use the `fetch-video-metadata` helper to download `.info.json` for one or more video IDs without re-downloading the video itself. The helper preserves the existing audio file stem so the transcription pipeline can find the metadata.
+
+```bash
+just fetch-video-metadata <channel_name> <video_id> [<video_id> ...]
+```
+
+Example:
+```bash
+just fetch-video-metadata Y_Combinator DOez-RwJ7mg lJausFj_Dto
+```
+
+The helper:
+- Reads all paths (audio dir, metadata dir, video subdir) from `config.yaml`
+- Looks up the existing WAV file stem in `data/downloads/audio/<channel>/` for each video ID
+- Writes `<stem>.info.json` to `data/downloads/metadata/<channel>/video/`
+- Fails fast on any video ID it cannot resolve to an existing WAV file
+
+Underlying scripts:
+- `scripts/fetch-video-metadata.py` — CLI wrapper that resolves paths and stems from config
+- `scripts/fetch-video-metadata.sh` — runs `yt-dlp --skip-download --write-info-json` with browser cookies (sources `scripts/config.sh`)
+
 ## Development
 
 ### Development Guidelines

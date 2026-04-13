@@ -110,6 +110,7 @@ help:
     @echo ""
     @printf "\033[0;33mTools:\033[0m\n"
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
+    @printf "  %-38s %s\n" "fetch-video-metadata <channel> <id...>" "Fetch missing .info.json for video IDs"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
@@ -665,6 +666,14 @@ test-coverage: init
     @echo ""
     @printf "\033[0;32m✓ Coverage threshold met\033[0m\n"
     @echo "  HTML: reports/coverage/html/index.html"
+    @echo ""
+
+# Fetch missing .info.json metadata for specific video IDs into the channel metadata dir
+fetch-video-metadata CHANNEL +VIDEO_IDS:
+    @echo ""
+    @printf "\033[0;34m=== Fetching Video Metadata ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/fetch-video-metadata.py {{ CHANNEL }} {{ VIDEO_IDS }}
     @echo ""
 
 # Find all files for a video ID across all data directories

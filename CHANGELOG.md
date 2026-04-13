@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Per-channel transcription limiter and video file cleaner script
+- FileProcessingFilter class for config-aware file skipping
+- `find-files` tool to locate video files across data directories
+- `find-empty-transcripts` script to list near-empty transcript files
+- Process channels with fewer pending files first during transcription
+- Pending file count per channel shown in transcription output
+- Abort audio extraction when target device has less than 2 GB free
+- Human-readable formatting for silence duration in extract-audio output
+- Inline change deltas from the previous run in pipeline stats display
+- Accurate processing count in convert-to-audio (excludes already-done files)
+- Dark grey dashes to represent zeros in stats display for visual clarity
 - File progress counter for audio extraction and video integrity checking
 - YouTube video download pipeline with configurable channels and format options
 - Configuration system with YAML loading, validation, and template support
@@ -31,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rewrote FileProcessingFilter to use video ID matching and made transcription fail fast on missing metadata
+- Ordered channels globally by pending count instead of per-language group during transcription
 - Rewrote video integrity checker from bash to Python with result caching
 - Replaced bash transcription orchestrator with Python implementation
 - Replaced simplified SRT timestamp format with plain text output
@@ -44,6 +57,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Skip empty transcripts produced by speechless videos
+- `yt-downloader` now uses `--merge-output-format mp4` to avoid format selection issues
+- `convert-to-audio` exits non-zero when a video has no audio stream
+- Increased minimum silence duration to 2 seconds in extract-audio
+- Upgraded litellm to 1.83.0 for security and correctness fixes
 - Filtered out near-zero duration speech segments during audio extraction
 - Escaped single quotes in ffmpeg concat file paths
 - Extracted speech segments individually to avoid aselect memory errors
