@@ -342,6 +342,29 @@ class LLMTopicLabeler:
             {"role": "user", "content": _LLM_TOPIC_LABEL_USER_PROMPT.format(text=text)},
         ]
 
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "topic_label",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["summary", "about", "topic_labels"],
+                    "properties": {
+                        "summary": {"type": "string"},
+                        "about": {"type": "string"},
+                        "topic_labels": {
+                            "type": "array",
+                            "minItems": 2,
+                            "maxItems": 5,
+                            "items": {"type": "string"},
+                        },
+                    },
+                },
+            },
+        }
+
         try:
             response = litellm.completion(
                 model=self._llm.model,
@@ -350,6 +373,7 @@ class LLMTopicLabeler:
                 api_key=self._llm.api_key,
                 max_tokens=self._llm.max_tokens,
                 temperature=self._llm.temperature,
+                response_format=response_format,
             )
         except BadRequestError as e:
             error_msg = str(e)
@@ -390,7 +414,7 @@ class LLMTopicLabeler:
             raise ValueError(f"No JSON content after cleaning response. Raw (first 500 chars): {response_text[:500]}")
 
         try:
-            data = json.loads(cleaned)
+            data = json.loads(cleaned, strict=False)
         except json.JSONDecodeError as e:
             raise ValueError(f"Failed to parse LLM response as JSON: {e}. Response: {response_text[:500]}") from e
 

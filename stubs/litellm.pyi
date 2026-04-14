@@ -1,5 +1,7 @@
 """Type stubs for litellm library."""
 
+from collections.abc import Mapping
+
 class ModelResponse:
     """Response from LLM completion."""
 
@@ -24,6 +26,7 @@ def completion(
     max_tokens: int,
     timeout: int | None = None,
     stream: bool | None = None,
+    response_format: Mapping[str, object] | None = None,
 ) -> ModelResponse: ...
 
 class EmbeddingData:
