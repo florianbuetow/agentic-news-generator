@@ -364,16 +364,12 @@ def main() -> int:
         return 1
 
     embedding_generator = EmbeddingGeneratorFactory.create(td_config.embedding)
-    try:
-        matcher = build_taxonomy_matcher(
-            data_dir=data_dir,
-            taxonomy_cfg=taxonomy_cfg,
-            embedding_model=td_config.embedding.model_name,
-            embedding_generator=embedding_generator,
-        )
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+    matcher = build_taxonomy_matcher(
+        data_dir=data_dir,
+        taxonomy_cfg=taxonomy_cfg,
+        embedding_model=td_config.embedding.model_name,
+        embedding_generator=embedding_generator,
+    )
 
     tfidf_extractor = TFIDFKeyphraseExtractor(config=keyphrases_cfg.tfidf)
     yake_extractor = YAKEKeyphraseExtractor(config=keyphrases_cfg.yake)
@@ -382,56 +378,59 @@ def main() -> int:
     llm_label_cfg = td_config.llm_label
     llm_labeler = LLMTopicLabeler(config=llm_label_cfg) if llm_label_cfg.enabled else None
 
-    print(f"Found {len(srt_files)} SRT file(s)")
-    print(f"Output directory: {output_dir}")
-    print()
-
-    succeeded = 0
-    skipped = 0
-    failed = 0
-
+    to_process: list[tuple[Path, Path, Path]] = []
+    already_done: list[Path] = []
     for srt_path in srt_files:
         relative_path = srt_path.relative_to(base_dir)
         output_subdir = output_dir / relative_path.parent
         output_filename = relative_path.stem + "_topic_tree.json"
         output_path = output_subdir / output_filename
-
         if output_path.exists() and not args.force:
-            print(f"Skipping: {relative_path} (_topic_tree.json already exists)")
-            skipped += 1
-            continue
+            already_done.append(relative_path)
+        else:
+            to_process.append((srt_path, output_subdir, output_path))
 
-        print(f"Processing: {relative_path}")
+    total_files = len(srt_files)
+    total_to_process = len(to_process)
+    total_skipped = len(already_done)
 
-        try:
-            output = build_tree_output(
-                srt_path=srt_path,
-                data_dir=data_dir,
-                seg_cfg=seg_cfg,
-                taxonomy_cfg=taxonomy_cfg,
-                keyphrases_cfg=keyphrases_cfg,
-                embedding_generator=embedding_generator,
-                embedding_model=td_config.embedding.model_name,
-                matcher=matcher,
-                tfidf_extractor=tfidf_extractor,
-                yake_extractor=yake_extractor,
-                keybert_extractor=keybert_extractor,
-                llm_labeler=llm_labeler,
-            )
-            output_subdir.mkdir(parents=True, exist_ok=True)
-            with open(output_path, "w", encoding="utf-8") as f:
-                json.dump(output.model_dump(), f, indent=2, ensure_ascii=False)
+    print(f"Found {total_files} SRT file(s): {total_to_process} to process, {total_skipped} already done")
+    print(f"Output directory: {output_dir}")
+    print()
 
-            print(f"  → {output.total_nodes} nodes → {output_path}")
-            succeeded += 1
-        except Exception as e:
-            print(f"  Error: {e}", file=sys.stderr)
-            failed += 1
+    succeeded = 0
+    total_nodes = 0
+
+    for i, (srt_path, output_subdir, output_path) in enumerate(to_process, start=1):
+        relative_path = srt_path.relative_to(base_dir)
+        print(f"[{i}/{total_to_process}] Processing: {relative_path}")
+
+        output = build_tree_output(
+            srt_path=srt_path,
+            data_dir=data_dir,
+            seg_cfg=seg_cfg,
+            taxonomy_cfg=taxonomy_cfg,
+            keyphrases_cfg=keyphrases_cfg,
+            embedding_generator=embedding_generator,
+            embedding_model=td_config.embedding.model_name,
+            matcher=matcher,
+            tfidf_extractor=tfidf_extractor,
+            yake_extractor=yake_extractor,
+            keybert_extractor=keybert_extractor,
+            llm_labeler=llm_labeler,
+        )
+        output_subdir.mkdir(parents=True, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(output.model_dump(), f, indent=2, ensure_ascii=False)
+
+        succeeded += 1
+        total_nodes += output.total_nodes
+        print(f"  → {output.total_nodes} nodes (running total: {total_nodes}) → {output_path}")
         print()
 
     print("=" * 50)
-    print(f"Completed: {succeeded} succeeded, {skipped} skipped, {failed} failed")
-    return 1 if failed > 0 else 0
+    print(f"Completed: {succeeded}/{total_to_process} files processed, {total_nodes} nodes total, {total_skipped} skipped")
+    return 0
 
 
 if __name__ == "__main__":
