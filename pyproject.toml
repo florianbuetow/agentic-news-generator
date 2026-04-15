@@ -17,6 +17,7 @@ dependencies = [
     "python-frontmatter>=1.0.0",
     "python-multipart>=0.0.22",
     "pyyaml>=6.0",
+    "requests>=2.25.0",
     "scikit-learn>=1.3.0",
     "seaborn>=0.13.0",
     "srt>=3.5.0",
@@ -47,6 +48,7 @@ dev = [
     "mypy>=1.7.0",
     "pyright>=1.1.0",
     "types-PyYAML>=6.0",
+    "types-requests>=2.31.0",
 
     # Security & Quality
     "bandit[toml]>=1.7.8",
@@ -59,7 +61,6 @@ dev = [
     # AI Test Detector
     "autogen-ext[openai]>=0.7.5",
     "autogen-agentchat>=0.7.5",
-    "requests>=2.25.0",
 
     # Git Hooks
     "pre-commit>=3.6.0",

@@ -88,6 +88,21 @@ transcription:
   # Output verbosity
   verbose: false  # Set to true for detailed output
 
+# Experimental LLM topic segmentation (scripts/topics-experiment.py)
+topics_experiment:
+  api_base: http://127.0.0.1:1234/v1
+  models_endpoint: http://127.0.0.1:1234/api/v0/models
+  api_key: lm-studio
+  models_http_timeout: 10.0
+  output_subdir: topics-experiment
+  temperature: 0.3
+  max_output_tokens: 32768
+  token_safety_factor: 1.1
+  prompt_overhead_tokens: 500
+  prefer_loaded: true
+  max_retries: 3
+  retry_delay: 2.0
+
 # Topic Segmentation Agent Configuration
 topic_segmentation:
   # Segmentation Agent LLM - using LM Studio

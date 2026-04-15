@@ -59,7 +59,7 @@ help:
     @printf "\033[0;33mRun & Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "run" "Run the main application"
     @printf "  %-38s %s\n" "all" "Run the complete pipeline"
-    @printf "  %-38s %s\n" "all-ingestion" "Run pipeline without topic detection"
+    @printf "  %-38s %s\n" "ingestion-all" "Run pipeline without topic detection"
     @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @printf "  %-38s %s\n" "stats" "Show processing status of downloads"
@@ -82,6 +82,9 @@ help:
     @printf "  %-38s %s\n" "topics-extract" "Extract topics from segments using LLM (Step 3)"
     @printf "  %-38s %s\n" "topics-visualize" "Generate visualizations from embeddings (Step 4)"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
+    @echo ""
+    @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
+    @printf "  %-38s %s\n" "topics-experiment" "Experimental topic extraction from de-hallucinated SRTs"
     @echo ""
     @printf "\033[0;33mNewspaper & Frontend:\033[0m\n"
     @printf "  %-38s %s\n" "notebooks" "Launch Jupyter notebook server"
@@ -195,7 +198,7 @@ all:
     @just topics-all
 
 # Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
-all-ingestion:
+ingestion-all:
     @just ci-quiet
     -@just download-videos
     @just check-video-integrity
@@ -331,6 +334,19 @@ topics-visualize:
     @printf "\033[0;34m=== Generating Embedding Visualizations ===\033[0m\n"
     @uv run python scripts/visualize-embeddings.py
     @echo ""
+
+# Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
+topics-experiment:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Running Topics Experiment (standalone) ===\033[0m\n"
+    if ! uv run python -u scripts/topics-experiment.py; then
+        printf "\033[0;31m✗ topics-experiment failed\033[0m\n"
+        exit 1
+    fi
+    printf "\033[0;32m✓ topics-experiment completed successfully\033[0m\n"
+    echo ""
 
 # Export topic segments to mini-rag format (.txt + .json pairs). Requires: --export-dir <path> [--file <path>] [--force]
 export-to-minirag *ARGS:

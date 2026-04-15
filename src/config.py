@@ -286,6 +286,25 @@ class TopicDetectionLLMLabelConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class TopicsExperimentConfig(BaseModel):
+    """Configuration for the experimental LLM topic segmentation script."""
+
+    api_base: str = Field(..., description="LM Studio OpenAI-compatible base URL")
+    models_endpoint: str = Field(..., description="LM Studio native /api/v0/models endpoint URL")
+    api_key: str = Field(..., description="API key for LM Studio (any non-empty string)")
+    models_http_timeout: float = Field(..., gt=0, description="HTTP timeout in seconds for the models endpoint call")
+    output_subdir: str = Field(..., min_length=1, description="Sub-directory under data_output_dir for experiment JSON files")
+    temperature: float = Field(..., ge=0.0, description="Sampling temperature for segmentation calls")
+    max_output_tokens: int = Field(..., gt=0, description="Maximum tokens reserved for LLM response")
+    token_safety_factor: float = Field(..., ge=1.0, description="Multiplier applied to measured input tokens")
+    prompt_overhead_tokens: int = Field(..., ge=0, description="Extra tokens reserved for system prompt and wrapping")
+    prefer_loaded: bool = Field(..., description="Prefer models already loaded in LM Studio when selecting")
+    max_retries: int = Field(..., gt=0, description="Number of LLM retries on parse/validation errors")
+    retry_delay: float = Field(..., gt=0, description="Delay in seconds between retries")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class TopicDetectionConfig(BaseModel):
     """Complete topic detection configuration."""
 
@@ -406,6 +425,10 @@ class Config:
         # Validate topic_detection section if present
         if "topic_detection" in self._data:
             self._topic_detection = self._validate_topic_detection()
+
+        # Validate topics_experiment section if present
+        if "topics_experiment" in self._data:
+            self._topics_experiment = self._validate_topics_experiment()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -544,6 +567,18 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Transcription configuration validation failed: {error_messages}") from e
 
+    def _validate_topics_experiment(self) -> TopicsExperimentConfig:
+        """Validate topics_experiment configuration.
+
+        Raises:
+            ValueError: If topics_experiment configuration is invalid.
+        """
+        try:
+            return TopicsExperimentConfig.model_validate(self._data["topics_experiment"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Topics experiment configuration validation failed: {error_messages}") from e
+
     def _validate_topic_detection(self) -> TopicDetectionConfig:
         """Validate topic detection configuration.
 
@@ -594,6 +629,16 @@ class Config:
         if not hasattr(self, "_topic_segmentation"):
             raise KeyError("Missing required key 'topic_segmentation' in config file")
         return self._topic_segmentation
+
+    def get_topics_experiment_config(self) -> TopicsExperimentConfig:
+        """Get topics_experiment configuration.
+
+        Raises:
+            KeyError: If topics_experiment section is not configured.
+        """
+        if not hasattr(self, "_topics_experiment"):
+            raise KeyError("Missing required key 'topics_experiment' in config file")
+        return self._topics_experiment
 
     def get_topic_detection_config(self) -> TopicDetectionConfig:
         """Get topic detection configuration.
