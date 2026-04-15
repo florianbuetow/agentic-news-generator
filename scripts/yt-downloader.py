@@ -2,35 +2,12 @@
 """Python wrapper for yt-downloader.sh that reads channels from config.yaml."""
 
 import random
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-# Add src to path to import config module
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config
-
-
-def sanitize_channel_name(name: str) -> str:
-    """Sanitize channel name for use as a directory name.
-
-    Removes or replaces characters that are not safe for filesystem paths.
-
-    Args:
-        name: The channel name to sanitize.
-
-    Returns:
-        A sanitized version of the name safe for use in filesystem paths.
-    """
-    # Replace spaces and special characters with underscores
-    # Keep alphanumeric characters, hyphens, and underscores
-    sanitized = re.sub(r"[^\w\s-]", "", name)
-    sanitized = re.sub(r"[-\s]+", "_", sanitized)
-    # Remove leading/trailing underscores
-    sanitized = sanitized.strip("_")
-    return sanitized
+from src.config import Config
+from src.util.channel_name import sanitize_channel_name
 
 
 def main() -> None:
