@@ -16,6 +16,7 @@ class LMStudioModel:
     model_type: str
     state: str
     max_context_length: int
+    loaded_context_length: int | None
 
     @property
     def is_loaded(self) -> bool:
@@ -26,6 +27,20 @@ class LMStudioModel:
     def is_text_capable(self) -> bool:
         """True when the model can accept text chat completions (llm or vlm)."""
         return self.model_type in ("llm", "vlm")
+
+    @property
+    def effective_context_length(self) -> int:
+        """Runtime ctx for loaded models; architectural max otherwise.
+
+        LM Studio reports ``max_context_length`` as the model's architectural
+        ceiling, but a loaded model runs with the (often smaller)
+        ``loaded_context_length`` the user configured at load time. Requests
+        exceeding the loaded value fail at runtime, so selection and
+        per-file fit checks must use this.
+        """
+        if self.loaded_context_length is not None:
+            return self.loaded_context_length
+        return self.max_context_length
 
 
 def fetch_lmstudio_models(*, models_endpoint: str, timeout: float) -> list[LMStudioModel]:
@@ -42,11 +57,14 @@ def fetch_lmstudio_models(*, models_endpoint: str, timeout: float) -> list[LMStu
     models: list[LMStudioModel] = []
     for entry in data:
         try:
+            loaded_raw = entry.get("loaded_context_length")
+            loaded_ctx = int(loaded_raw) if loaded_raw is not None else None
             model = LMStudioModel(
                 model_id=str(entry["id"]),
                 model_type=str(entry["type"]),
                 state=str(entry["state"]),
                 max_context_length=int(entry["max_context_length"]),
+                loaded_context_length=loaded_ctx,
             )
         except KeyError as e:
             raise ValueError(f"Model entry missing required field {e}: {entry!r}") from e
@@ -71,15 +89,17 @@ def select_best_model(
     if required_tokens <= 0:
         raise ValueError(f"required_tokens must be > 0, got {required_tokens}")
 
-    candidates = [m for m in models if m.is_text_capable and m.max_context_length >= required_tokens]
+    candidates = [m for m in models if m.is_text_capable and m.effective_context_length >= required_tokens]
 
     if not candidates:
-        available = ", ".join(f"{m.model_id}({m.model_type},ctx={m.max_context_length})" for m in models)
+        available = ", ".join(
+            f"{m.model_id}({m.model_type},ctx={m.effective_context_length},max={m.max_context_length})" for m in models
+        )
         raise ValueError(f"No LM Studio model can hold required_tokens={required_tokens}. Available (need type in llm/vlm): {available}")
 
     def rank_key(m: LMStudioModel) -> tuple[int, int, str]:
         loaded_bonus = 0 if (prefer_loaded and m.is_loaded) else 1
-        return (loaded_bonus, -m.max_context_length, m.model_id)
+        return (loaded_bonus, -m.effective_context_length, m.model_id)
 
     candidates.sort(key=rank_key)
     return candidates[0]

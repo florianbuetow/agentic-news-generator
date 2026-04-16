@@ -168,6 +168,12 @@ def process_srt_file(
     return f"ok ({len(run_result.topics.topics)} topics, {run_result.attempts_made} attempt(s))"
 
 
+def count_file_tokens(*, path: Path, encoder: tiktoken.Encoding) -> int:
+    """Return the token count for the full text content of a file."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return len(encoder.encode(text, disallowed_special=()))
+
+
 def format_eta(seconds_remaining: float) -> str:
     r"""Format a remaining duration as ``\d+h\d+m`` (hours + minutes, floored)."""
     total_minutes = max(0, int(seconds_remaining // 60))
@@ -203,16 +209,19 @@ def main() -> int:
     print(f"Found {total_found} SRT file(s) across {len(config.get_channels())} channel(s).")
     print(f"Largest SRT: {collect.max_bytes_path.name} ({collect.max_bytes_size:,} bytes, {collect.max_bytes_tokens:,} tokens)")
 
-    required_tokens = compute_required_tokens(base_tokens=collect.max_bytes_tokens, cfg=experiment_cfg)
+    required_tokens_info = compute_required_tokens(base_tokens=collect.max_bytes_tokens, cfg=experiment_cfg)
     print(
-        f"Required context window: {required_tokens:,} tokens "
+        f"Required context window for largest file: {required_tokens_info:,} tokens "
         f"(safety {experiment_cfg.token_safety_factor}x + prompt {experiment_cfg.prompt_overhead_tokens} "
-        f"+ output {experiment_cfg.max_output_tokens})"
+        f"+ output {experiment_cfg.max_output_tokens}) — files exceeding 90% of selected ctx are skipped"
     )
 
     print("Querying LM Studio for available models...")
-    model = pick_model(cfg=experiment_cfg, required_tokens=required_tokens)
-    print(f"Selected model: {model.model_id} (type={model.model_type}, state={model.state}, ctx={model.max_context_length:,})")
+    model = pick_model(cfg=experiment_cfg, required_tokens=1)
+    print(
+        f"Selected model: {model.model_id} (type={model.model_type}, state={model.state}, "
+        f"ctx={model.effective_context_length:,}, arch_max={model.max_context_length:,})"
+    )
 
     options = SegmenterOptions(
         model=f"openai/{model.model_id}",
@@ -264,6 +273,15 @@ def main() -> int:
         prefix = format_progress(index=idx, total=total, eta_seconds=eta_seconds)
         rel = item.srt_path.relative_to(item.channel_dir)
         print(f"{prefix}  {item.channel.name}/{rel}")
+
+        file_tokens = count_file_tokens(path=item.srt_path, encoder=encoder)
+        ctx_threshold = int(model.effective_context_length * 0.9)
+        if file_tokens > ctx_threshold:
+            print(
+                f"          -> skip (oversized: {file_tokens:,} tokens > 90% of ctx "
+                f"{model.effective_context_length:,} = {ctx_threshold:,})"
+            )
+            continue
 
         status = process_srt_file(
             item=item,
