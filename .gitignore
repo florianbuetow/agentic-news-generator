@@ -219,6 +219,7 @@ __marimo__/
 
 # Project-specific configuration files
 config/config.yaml
+config/filefilter.json
 
 # Claude Code - exclude settings.local.json in all subdirectories
 **/settings.local.json

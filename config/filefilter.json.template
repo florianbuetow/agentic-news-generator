@@ -1,0 +1,6 @@
+{
+    "data_downloads_audio_dir": [
+        "ChannelName/VIDEO_ID",
+        "AnotherChannel/ANOTHER_VIDEO_ID"
+    ]
+}
