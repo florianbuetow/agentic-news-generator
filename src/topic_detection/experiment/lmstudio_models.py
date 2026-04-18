@@ -92,9 +92,7 @@ def select_best_model(
     candidates = [m for m in models if m.is_text_capable and m.effective_context_length >= required_tokens]
 
     if not candidates:
-        available = ", ".join(
-            f"{m.model_id}({m.model_type},ctx={m.effective_context_length},max={m.max_context_length})" for m in models
-        )
+        available = ", ".join(f"{m.model_id}({m.model_type},ctx={m.effective_context_length},max={m.max_context_length})" for m in models)
         raise ValueError(f"No LM Studio model can hold required_tokens={required_tokens}. Available (need type in llm/vlm): {available}")
 
     def rank_key(m: LMStudioModel) -> tuple[int, int, str]:

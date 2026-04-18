@@ -278,8 +278,7 @@ def main() -> int:
         ctx_threshold = int(model.effective_context_length * 0.9)
         if file_tokens > ctx_threshold:
             print(
-                f"          -> skip (oversized: {file_tokens:,} tokens > 90% of ctx "
-                f"{model.effective_context_length:,} = {ctx_threshold:,})"
+                f"          -> skip (oversized: {file_tokens:,} tokens > 90% of ctx {model.effective_context_length:,} = {ctx_threshold:,})"
             )
             continue
 
