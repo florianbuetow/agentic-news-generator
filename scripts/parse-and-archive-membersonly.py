@@ -277,13 +277,13 @@ def main() -> None:
     config_path = project_root / "config" / "config.yaml"
     download_log_path = Path("reports/video-download.log")
 
-    if not download_log_path.exists():
-        print(f"No download log found at {download_log_path}")
-        print("Nothing to do.")
-        return
-
     config = load_config(config_path)
     configure_root_logger(config.getDataLogsDir())
+
+    if not download_log_path.exists():
+        logger.info(f"No download log found at {download_log_path}")
+        logger.info("Nothing to do.")
+        return
 
     url_to_video_ids = parse_download_log(download_log_path)
 

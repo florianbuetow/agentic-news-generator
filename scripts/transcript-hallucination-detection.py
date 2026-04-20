@@ -307,7 +307,7 @@ Examples:
     srt_files = [f for f in srt_files if not f.name.startswith("._")]
 
     if not srt_files:
-        logger.error("No SRT files found in transcripts directory")
+        logger.error(f"No SRT files found in transcripts directory: {transcripts_dir}")
         return 1
 
     logger.info(f"Found {len(srt_files)} SRT file(s) to process")

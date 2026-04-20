@@ -194,7 +194,7 @@ def main() -> int:
     srt_files = [f for f in srt_files if not f.name.startswith("._")]
 
     if not srt_files:
-        logger.error("No SRT files found in transcripts directory")
+        logger.error(f"No SRT files found in transcripts directory: {transcripts_dir}")
         return 1
 
     logger.info(f"Phase 2: Processing {len(srt_files)} transcript file(s)")
