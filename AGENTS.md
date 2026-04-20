@@ -27,31 +27,6 @@
 - After **every change** to the code, the tests must be executed
 - Always verify the program runs correctly with `just run` after modifications
 
-## Jupyter Notebook Validation
-When modifying Jupyter notebook (.ipynb) files, validate changes using these methods:
-
-- **JSON structure validation**:
-  ```bash
-  uv run python -m json.tool notebook.ipynb > /dev/null && echo "Valid JSON" || echo "Invalid JSON"
-  ```
-
-- **Python syntax check** (without execution):
-  ```bash
-  uv run python -c "
-  import nbformat
-  nb = nbformat.read('notebook.ipynb', as_version=4)
-  for cell in nb.cells:
-      if cell.cell_type == 'code':
-          compile(cell.source or '', '<cell>', 'exec')
-  print('Valid Python syntax')
-  "
-  ```
-
-- **Full execution validation** (for runtime checks):
-  ```bash
-  jupyter nbconvert --execute --to notebook --inplace --allow-errors notebook.ipynb --ExecutePreprocessor.timeout=-1
-  ```
-
 ## Python Execution Rules
 - Python code must be executed **only** via `uv run ...`
   - Example: `uv run src/main.py`
@@ -72,10 +47,7 @@ When modifying Jupyter notebook (.ipynb) files, validate changes using these met
 - Prompt templates go in `prompts/`
 - **Input data**: `data/input/`
 - **Output data**: `data/output/`
-- **Temporary debug scripts**: `debug/`
-  - Create all temporary test and debugging scripts in `debug/` subfolder
-  - This makes it easy to identify and clean up scripts that are no longer needed
-  - Debug scripts should not be committed to version control
+- **Temporary debug scripts**: `debug/` (see `TROUBLESHOOTING.md` for usage guidelines)
 - **Never create Python files in the project root directory**
   - Wrong: `./test.py`, `./helper.py`
   - Correct: `./src/helper.py`, `./scripts/test.py`, `./debug/test_something.py`
@@ -110,4 +82,10 @@ When modifying Jupyter notebook (.ipynb) files, validate changes using these met
 - Use clear, descriptive filenames
 - Include metadata files alongside generated content when useful
 - Keep raw outputs separate from processed/refined outputs
+
+## Troubleshooting & Debugging
+- See `TROUBLESHOOTING.md` at project root for catalogue of diagnostic helper scripts in `scripts/` and `tools/`
+- Covers: finding files by video ID, detecting corrupt videos, empty transcripts, hallucination analysis, LM Studio status checks, AI-powered test/shell reviewers, and code quality diagnostics
+- Contains playbooks for common failure modes (empty transcripts, corrupt videos, LLM pipeline stalls)
+- Check there first before writing new debug scripts
 
