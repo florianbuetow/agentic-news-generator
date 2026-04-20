@@ -10,6 +10,9 @@ import time
 from pathlib import Path
 
 from src.config import Config
+from src.util.log_util import configure_root_logger, get_logger
+
+logger = get_logger(__name__)
 
 ALLOWED_EXTENSIONS = {"mp4", "mkv", "webm", "m4a", "mov", "m4v", "avi", "flv"}
 MIN_BITRATE_BPS = 1000
@@ -63,34 +66,32 @@ def _check_file(input_file: Path, timeout_cmd: str | None, channel_name: str, fi
     duration_str = _check_duration(input_file, timeout_cmd)
 
     if not duration_str or duration_str == "N/A":
-        return f"  🚨 CORRUPT (unreadable): {channel_name}/{input_file.name} [{file_size} bytes]"
+        return f"  CORRUPT (unreadable): {channel_name}/{input_file.name} [{file_size} bytes]"
 
     duration_match = re.match(r"^(\d+(?:\.\d+)?)$", duration_str)
     if not duration_match:
-        return f"  🚨 CORRUPT (invalid duration '{duration_str}'): {channel_name}/{input_file.name} [{file_size} bytes]"
+        return f"  CORRUPT (invalid duration '{duration_str}'): {channel_name}/{input_file.name} [{file_size} bytes]"
 
     duration = float(duration_match.group(1))
     if duration > MIN_DURATION_FOR_BITRATE_CHECK:
         bitrate = file_size / duration
         if bitrate < MIN_BITRATE_BPS:
-            return (
-                f"  🚨 CORRUPT (incomplete download): {channel_name}/{input_file.name} [{file_size}B / {duration:.1f}s = {bitrate:.0f} B/s]"
-            )
+            return f"  CORRUPT (incomplete download): {channel_name}/{input_file.name} [{file_size}B / {duration:.1f}s = {bitrate:.0f} B/s]"
 
     return None
 
 
 def _print_corrupt_files(corrupt_files: list[Path]) -> None:
-    """Print the list of corrupt files with video IDs if extractable."""
-    print()
-    print("Corrupt files:")
+    """Log the list of corrupt files with video IDs if extractable."""
+    logger.error("")
+    logger.error("Corrupt files:")
     for f in corrupt_files:
         match = re.search(r"\[([A-Za-z0-9_-]{11})\]\.[a-zA-Z0-9]+$", f.name)
         video_id = match.group(1) if match else None
         if video_id:
-            print(f"  {f} (video_id: {video_id})")
+            logger.error(f"  {f} (video_id: {video_id})")
         else:
-            print(f"  {f}")
+            logger.error(f"  {f}")
 
 
 class _Stats:
@@ -111,7 +112,7 @@ class _Stats:
         if elapsed >= CACHE_SAVE_INTERVAL_SECONDS:
             _save_cache(self._cache_file, self.new_cache)
             self._last_save = time.monotonic()
-            print(f"Updated {self._cache_file}, sleeping for {CACHE_SAVE_SLEEP_SECONDS} seconds...")
+            logger.info(f"Updated {self._cache_file}, sleeping for {CACHE_SAVE_SLEEP_SECONDS} seconds...")
             time.sleep(CACHE_SAVE_SLEEP_SECONDS)
 
 
@@ -127,7 +128,7 @@ def _process_channel(
     channel_corrupt = 0
     channel_checked = 0
 
-    print(f"Processing channel: {channel_name}")
+    logger.info(f"Processing channel: {channel_name}")
 
     files = sorted(
         f
@@ -149,7 +150,7 @@ def _process_channel(
         total_processed = stats.checked + stats.cached + 1
 
         if total_processed % PROGRESS_INTERVAL == 0:
-            print(
+            logger.info(
                 f"  ... processed {total_processed} files so far ({stats.cached} cached, {stats.checked} checked, {stats.corrupt} corrupt)"
             )
 
@@ -164,7 +165,7 @@ def _process_channel(
 
         error = _check_file(input_file, timeout_cmd, channel_name, file_size)
         if error:
-            print(error)
+            logger.error(error)
             stats.corrupt += 1
             channel_corrupt += 1
             stats.corrupt_files.append(input_file)
@@ -174,28 +175,30 @@ def _process_channel(
         stats.maybe_save()
 
     if channel_checked > 0 and channel_corrupt > 0:
-        print(f"  {channel_name}: {channel_corrupt} corrupt out of {channel_checked} files")
+        logger.error(f"  {channel_name}: {channel_corrupt} corrupt out of {channel_checked} files")
 
 
 def main() -> int:
     """Check all video files for corruption, using a cache to skip unchanged files."""
     if not shutil.which("ffprobe"):
-        print("🚨 ERROR: ffprobe is not installed (should come with ffmpeg)")
+        print("ERROR: ffprobe is not installed (should come with ffmpeg)", file=sys.stderr)
         return 1
 
     timeout_cmd = _detect_timeout_cmd()
 
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
+    configure_root_logger(config.getDataLogsDir())
+
     data_dir = config.getDataDir()
     videos_dir = config.getDataDownloadsVideosDir()
     cache_file = data_dir / "video_integrity_cache.json"
     cache = _load_cache(cache_file)
-    print(f"Loaded {len(cache)} entries from integrity cache")
+    logger.info(f"Loaded {len(cache)} entries from integrity cache")
 
-    print("Checking video file integrity")
-    print("==========================================")
-    print()
+    logger.info("Checking video file integrity")
+    logger.info("==========================================")
+    logger.info("")
 
     stats = _Stats(cache_file)
     channel_dirs = sorted(p for p in videos_dir.iterdir() if p.is_dir() and not p.name.startswith("."))
@@ -206,22 +209,20 @@ def main() -> int:
     _save_cache(cache_file, stats.new_cache)
 
     total_files = stats.checked + stats.cached
-    print()
-    print("==========================================")
-    print(f"Total files:   {total_files}")
-    print(f"Total cached:  {stats.cached} (unchanged since last check)")
-    print(f"Total checked: {stats.checked}")
-    print(f"Total corrupt: {stats.corrupt}")
-    print(f"Total clean:   {total_files - stats.corrupt}")
+    logger.info("")
+    logger.info("==========================================")
+    logger.info(f"Total files:   {total_files}")
+    logger.info(f"Total cached:  {stats.cached} (unchanged since last check)")
+    logger.info(f"Total checked: {stats.checked}")
+    logger.info(f"Total corrupt: {stats.corrupt}")
+    logger.info(f"Total clean:   {total_files - stats.corrupt}")
 
     if stats.corrupt > 0:
         _print_corrupt_files(stats.corrupt_files)
-        print()
-        print(f"\033[31m✗ check-video-integrity failed: {stats.corrupt} corrupt file(s) found\033[0m")
+        logger.error(f"check-video-integrity failed: {stats.corrupt} corrupt file(s) found")
         return 1
 
-    print()
-    print("\033[32m✓ check-video-integrity passed: all files OK\033[0m")
+    logger.info("check-video-integrity passed: all files OK")
     return 0
 
 

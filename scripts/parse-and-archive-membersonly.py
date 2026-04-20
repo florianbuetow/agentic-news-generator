@@ -16,6 +16,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from config import ChannelConfig, Config
+from src.util.log_util import configure_root_logger, get_logger
+
+logger = get_logger(__name__)
 
 
 def parse_channel_url(line: str) -> str | None:
@@ -169,7 +172,7 @@ def process_channel(channel: ChannelConfig, video_ids: list[str], videos_dir: Pa
 
     # Create directory if needed
     if not channel_dir.exists():
-        print(f"⚠ Creating directory: {channel_dir}")
+        logger.warning(f"Creating directory: {channel_dir}")
         channel_dir.mkdir(parents=True, exist_ok=True)
 
     # Load existing IDs and filter duplicates
@@ -179,15 +182,15 @@ def process_channel(channel: ChannelConfig, video_ids: list[str], videos_dir: Pa
 
     # Report and append
     if not new_video_ids:
-        print(f"✓ {sanitized_name}: All {len(video_ids)} video ID(s) already archived")
+        logger.info(f"{sanitized_name}: All {len(video_ids)} video ID(s) already archived")
         return 0, duplicate_count
 
     append_new_video_ids(archive_file, new_video_ids)
 
     if duplicate_count > 0:
-        print(f"✓ {sanitized_name}: Appended {len(new_video_ids)} new video ID(s) ({duplicate_count} already archived)")
+        logger.info(f"{sanitized_name}: Appended {len(new_video_ids)} new video ID(s) ({duplicate_count} already archived)")
     else:
-        print(f"✓ {sanitized_name}: Appended {len(new_video_ids)} video ID(s)")
+        logger.info(f"{sanitized_name}: Appended {len(new_video_ids)} video ID(s)")
 
     return len(new_video_ids), duplicate_count
 
@@ -239,7 +242,7 @@ def process_all_channels(
             total_archived += archived
             total_duplicates += duplicates
         except Exception as e:
-            print(f"✗ {channel.name}: Failed to process - {e}", file=sys.stderr)
+            logger.error(f"{channel.name}: Failed to process - {e}")
 
     return total_archived, total_duplicates, unknown_urls
 
@@ -254,18 +257,18 @@ def print_summary(total_archived: int, total_duplicates: int, unknown_urls: list
         total_videos: Total number of videos processed
     """
     if unknown_urls:
-        print()
+        logger.info("")
         for url, count in unknown_urls:
-            print(f"⚠ {url}: Channel not found in config (skipping {count} video(s))")
+            logger.warning(f"{url}: Channel not found in config (skipping {count} video(s))")
 
     total_skipped = sum(count for _, count in unknown_urls)
-    print()
+    logger.info("")
     if total_duplicates > 0:
-        print(f"Summary: {total_archived} new, {total_duplicates} already archived, {total_skipped} skipped")
+        logger.info(f"Summary: {total_archived} new, {total_duplicates} already archived, {total_skipped} skipped")
     else:
-        print(f"Summary: {total_archived}/{total_videos} video ID(s) successfully archived")
+        logger.info(f"Summary: {total_archived}/{total_videos} video ID(s) successfully archived")
         if total_skipped > 0:
-            print(f"         {total_skipped}/{total_videos} video ID(s) skipped (channel not in config)")
+            logger.info(f"         {total_skipped}/{total_videos} video ID(s) skipped (channel not in config)")
 
 
 def main() -> None:
@@ -280,14 +283,16 @@ def main() -> None:
         return
 
     config = load_config(config_path)
+    configure_root_logger(config.getDataLogsDir())
+
     url_to_video_ids = parse_download_log(download_log_path)
 
     if not url_to_video_ids:
-        print("No members-only videos found in download log.")
+        logger.info("No members-only videos found in download log.")
         return
 
     total_videos = sum(len(ids) for ids in url_to_video_ids.values())
-    print(f"Found {total_videos} members-only videos to archive")
+    logger.info(f"Found {total_videos} members-only videos to archive")
 
     url_to_channel = build_url_to_channel_map(config.get_channels())
     videos_dir = config.getDataDownloadsVideosDir()

@@ -15,6 +15,9 @@ from pathlib import Path
 from src.config import Config
 from src.nlp.language_detector import LanguageDetector
 from src.util.fs_util import FSUtil
+from src.util.log_util import configure_root_logger, get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -125,7 +128,7 @@ def analyze_file(txt_file: Path, detector: LanguageDetector, target_words: int =
     try:
         content = FSUtil.read_text_file(txt_file)
     except Exception as e:
-        print(f"  ⚠️  Warning: Could not read {txt_file.name}: {e}")
+        logger.warning(f"Could not read {txt_file.name}: {e}")
         return FileLanguageResult(filename=txt_file.name, languages=[], word_count=0)
 
     # Count total words
@@ -141,7 +144,7 @@ def analyze_file(txt_file: Path, detector: LanguageDetector, target_words: int =
     for chunk in chunks:
         lang_code = detector.detect_language(chunk)
         if lang_code == "??":
-            print(f"  ⚠️  Warning: No alphabetic words found in chunk from {txt_file.name}")
+            logger.warning(f"No alphabetic words found in chunk from {txt_file.name}")
         languages.append(lang_code if lang_code else "unknown")
 
     return FileLanguageResult(filename=txt_file.name, languages=languages, word_count=total_words)
@@ -232,14 +235,14 @@ def report_non_english_files(non_english_files: list[tuple[str, Path, FileLangua
     Args:
         non_english_files: List of (channel_name, file_path, result) tuples for non-English files.
     """
-    print()
-    print("⚠️  Non-English transcriptions detected:")
-    print()
+    logger.info("")
+    logger.warning("Non-English transcriptions detected:")
+    logger.info("")
     for channel_name, file_path, result in non_english_files:
         unique_langs = result.language_summary
-        print(f"  [{channel_name}] `[{unique_langs}]` {file_path}")
-    print()
-    print(f"Total non-English files: {len(non_english_files)}")
+        logger.warning(f"  [{channel_name}] [{unique_langs}] {file_path}")
+    logger.info("")
+    logger.warning(f"Total non-English files: {len(non_english_files)}")
 
 
 def main() -> int:
@@ -251,6 +254,7 @@ def main() -> int:
     # Load configuration
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
+    configure_root_logger(config.getDataLogsDir())
 
     # Get paths
     transcripts_dir = config.getDataDownloadsTranscriptsDir()
@@ -262,13 +266,13 @@ def main() -> int:
     try:
         detector = LanguageDetector(model_path=model_path)
     except FileNotFoundError as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         return 1
 
     # Check if transcripts directory exists
     if not transcripts_dir.exists():
-        print(f"Error: Transcripts directory not found: {transcripts_dir}")
-        print("Ensure transcripts have been downloaded.")
+        logger.error(f"Transcripts directory not found: {transcripts_dir}")
+        logger.error("Ensure transcripts have been downloaded.")
         return 1
 
     # Discover channels
@@ -277,11 +281,11 @@ def main() -> int:
     channel_dirs = sorted(channel_dirs, key=lambda d: d.name)
 
     if not channel_dirs:
-        print(f"No channel directories found in {transcripts_dir}")
+        logger.error(f"No channel directories found in {transcripts_dir}")
         return 1
 
-    print("Analyzing language distribution in transcripts...")
-    print()
+    logger.info("Analyzing language distribution in transcripts...")
+    logger.info("")
 
     total_files = 0
     total_channels = len(channel_dirs)
@@ -290,15 +294,15 @@ def main() -> int:
     # Process each channel
     for channel_dir in channel_dirs:
         channel_name = channel_dir.name
-        print(f"Processing channel: {channel_name}")
+        logger.info(f"Processing channel: {channel_name}")
 
         # Find all .txt files
         txt_files = FSUtil.find_files_by_extension(channel_dir, ".txt", recursive=True)
         txt_files = [f for f in txt_files if not f.name.startswith("._")]
 
         if not txt_files:
-            print("  No .txt files found")
-            print()
+            logger.info("  No .txt files found")
+            logger.info("")
             continue
 
         # Analyze each file
@@ -314,7 +318,7 @@ def main() -> int:
             # Display progress
             lang_display = f"[{result.language_summary}]"
             chunk_count = len(result.languages)
-            print(f"  - {txt_file.name}: {chunk_count} chunks analyzed {lang_display}")
+            logger.info(f"  - {txt_file.name}: {chunk_count} chunks analyzed {lang_display}")
 
         total_files += len(txt_files)
 
@@ -330,10 +334,10 @@ def main() -> int:
             display_path = report_file.relative_to(Path.cwd())
         except ValueError:
             display_path = report_file
-        print(f"✅ Report saved: {display_path}")
-        print()
+        logger.info(f"Report saved: {display_path}")
+        logger.info("")
 
-    print(f"✅ Analysis complete: {total_files} files analyzed across {total_channels} channels")
+    logger.info(f"Analysis complete: {total_files} files analyzed across {total_channels} channels")
 
     # Report non-English files and exit with error if any found
     if non_english_files_global:

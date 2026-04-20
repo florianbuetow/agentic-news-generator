@@ -1,12 +1,12 @@
 """Compiler for transforming parsed articles into output format."""
 
-import logging
 from typing import Any
 
 from src.config import ArticleCompilerConfig
 from src.models.article import HeroArticle, MarkdownArticle, SecondaryMain
+from src.util.log_util import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ArticleCompiler:

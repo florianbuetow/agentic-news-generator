@@ -31,7 +31,10 @@ from src.config import Config  # noqa: E402
 from src.file_processing_filter import FileProcessingFilter  # noqa: E402
 from src.transcription.argument_helper import TranscriptionArgumentHelper  # noqa: E402
 from src.util.fs_util import FSUtil  # noqa: E402
+from src.util.log_util import configure_root_logger, get_logger  # noqa: E402
 from src.util.whisper_languages import WhisperLanguages  # noqa: E402
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -179,18 +182,18 @@ def process_single_wav_file(  # noqa: C901
 
     # Reject empty/corrupt wav files
     if wav_file.stat().st_size == 0:
-        print(f"    🚨 ERROR: Empty wav file: {wav_file}")
+        logger.error(f"Empty wav file: {wav_file}")
         return (False, 0)
 
     # Skip if transcript already exists (idempotent)
     if (channel_transcripts_dir / f"{base_name}.txt").exists():
         if verbose:
-            print(f"    ⏭️  Skipping: {base_name}.wav (transcript already exists)")
+            logger.debug(f"Skipping: {base_name}.wav (transcript already exists)")
         return (True, 0)
 
     # Build progress prefix if tracker provided
     progress_str = f" {progress.get_progress_prefix()}" if progress else ""
-    print(f"    🎙️ {progress_str} Transcribing: {base_name}.wav")
+    logger.info(f"   {progress_str} Transcribing: {base_name}.wav")
 
     # Build initial prompt from metadata
     initial_prompt = ""
@@ -198,7 +201,7 @@ def process_single_wav_file(  # noqa: C901
         metadata_file = metadata_dir / channel_name / metadata_video_subdir / f"{base_name}.info.json"
 
         if verbose:
-            print(f"      🔍 Looking for metadata: {metadata_file}")
+            logger.debug(f"Looking for metadata: {metadata_file}")
 
         if metadata_file.exists():
             try:
@@ -207,14 +210,14 @@ def process_single_wav_file(  # noqa: C901
 
                 duration = metadata.get("duration")
                 if duration is not None and duration < min_duration:
-                    print(f"    ⏭️  Skipping: {base_name}.wav (duration {duration}s < {min_duration}s minimum)")
+                    logger.info(f"Skipping: {base_name}.wav (duration {duration}s < {min_duration}s minimum)")
                     return (True, 0)
 
                 title = metadata.get("title", "")
                 description = metadata.get("description", "")[:description_max_length]
 
                 if verbose:
-                    print(f"      ✅ Metadata found - Title: {title[:50]}...")
+                    logger.debug(f"Metadata found - Title: {title[:50]}...")
 
                 if title:
                     initial_prompt = TranscriptionArgumentHelper.build_prompt(
@@ -224,9 +227,9 @@ def process_single_wav_file(  # noqa: C901
                         description=description,
                     )
             except (json.JSONDecodeError, KeyError) as e:
-                print(f"      ⚠️  Warning: Failed to parse metadata: {e}", file=sys.stderr)
+                logger.warning(f"Failed to parse metadata: {e}")
         else:
-            print(f"      🚨 ERROR: Metadata file not found: {metadata_file}")
+            logger.error(f"Metadata file not found: {metadata_file}")
             return (False, 0)
 
     # Create temp output directory
@@ -250,7 +253,7 @@ def process_single_wav_file(  # noqa: C901
             # Check if whisper produced actual content (not just empty files)
             srt_file = next(temp_output_dir.glob("*.srt"), None)
             if srt_file and srt_file.stat().st_size == 0:
-                print(f"      ⏭️  Skipping: {base_name}.wav (no speech detected - empty transcript)")
+                logger.info(f"Skipping: {base_name}.wav (no speech detected - empty transcript)")
                 if empty_transcript_log:
                     with open(empty_transcript_log, "a", encoding="utf-8") as log:
                         log.write(f"{channel_name}/{base_name}.wav\n")
@@ -265,14 +268,14 @@ def process_single_wav_file(  # noqa: C901
                     moved += 1
 
             if moved > 0:
-                print(f"      ✅ Success: {base_name}")
+                logger.info(f"Success: {base_name}")
                 time.sleep(sleep_between_files)
                 return (True, moved)
             else:
-                print(f"      ❌ Failed: No transcript generated for {base_name}.wav")
+                logger.error(f"Failed: No transcript generated for {base_name}.wav")
                 return (False, 0)
         else:
-            print(f"      ❌ Failed to transcribe {base_name}.wav")
+            logger.error(f"Failed to transcribe {base_name}.wav")
             return (False, 0)
 
     finally:
@@ -307,6 +310,7 @@ def main() -> int:  # noqa: C901
     metadata_dir = project_root / config.getDataDownloadsMetadataDir()
     logs_dir = Path(config.getDataLogsDir())
     FSUtil.ensure_directory_exists(logs_dir)
+    configure_root_logger(logs_dir)
     empty_transcript_log = logs_dir / "empty_transcripts.log"
 
     # Get transcription settings from config
@@ -376,16 +380,15 @@ def main() -> int:  # noqa: C901
     # Create progress tracker
     progress = ProgressTracker(total_files=len(files_to_transcribe))
 
-    # Print header
-    print("Starting batch transcription with language grouping")
-    print(f"English model: {config.getTranscriptionModelEnName()} ({model_en_repo})")
-    print(f"Multilingual model: {config.getTranscriptionModelMultiName()} ({model_multi_repo})")
-    print(f"Hallucination silence threshold: {hallucination_silence_threshold}s")
-    print(f"Compression ratio threshold: {compression_ratio_threshold}")
-    print(f"Use YouTube metadata: {use_youtube_metadata}")
-    print(f"Files to transcribe: {len(files_to_transcribe)}")
-    print("=" * 56)
-    print()
+    logger.info("Starting batch transcription with language grouping")
+    logger.info(f"English model: {config.getTranscriptionModelEnName()} ({model_en_repo})")
+    logger.info(f"Multilingual model: {config.getTranscriptionModelMultiName()} ({model_multi_repo})")
+    logger.info(f"Hallucination silence threshold: {hallucination_silence_threshold}s")
+    logger.info(f"Compression ratio threshold: {compression_ratio_threshold}")
+    logger.info(f"Use YouTube metadata: {use_youtube_metadata}")
+    logger.info(f"Files to transcribe: {len(files_to_transcribe)}")
+    logger.info("=" * 56)
+    logger.info("")
 
     # Start progress tracking
     progress.start()
@@ -399,7 +402,7 @@ def main() -> int:  # noqa: C901
         channel_audio_dir = audio_dir / channel_name
 
         if not channel_audio_dir.exists():
-            print(f"⚠️  Channel directory not found: {channel_audio_dir} (skipping)")
+            logger.warning(f"Channel directory not found: {channel_audio_dir} (skipping)")
             continue
 
         # Determine model and task for this channel's language
@@ -413,8 +416,8 @@ def main() -> int:  # noqa: C901
         language_name = supported_languages.get(lang, lang)
 
         pending = pending_count_by_channel.get(channel_name, 0)
-        print(f"  📁 Channel: {channel_name} ({pending} pending, lang={lang})")
-        print("  ---")
+        logger.info(f"Channel: {channel_name} ({pending} pending, lang={lang})")
+        logger.info("  ---")
 
         # Create transcripts directory for this channel
         channel_transcripts_dir = transcripts_dir / channel_name
@@ -433,7 +436,7 @@ def main() -> int:  # noqa: C901
         for i, wav_file in enumerate(wav_files):
             if transcribed_for_channel >= channel_limiter:
                 remaining = sum(1 for w in wav_files[i:] if not (channel_transcripts_dir / f"{w.stem}.txt").exists())
-                print(f"  ⛔ Transcription limited to {transcribed_for_channel}/{channel_limiter} files. Skipping {remaining} files.")
+                logger.info(f"Transcription limited to {transcribed_for_channel}/{channel_limiter} files. Skipping {remaining} files.")
                 break
 
             if file_filter.should_skip_file(str(wav_file), str(audio_dir)):
@@ -474,24 +477,22 @@ def main() -> int:  # noqa: C901
                 total_processed += 1
                 transcribed_for_channel += 1
             else:
-                print(f"\n  ✗ Aborting: transcription failed for {wav_file.name}")
+                logger.error(f"Aborting: transcription failed for {wav_file.name}")
                 return 1
 
-        # Print skip summary if any files were skipped
         if skipped_count > 0:
-            print(f"  ⏭️  Skipped {skipped_count} file(s) (transcript already exists)")
+            logger.info(f"Skipped {skipped_count} file(s) (transcript already exists)")
 
-        print()
+        logger.info("")
 
-    # Final summary with elapsed time
     total_elapsed = time.time() - progress.start_time
-    print()
-    print("=" * 56)
-    print("  Transcription Complete")
-    print("=" * 56)
-    print(f"  Processed: {total_processed}")
-    print(f"  Elapsed: {progress.format_duration(total_elapsed)}")
-    print()
+    logger.info("")
+    logger.info("=" * 56)
+    logger.info("  Transcription Complete")
+    logger.info("=" * 56)
+    logger.info(f"  Processed: {total_processed}")
+    logger.info(f"  Elapsed: {progress.format_duration(total_elapsed)}")
+    logger.info("")
 
     return 0
 

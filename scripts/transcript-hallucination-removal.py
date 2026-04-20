@@ -17,6 +17,9 @@ from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 from src.processing.srt_converter import srt_to_plain_text
 from src.util.fs_util import FSUtil
+from src.util.log_util import configure_root_logger, get_logger
+
+logger = get_logger(__name__)
 
 # Whitespace normalization pattern (same as RepetitionDetector)
 _WS = re.compile(r"\s+")
@@ -71,6 +74,7 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
         return 1
 
     config = Config(config_path)
+    configure_root_logger(config.getDataLogsDir())
 
     base_dir = Path(__file__).parent.parent
     data_dir = base_dir / config.getDataDir()
@@ -79,10 +83,10 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
     output_dir = base_dir / config.getDataDownloadsTranscriptsCleanedDir()
 
     if not transcripts_dir.exists():
-        print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
+        logger.error(f"Transcripts directory not found: {transcripts_dir}")
         return 1
     if not hallucinations_dir.exists():
-        print(f"Error: Hallucinations directory not found: {hallucinations_dir}", file=sys.stderr)
+        logger.error(f"Hallucinations directory not found: {hallucinations_dir}")
         return 1
 
     try:
@@ -92,12 +96,13 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
             config=config,
         )
     except KeyError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         return 1
 
-    print(f"Found transcripts directory: {transcripts_dir}")
-    print(f"Found hallucinations directory: {hallucinations_dir}")
-    print(f"Output directory: {output_dir}\n")
+    logger.info(f"Found transcripts directory: {transcripts_dir}")
+    logger.info(f"Found hallucinations directory: {hallucinations_dir}")
+    logger.info(f"Output directory: {output_dir}")
+    logger.info("")
 
     return config, data_dir, transcripts_dir, hallucinations_dir, output_dir, detector
 
@@ -125,38 +130,41 @@ def process_single_file(
     output_file = output_channel_dir / srt_file.name
 
     if lookup_key in hallucinations_lookup:
-        print(f"Processing: {relative_path}")
+        logger.info(f"Processing: {relative_path}")
         hallucinations = hallucinations_lookup[lookup_key]
         success = process_srt_with_hallucinations(srt_file, output_file, hallucinations, detector)
         if success:
-            print(f"  ✓ Cleaned {len(hallucinations)} hallucination(s)\n")
+            logger.info(f"  Cleaned {len(hallucinations)} hallucination(s)")
+            logger.info("")
             return "cleaned", True, None
         else:
-            print("  ✗ Failed to clean hallucinations\n")
+            logger.error("  Failed to clean hallucinations")
+            logger.info("")
             return "cleaned", False, "Failed to clean hallucinations"
     else:
         copy_srt_unchanged(srt_file, output_file)
         return "copied", True, None
 
 
-def print_summary(
+def log_summary(
     total_files: int,
     cleaned_files: int,
     copied_files: int,
     failed_files: list[tuple[str, str]],
 ) -> None:
-    """Print processing summary."""
-    print("\n" + "=" * 50)
-    print("Summary")
-    print("=" * 50)
-    print(f"Total files processed: {total_files}")
-    print(f"Files cleaned: {cleaned_files}")
-    print(f"Files copied unchanged: {copied_files}")
+    """Log processing summary."""
+    logger.info("")
+    logger.info("=" * 50)
+    logger.info("Summary")
+    logger.info("=" * 50)
+    logger.info(f"Total files processed: {total_files}")
+    logger.info(f"Files cleaned: {cleaned_files}")
+    logger.info(f"Files copied unchanged: {copied_files}")
 
     if failed_files:
-        print(f"\nFailed files ({len(failed_files)}):")
+        logger.error(f"Failed files ({len(failed_files)}):")
         for filename, error in failed_files:
-            print(f"  - {filename}: {error}")
+            logger.error(f"  - {filename}: {error}")
 
 
 def main() -> int:
@@ -174,22 +182,23 @@ def main() -> int:
     # Phase 1: Build hallucinations lookup
     hallucinations_lookup = build_hallucinations_lookup(hallucinations_dir, data_dir)
 
-    print(f"Phase 1: Found {len(hallucinations_lookup)} file(s) with hallucinations")
+    logger.info(f"Phase 1: Found {len(hallucinations_lookup)} file(s) with hallucinations")
     if hallucinations_lookup:
-        print("Files with hallucinations:")
+        logger.info("Files with hallucinations:")
         for key in sorted(hallucinations_lookup.keys()):
-            print(f"  - {key} ({len(hallucinations_lookup[key])} hallucination(s))")
-    print()
+            logger.info(f"  - {key} ({len(hallucinations_lookup[key])} hallucination(s))")
+    logger.info("")
 
     # Phase 2: Process transcripts
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
     srt_files = [f for f in srt_files if not f.name.startswith("._")]
 
     if not srt_files:
-        print("No SRT files found in transcripts directory", file=sys.stderr)
+        logger.error("No SRT files found in transcripts directory")
         return 1
 
-    print(f"Phase 2: Processing {len(srt_files)} transcript file(s)\n")
+    logger.info(f"Phase 2: Processing {len(srt_files)} transcript file(s)")
+    logger.info("")
 
     failed_files = []
     cleaned_files = 0
@@ -211,9 +220,10 @@ def main() -> int:
         except Exception as e:
             relative_path = srt_file.relative_to(data_dir)
             failed_files.append((str(relative_path), str(e)))
-            print(f"  ✗ Error: {e}\n")
+            logger.error(f"  Error: {e}")
+            logger.info("")
 
-    print_summary(len(srt_files), cleaned_files, copied_files, failed_files)
+    log_summary(len(srt_files), cleaned_files, copied_files, failed_files)
     return 1 if failed_files else 0
 
 
@@ -227,7 +237,7 @@ def build_hallucinations_lookup(hallucinations_dir: Path, data_dir: Path) -> dic
     Returns:
         Dictionary mapping source file paths (relative to data_dir) to lists of hallucination objects.
     """
-    hallucinations_lookup = defaultdict(list)
+    hallucinations_lookup: defaultdict[str, list[dict]] = defaultdict(list)
 
     # Find all JSON files in hallucinations directory
     json_files = FSUtil.find_files_by_extension(hallucinations_dir, ".json", recursive=True)
@@ -246,7 +256,7 @@ def build_hallucinations_lookup(hallucinations_dir: Path, data_dir: Path) -> dic
                     value = data["hallucinations_detected"]
                     hallucinations_lookup[key] = value
         except (json.JSONDecodeError, KeyError) as e:
-            print(f"Warning: Failed to parse {json_file}: {e}", file=sys.stderr)
+            logger.warning(f"Failed to parse {json_file}: {e}")
             continue
 
     return dict(hallucinations_lookup)
@@ -279,7 +289,7 @@ def process_srt_with_hallucinations(
         start_timestamp = hallucination["start_timestamp"]
         end_timestamp = hallucination["end_timestamp"]
 
-        print(f"    Cleaning hallucination {idx}/{len(hallucinations)} at {start_timestamp}—{end_timestamp}...")
+        logger.info(f"    Cleaning hallucination {idx}/{len(hallucinations)} at {start_timestamp}—{end_timestamp}...")
 
         # Convert to timedelta
         start_td = srt.srt_timestamp_to_timedelta(start_timestamp)
@@ -297,7 +307,7 @@ def process_srt_with_hallucinations(
 
         if not affected_indices:
             # No segments found in window (edge case)
-            print(f"    ⚠ Warning: No segments found in hallucination window {start_timestamp}—{end_timestamp}")
+            logger.warning(f"    No segments found in hallucination window {start_timestamp}—{end_timestamp}")
             continue
 
         # Clean the text
@@ -306,7 +316,7 @@ def process_srt_with_hallucinations(
         # Validate: Check hallucination exists BEFORE cleaning
         hallucinations_before = detector.detect_hallucinations(window_content)
         if not hallucinations_before:
-            print("    ⚠ Warning: No hallucination detected in window before cleaning (false positive?)")
+            logger.warning("    No hallucination detected in window before cleaning (false positive?)")
 
         # Get hallucination info for deterministic cleaning
         hallucination_pattern = hallucination.get("repetition_pattern", "")
@@ -319,11 +329,11 @@ def process_srt_with_hallucinations(
             # Validate: Check hallucination is GONE AFTER cleaning
             hallucinations_after = detector.detect_hallucinations(window_content_clean)
             if hallucinations_after:
-                print(f"    ⚠ Warning: Hallucination still detected after cleaning ({len(hallucinations_after)} pattern(s))")
+                logger.warning(f"    Hallucination still detected after cleaning ({len(hallucinations_after)} pattern(s))")
             else:
-                print("    ✓ Cleaned successfully (verified: no hallucinations detected)")
+                logger.info("    Cleaned successfully (verified: no hallucinations detected)")
         else:
-            print("    ⚠ Warning: Invalid hallucination data - skipping")
+            logger.warning("    Invalid hallucination data - skipping")
             continue
 
         # Replace text in affected segments

@@ -16,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 from src.util.fs_util import FSUtil
+from src.util.log_util import configure_root_logger, get_logger
+
+logger = get_logger(__name__)
 
 
 def timedelta_to_srt_timestamp(td: timedelta) -> str:
@@ -199,8 +202,8 @@ def process_srt_file(
         return (False, f"Unexpected error: {e}", 0)
 
 
-def print_file_result(filename: str, hallucination_count: int, example: dict[str, Any] | None = None) -> None:
-    """Print console output for a file.
+def log_file_result(filename: str, hallucination_count: int, example: dict[str, Any] | None = None) -> None:
+    """Log result for a file.
 
     Args:
         filename: Name of the SRT file.
@@ -208,16 +211,16 @@ def print_file_result(filename: str, hallucination_count: int, example: dict[str
         example: Example hallucination to display (if any).
     """
     if hallucination_count == 0:
-        print(f"✅ {filename}: No hallucinations detected")
+        logger.info(f"{filename}: No hallucinations detected")
     else:
-        print(f"🛑 {filename}: Found {hallucination_count} potential hallucination(s)")
+        logger.warning(f"{filename}: Found {hallucination_count} potential hallucination(s)")
 
         if example:
-            print(f"  Example at {example['start_timestamp']}:")
+            logger.warning(f"  Example at {example['start_timestamp']}:")
             preview = example["original_text"][:100]
             if len(example["original_text"]) > 100:
                 preview += "..."
-            print(f"  {preview}")
+            logger.warning(f"  {preview}")
 
 
 def main() -> int:  # noqa: C901
@@ -230,6 +233,8 @@ def main() -> int:  # noqa: C901
 
     # Load Config class for data_dir
     config = Config(config_path)
+    configure_root_logger(config.getDataLogsDir())
+
     data_dir = Path(__file__).parent.parent / config.getDataDir()
 
     # Load raw YAML to access hallucination_detection config
@@ -243,17 +248,11 @@ def main() -> int:  # noqa: C901
     config_output_dir = hallucination_config.get("output_dir")
 
     if config_min_window_size is None or config_overlap_percent is None:
-        print(
-            "Error: hallucination_detection.min_window_size and overlap_percent must be configured in config.yaml",
-            file=sys.stderr,
-        )
+        logger.error("hallucination_detection.min_window_size and overlap_percent must be configured in config.yaml")
         return 1
 
     if config_output_dir is None:
-        print(
-            "Error: hallucination_detection.output_dir must be configured in config.yaml",
-            file=sys.stderr,
-        )
+        logger.error("hallucination_detection.output_dir must be configured in config.yaml")
         return 1
 
     # Parse arguments (allow CLI overrides)
@@ -287,16 +286,16 @@ Examples:
 
     # Validate parameters
     if min_window_size < 1:
-        print("Error: min-window-size must be >= 1", file=sys.stderr)
+        logger.error("min-window-size must be >= 1")
         return 1
     if not 0 <= overlap_percent < 100:
-        print("Error: overlap-percent must be in [0, 100)", file=sys.stderr)
+        logger.error("overlap-percent must be in [0, 100)")
         return 1
 
     # Find all SRT files (using paths from config)
     transcripts_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsDir()
     if not transcripts_dir.exists():
-        print(f"Error: Transcripts directory not found: {transcripts_dir}", file=sys.stderr)
+        logger.error(f"Transcripts directory not found: {transcripts_dir}")
         return 1
 
     # Hallucination detection output directory from config
@@ -308,10 +307,11 @@ Examples:
     srt_files = [f for f in srt_files if not f.name.startswith("._")]
 
     if not srt_files:
-        print("No SRT files found in transcripts directory", file=sys.stderr)
+        logger.error("No SRT files found in transcripts directory")
         return 1
 
-    print(f"Found {len(srt_files)} SRT file(s) to process\n")
+    logger.info(f"Found {len(srt_files)} SRT file(s) to process")
+    logger.info("")
 
     # Initialize detector (SVM classifier decides what's a hallucination)
     detector = RepetitionDetector(
@@ -329,7 +329,7 @@ Examples:
     for srt_file in srt_files:
         # Display relative path for cleaner output
         relative_path = srt_file.relative_to(transcripts_dir)
-        print(f"Processing: {relative_path}")
+        logger.info(f"Processing: {relative_path}")
 
         success, error_msg, hallucination_count = process_srt_file(
             srt_file,
@@ -343,7 +343,7 @@ Examples:
         total_files += 1
 
         if not success:
-            print(f"  ❌ Failed: {error_msg}")
+            logger.error(f"  Failed: {error_msg}")
             failed_files.append((str(relative_path), error_msg))
         else:
             # Load the result to get an example if hallucinations were found
@@ -367,22 +367,22 @@ Examples:
                 files_with_hallucinations += 1
                 total_hallucinations += hallucination_count
 
-            print_file_result(str(relative_path), hallucination_count, example)
+            log_file_result(str(relative_path), hallucination_count, example)
 
-        print()  # Blank line between files
+        logger.info("")  # Blank line between files
 
-    # Print summary
-    print("=" * 50)
-    print("Summary")
-    print("=" * 50)
-    print(f"Total files processed: {total_files}")
-    print(f"Files with hallucinations: {files_with_hallucinations}")
-    print(f"Total hallucinations detected: {total_hallucinations}")
+    # Log summary
+    logger.info("=" * 50)
+    logger.info("Summary")
+    logger.info("=" * 50)
+    logger.info(f"Total files processed: {total_files}")
+    logger.info(f"Files with hallucinations: {files_with_hallucinations}")
+    logger.info(f"Total hallucinations detected: {total_hallucinations}")
 
     if failed_files:
-        print(f"\nFailed files ({len(failed_files)}):")
+        logger.error(f"Failed files ({len(failed_files)}):")
         for filename, error in failed_files:
-            print(f"  - {filename}: {error}")
+            logger.error(f"  - {filename}: {error}")
 
     return 1 if failed_files else 0
 

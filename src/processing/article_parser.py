@@ -1,6 +1,5 @@
 """Parser for markdown article files."""
 
-import logging
 import re
 from pathlib import Path
 
@@ -10,8 +9,9 @@ from pydantic import ValidationError
 
 from src.config import ArticleCompilerConfig
 from src.models.article import ArticleFrontmatter, MarkdownArticle
+from src.util.log_util import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ArticleParser:

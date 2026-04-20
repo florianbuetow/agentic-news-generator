@@ -10,6 +10,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config
+from src.util.log_util import configure_root_logger, get_logger
+
+logger = get_logger(__name__)
 
 
 def main() -> int:  # noqa: C901
@@ -22,16 +25,17 @@ def main() -> int:  # noqa: C901
 
     # Load Config class
     config = Config(config_path)
+    configure_root_logger(config.getDataLogsDir())
 
     # Get hallucination detection output directory from Config
     transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
 
     if not transcripts_hallucinations_dir.exists():
-        print(f"Error: Hallucination output directory not found: {transcripts_hallucinations_dir}", file=sys.stderr)
+        logger.error(f"Hallucination output directory not found: {transcripts_hallucinations_dir}")
         return 1
 
     # Collect all hallucinations grouped by file
-    hallucinations_by_file = defaultdict(list)
+    hallucinations_by_file: defaultdict[str, list[dict[str, object]]] = defaultdict(list)
 
     # Find all channel directories (each contains hallucination JSON files)
     analysis_dirs = [d for d in transcripts_hallucinations_dir.glob("*") if d.is_dir()]
@@ -74,11 +78,11 @@ def main() -> int:  # noqa: C901
                     )
 
             except Exception as e:
-                print(f"Warning: Could not process {json_file}: {e}", file=sys.stderr)
+                logger.warning(f"Could not process {json_file}: {e}")
                 continue
 
     if not hallucinations_by_file:
-        print("No hallucinations found to digest.")
+        logger.info("No hallucinations found to digest.")
         return 0
 
     # Generate markdown digest
@@ -112,9 +116,9 @@ def main() -> int:  # noqa: C901
                 f.write(f"{h['window']}\n\n")
                 f.write("---\n\n")
 
-    print(f"✅ Digest created: {output_file}")
-    print(f"   Total files: {len(hallucinations_by_file)}")
-    print(f"   Total hallucinations: {total_hallucinations}")
+    logger.info(f"Digest created: {output_file}")
+    logger.info(f"   Total files: {len(hallucinations_by_file)}")
+    logger.info(f"   Total hallucinations: {total_hallucinations}")
 
     return 0
 
