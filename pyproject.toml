@@ -57,6 +57,7 @@ dev = [
     "codespell>=2.3.0",
     "pip-audit>=2.7.0",
     "semgrep>=1.144.0",
+    "yamllint>=1.35.0",
 
     # AI Test Detector
     "autogen-ext[openai]>=0.7.5",

@@ -97,6 +97,7 @@ help:
     @printf "  %-38s %s\n" "code-style" "Check code style and formatting (read-only)"
     @printf "  %-38s %s\n" "code-config" "Check config.yaml matches template structure"
     @printf "  %-38s %s\n" "code-spell" "Check spelling in code and documentation"
+    @printf "  %-38s %s\n" "check-config-syntax" "Validate YAML file syntax across the project"
     @printf "  %-38s %s\n" "code-typecheck" "Run static type checking with mypy"
     @printf "  %-38s %s\n" "code-lspchecks" "Run strict type checking with Pyright (LSP-based)"
     @printf "  %-38s %s\n" "code-security" "Run security checks with bandit"
@@ -605,6 +606,19 @@ code-spell:
     @printf "\033[0;32m✓ Spelling checks passed\033[0m\n"
     @echo ""
 
+# Validate YAML file syntax across the project
+check-config-syntax:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Validating YAML Syntax ===\033[0m\n"
+    find . \( -path ./frontend/newspaper/node_modules -o -path ./.git -o -path ./.venv \) -prune \
+        -o \( -name "*.yml" -o -name "*.yaml" \) -print \
+        | xargs uv run yamllint -d "{extends: relaxed, rules: {line-length: disable, empty-lines: disable}}"
+    echo ""
+    printf "\033[0;32m✓ YAML validation passed\033[0m\n"
+    echo ""
+
 # Scan dependencies for known vulnerabilities
 code-audit:
     @echo ""
@@ -732,6 +746,7 @@ ci:
     just code-security
     just code-deptry
     just code-spell
+    just check-config-syntax
     just code-semgrep
     just code-audit
     just test
@@ -772,6 +787,9 @@ ci-quiet:
 
     just code-spell > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-spell failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "\033[0;32m✓ Code-spell passed\033[0m\n"
+
+    just check-config-syntax > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Check-config-syntax failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ Check-config-syntax passed\033[0m\n"
 
     just code-semgrep > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-semgrep failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "\033[0;32m✓ Code-semgrep passed\033[0m\n"
