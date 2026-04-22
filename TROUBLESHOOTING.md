@@ -122,6 +122,22 @@ Run individually when CI fails:
 
 ---
 
+## Playbook: Non-English / Language Detection False Positive
+
+When `transcript-language-analysis.py` flags a file as non-English, **check content quality first** before assuming genuine foreign language content.
+
+Degenerate transcripts (Whisper hallucinations with repetitive tokens like "AI, AI, AI...") trigger false language classifications because short repeated tokens resemble words in other languages (e.g. "ai" is French for "have").
+
+1. `just find-files <VIDEO_ID>` — confirm transcript file exists and find its path.
+2. Check file size: `ls -lh <transcript.txt>` — suspiciously small or unexpectedly large files indicate problems.
+3. Read first ~20 lines: look for repeated tokens, all-caps acronyms, or single words repeated thousands of times.
+4. If degenerate/hallucinated → treat as corrupt transcript, follow **Playbook: Empty Transcript for a Video**.
+5. If genuinely non-English → decide whether to keep, filter, or redownload with correct language settings.
+
+**General rule:** content size and basic content sanity (empty files, missing files, degenerate repetition) are the **first things to check** for any transcript quality issue, before deeper analysis.
+
+---
+
 ## Playbook: Empty Transcript for a Video
 
 1. `just find-files <VIDEO_ID>` — confirm files exist.
