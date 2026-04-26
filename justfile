@@ -62,7 +62,7 @@ help:
     @printf "  %-38s %s\n" "ingestion-all" "Run pipeline without topic detection"
     @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
-    @printf "  %-38s %s\n" "stats" "Show processing status of downloads"
+    @printf "  %-38s %s\n" "stats [hour|day]" "Show processing status (throttle: once per hour/day)"
     @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
     @echo ""
     @printf "\033[0;33mData Pipeline:\033[0m\n"
@@ -371,11 +371,36 @@ status:
     @echo ""
 
 # Show processing status of downloads
-stats:
-    @clear
-    @echo ""
-    @uv run scripts/status.py
-    @echo ""
+stats period="":
+    #!/usr/bin/env bash
+    cache_flag=""
+    stats_from=""
+    if [[ "{{period}}" == "hour" ]]; then
+        stamp="/tmp/stats-hour.stamp"
+        now=$(date +%s)
+        if [[ ! -f "$stamp" ]] || (( now - $(stat -f "%m" "$stamp") >= 3600 )); then
+            touch "$stamp"
+        else
+            cache_flag="--no-update-cache"
+        fi
+        stats_from=$(date -r "$(stat -f "%m" "$stamp")" "+%Y-%m-%d %H:%M:%S")
+    elif [[ "{{period}}" == "day" ]]; then
+        stamp="/tmp/stats-day.stamp"
+        if [[ ! -f "$stamp" || "$(stat -f "%Sm" -t "%Y-%m-%d" "$stamp")" != "$(date +%Y-%m-%d)" ]]; then
+            touch "$stamp"
+        else
+            cache_flag="--no-update-cache"
+        fi
+        stats_from=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$stamp")
+    elif [[ -n "{{period}}" ]]; then
+        echo "Unknown period: {{period}}. Use 'hour' or 'day'."
+        exit 1
+    fi
+    clear
+    echo ""
+    uv run scripts/status.py $cache_flag
+    echo ""
+    [[ -n "$stats_from" ]] && printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
 
 # Count total audio hours from transcript timestamps
 audio-hours:

@@ -203,6 +203,8 @@ def _print_stat_row(
 
 def main() -> int:
     """Main entry point."""
+    update_cache = "--no-update-cache" not in sys.argv
+
     # Load configuration
     project_root = Path(__file__).parent.parent
     config_path = project_root / "config" / "config.yaml"
@@ -327,13 +329,13 @@ def main() -> int:
     prev_totals: dict[str, int] | None = previous.get("totals") if previous else None
     _print_stat_row("TOTAL", totals, prev_totals, overall_pct, total_size_gb, channel_width, col_width)
 
-    # Save current stats for next run
-    cache_data = {
-        "totals": {k: int(totals[k]) for k in STAT_KEYS},
-        "channels": {name: {k: int(s[k]) for k in STAT_KEYS} for name, s in channel_stats.items()},
-    }
-    cache_file.parent.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(json.dumps(cache_data, indent=2) + "\n")
+    if update_cache:
+        cache_data = {
+            "totals": {k: int(totals[k]) for k in STAT_KEYS},
+            "channels": {name: {k: int(s[k]) for k in STAT_KEYS} for name, s in channel_stats.items()},
+        }
+        cache_file.parent.mkdir(parents=True, exist_ok=True)
+        cache_file.write_text(json.dumps(cache_data, indent=2) + "\n")
 
     print()
     return 0
