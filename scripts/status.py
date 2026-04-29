@@ -34,6 +34,7 @@ def get_channel_stats(  # noqa: C901
     archive_dir: Path,
     transcripts_hallucinations_dir: Path,
     transcripts_cleaned_dir: Path,
+    transcripts_summaries_dir: Path,
     topics_dir: Path,
 ) -> dict[str, dict[str, int | float]]:
     """Get statistics for each channel across all pipeline stages.
@@ -48,6 +49,7 @@ def get_channel_stats(  # noqa: C901
             "transcripts": 0,
             "hall_analysis": 0,
             "cleaned_transcripts": 0,
+            "summaries": 0,
             "topics_embeddings": 0,
             "topics_segmentations": 0,
             "topics_extracted": 0,
@@ -110,6 +112,13 @@ def get_channel_stats(  # noqa: C901
                 count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".srt" and not f.name.startswith("._"))
                 stats[channel_dir.name]["cleaned_transcripts"] = count
 
+    # Count summaries
+    if transcripts_summaries_dir.exists():
+        for channel_dir in transcripts_summaries_dir.iterdir():
+            if channel_dir.is_dir():
+                count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".md" and not f.name.startswith("._"))
+                stats[channel_dir.name]["summaries"] = count
+
     # Count topic detection outputs
     if topics_dir.exists():
         for channel_dir in topics_dir.iterdir():
@@ -161,6 +170,7 @@ STAT_KEYS = [
     "transcripts",
     "hall_analysis",
     "cleaned_transcripts",
+    "summaries",
     "topics_embeddings",
     "topics_segmentations",
     "topics_extracted",
@@ -215,6 +225,7 @@ def main() -> int:
     archive_dir = config.getDataArchiveDir()
     transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
     transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
+    transcripts_summaries_dir = config.getDataDownloadsTranscriptsSummariesDir()
 
     # Topics output directory
     td_config = config.get_topic_detection_config()
@@ -230,6 +241,7 @@ def main() -> int:
         archive_dir,
         transcripts_hallucinations_dir,
         transcripts_cleaned_dir,
+        transcripts_summaries_dir,
         topics_dir,
     )
 
@@ -245,6 +257,7 @@ def main() -> int:
         "transcripts": sum(int(s["transcripts"]) for s in channel_stats.values()),
         "hall_analysis": sum(int(s["hall_analysis"]) for s in channel_stats.values()),
         "cleaned_transcripts": sum(int(s["cleaned_transcripts"]) for s in channel_stats.values()),
+        "summaries": sum(int(s["summaries"]) for s in channel_stats.values()),
         "topics_embeddings": sum(int(s["topics_embeddings"]) for s in channel_stats.values()),
         "topics_segmentations": sum(int(s["topics_segmentations"]) for s in channel_stats.values()),
         "topics_extracted": sum(int(s["topics_extracted"]) for s in channel_stats.values()),
@@ -285,6 +298,7 @@ def main() -> int:
         ("Tran-", "scripts", col_width),
         ("Hall.", "Analysis", col_width),
         ("Cleaned", "Trans.", col_width),
+        ("", "Summ.", col_width),
         ("Topics", "Embed.", col_width),
         ("Topics", "Segment.", col_width),
         ("Topics", "Extract.", col_width),

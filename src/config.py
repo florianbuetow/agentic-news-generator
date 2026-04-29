@@ -305,6 +305,14 @@ class TopicsExperimentConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class SummarizeTranscriptsConfig(BaseModel):
+    """Configuration for transcript summarization via LLM."""
+
+    llm: LLMConfig = Field(..., description="LLM config for transcript summarization")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class TopicDetectionConfig(BaseModel):
     """Complete topic detection configuration."""
 
@@ -380,6 +388,7 @@ class PathsConfig(BaseModel):
         ..., description="Transcript hallucinations analysis directory path", min_length=1
     )
     data_downloads_transcripts_cleaned_dir: str = Field(..., description="Cleaned transcripts directory path", min_length=1)
+    data_downloads_transcripts_summaries_dir: str = Field(..., description="Transcript summaries directory path", min_length=1)
     data_downloads_audio_dir: str = Field(..., description="Audio files directory path", min_length=1)
     data_downloads_metadata_dir: str = Field(..., description="Metadata files directory path", min_length=1)
     data_output_dir: str = Field(..., description="Output directory path", min_length=1)
@@ -429,6 +438,10 @@ class Config:
         # Validate topics_experiment section if present
         if "topics_experiment" in self._data:
             self._topics_experiment = self._validate_topics_experiment()
+
+        # Validate summarize_transcripts section if present
+        if "summarize_transcripts" in self._data:
+            self._summarize_transcripts = self._validate_summarize_transcripts()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -579,6 +592,14 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Topics experiment configuration validation failed: {error_messages}") from e
 
+    def _validate_summarize_transcripts(self) -> SummarizeTranscriptsConfig:
+        """Validate summarize_transcripts configuration."""
+        try:
+            return SummarizeTranscriptsConfig.model_validate(self._data["summarize_transcripts"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Summarize transcripts configuration validation failed: {error_messages}") from e
+
     def _validate_topic_detection(self) -> TopicDetectionConfig:
         """Validate topic detection configuration.
 
@@ -639,6 +660,12 @@ class Config:
         if not hasattr(self, "_topics_experiment"):
             raise KeyError("Missing required key 'topics_experiment' in config file")
         return self._topics_experiment
+
+    def get_summarize_transcripts_config(self) -> SummarizeTranscriptsConfig:
+        """Get summarize_transcripts configuration."""
+        if not hasattr(self, "_summarize_transcripts"):
+            raise KeyError("Missing required key 'summarize_transcripts' in config file")
+        return self._summarize_transcripts
 
     def get_topic_detection_config(self) -> TopicDetectionConfig:
         """Get topic detection configuration.
@@ -741,6 +768,10 @@ class Config:
             Path object pointing to the data/downloads/transcripts_cleaned directory.
         """
         return Path(self._paths.data_downloads_transcripts_cleaned_dir)
+
+    def getDataDownloadsTranscriptsSummariesDir(self) -> Path:
+        """Get the transcript summaries directory path."""
+        return Path(self._paths.data_downloads_transcripts_summaries_dir)
 
     def getDataDownloadsAudioDir(self) -> Path:
         """Get the data downloads audio directory path.

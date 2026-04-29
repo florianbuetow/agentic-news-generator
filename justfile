@@ -73,6 +73,7 @@ help:
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
     @printf "  %-38s %s\n" "analyze-transcripts-hallucinations" "Analyze transcripts for hallucinations"
     @printf "  %-38s %s\n" "transcripts-remove-hallucinations" "Remove hallucinations from transcripts using LLM"
+    @printf "  %-38s %s\n" "summarize-transcripts" "Summarize cleaned transcripts using LLM"
     @echo ""
     @printf "\033[0;33mTopic Detection:\033[0m\n"
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
@@ -196,6 +197,7 @@ all:
     @just archive-videos
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
+    @just summarize-transcripts
     @just topics-all
 
 # Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
@@ -208,6 +210,7 @@ ingestion-all:
     @just archive-videos
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
+    @just summarize-transcripts
 
 # Download YouTube videos from channels in config.yaml
 download-videos:
@@ -299,6 +302,13 @@ transcripts-remove-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
     @uv run python scripts/transcript-hallucination-removal.py
+    @echo ""
+
+# Summarize cleaned transcripts using LLM
+summarize-transcripts:
+    @echo ""
+    @printf "\033[0;34m=== Summarizing Cleaned Transcripts ===\033[0m\n"
+    @uv run python scripts/summarize-transcripts.py
     @echo ""
 
 # Generate embeddings from SRT transcripts (Step 1)
@@ -878,6 +888,10 @@ all-quiet:
     printf "🚀 Starting transcripts-remove-hallucinations...\n"
     just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed transcripts-remove-hallucinations\n"
+
+    printf "🚀 Starting summarize-transcripts...\n"
+    just summarize-transcripts > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Summarize-transcripts failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed summarize-transcripts\n"
 
     printf "🚀 Starting topics-all...\n"
     just topics-all > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Topics-all failed\033[0m\n"; cat $TMPFILE; exit 1; }

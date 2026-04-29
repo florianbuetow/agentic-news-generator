@@ -19,6 +19,7 @@ def get_valid_paths_config(tmp_path: Path) -> dict[str, str]:
         "data_downloads_transcripts_dir": str(base_data_dir / "downloads" / "transcripts"),
         "data_downloads_transcripts_hallucinations_dir": str(base_data_dir / "downloads" / "transcripts-hallucinations"),
         "data_downloads_transcripts_cleaned_dir": str(base_data_dir / "downloads" / "transcripts_cleaned"),
+        "data_downloads_transcripts_summaries_dir": str(base_data_dir / "downloads" / "transcripts_summaries"),
         "data_downloads_audio_dir": str(base_data_dir / "downloads" / "audio") + "/",
         "data_downloads_metadata_dir": str(base_data_dir / "downloads" / "metadata"),
         "data_output_dir": str(base_data_dir / "output") + "/",

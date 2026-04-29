@@ -7,6 +7,7 @@ paths:
   data_downloads_transcripts_dir: ./data/downloads/transcripts
   data_downloads_transcripts_hallucinations_dir: ./data/downloads/transcripts-hallucinations
   data_downloads_transcripts_cleaned_dir: ./data/downloads/transcripts_cleaned
+  data_downloads_transcripts_summaries_dir: ./data/downloads/transcripts_summaries
   data_downloads_audio_dir: ./data/downloads/audio
   data_downloads_metadata_dir: ./data/downloads/metadata
   data_output_dir: ./data/output/
@@ -254,3 +255,16 @@ article_compiler:
   links:
     base_path: "/articles/"
     slug_from_filename: true
+
+# Transcript Summarization Configuration
+summarize_transcripts:
+  llm:
+    model: openai/gemma-4-26b-a4b-it-mlx
+    api_base: http://127.0.0.1:1234/v1
+    api_key: lm-studio
+    context_window: 262144
+    max_tokens: 32768
+    temperature: 0.3
+    context_window_threshold: 90
+    max_retries: 3
+    retry_delay: 2.0
