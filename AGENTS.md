@@ -19,9 +19,12 @@
 - **NEVER include AI attribution in commit messages**
 - **NEVER add "Generated with AI assistance" or similar phrases**
 - **NEVER add "Co-Authored-By: [AI Agent Name]" or similar attribution**
+- **NEVER mention authors, creators, or external people by name in commit messages**
+- **NEVER mention source URLs, video links, or external sources in commit messages**
 - **NEVER run `git add -A` or `git add .` - always stage files explicitly**
 - Keep commit messages professional and focused on the changes made
-- Commit messages should describe what changed and why, without mentioning AI assistance
+- Commit messages should describe what changed and why, without mentioning AI assistance, authors, or sources
+- Note: this rule applies to commit messages only — guides, docs, and code comments may credit authors and link sources as needed
 
 ## Testing
 - After **every change** to the code, the tests must be executed
