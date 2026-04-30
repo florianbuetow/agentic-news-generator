@@ -276,9 +276,9 @@ def main() -> int:
     print(f"Total Channels: {len(channel_stats)}")
     print()
 
-    # Calculate overall completion (topics extracted / total videos)
-    if total_videos > 0:
-        overall_pct = (totals["topics_extracted"] / total_videos) * 100
+    total_transcripts = int(totals["transcripts"])
+    if total_transcripts > 0:
+        overall_pct = (totals["topics_extracted"] / total_transcripts) * 100
         print(f"Overall Pipeline Completion: {overall_pct:.1f}%")
         print()
 
@@ -329,8 +329,8 @@ def main() -> int:
 
     for channel_name in sorted(channel_stats.keys()):
         s = channel_stats[channel_name]
-        videos_total = s["videos_active"] + s["videos_archived"]
-        completion_pct = (s["topics_extracted"] / videos_total * 100) if videos_total > 0 else 0.0
+        transcripts_total = int(s["transcripts"])
+        completion_pct = (s["topics_extracted"] / transcripts_total * 100) if transcripts_total > 0 else 0.0
         size_gb = float(s["total_size_bytes"]) / (1024**3)
         display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
         prev_ch: dict[str, int] | None = prev_channels.get(channel_name)
@@ -338,10 +338,25 @@ def main() -> int:
 
     # Print totals row
     print("-" * line_width)
-    overall_pct = (totals["topics_extracted"] / total_videos * 100) if total_videos > 0 else 0.0
+    overall_pct = (totals["topics_extracted"] / total_transcripts * 100) if total_transcripts > 0 else 0.0
     total_size_gb = float(totals["total_size_bytes"]) / (1024**3)
     prev_totals: dict[str, int] | None = previous.get("totals") if previous else None
     _print_stat_row("TOTAL", totals, prev_totals, overall_pct, total_size_gb, channel_width, col_width)
+
+    # Print percentage row: each column as % of total transcripts
+    pct_keys = set(STAT_KEYS[STAT_KEYS.index("transcripts") :])
+    num_w = col_width - 3
+    pct_parts = [f"{'% OF TRANSCRIPTS':<{channel_width}}"]
+    for key in STAT_KEYS:
+        if key in pct_keys and total_transcripts > 0:
+            pct = int(totals[key]) / total_transcripts * 100
+            pct_str = f"{pct:.0f}%"
+            pct_parts.append(f"{pct_str:>{num_w}}   ")
+        else:
+            pct_parts.append(f"{'':>{num_w}}   ")
+    pct_parts.append(f"{'':>{col_width}}")
+    pct_parts.append(f"{'':>{col_width}}")
+    print(" ".join(pct_parts))
 
     if update_cache:
         cache_data = {
