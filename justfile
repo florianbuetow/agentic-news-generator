@@ -410,7 +410,9 @@ stats period="":
     echo ""
     uv run scripts/status.py $cache_flag
     echo ""
-    [[ -n "$stats_from" ]] && printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
+    if [[ -n "$stats_from" ]]; then
+        printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
+    fi
 
 # Count total audio hours from transcript timestamps
 audio-hours:
