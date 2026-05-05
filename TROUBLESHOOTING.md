@@ -151,6 +151,21 @@ Degenerate transcripts (Whisper hallucinations with repetitive tokens like "AI, 
 2. `just clean-video-files VIDEO_ID=<id>` — interactive removal + archive cleanup.
 3. `just download-videos` — redownload (archive entry removed in step 2 lets yt-dlp refetch).
 
+---
+
+## Playbook: Removing Download Artifacts — Re-download Decision
+
+When deleting any artifact for a video ID (`.mp4`, `.mp4.part`, `.wav`, `.info.json`, `.silence_map.json`, transcript files), **always ask explicitly** whether to also remove the entry from `downloaded.txt` (yt-dlp archive).
+
+**Decision rule:**
+
+- **Re-download wanted** (remove from `downloaded.txt`): genuine corrupt download, network failure mid-download, transcribed but transcript was lost.
+- **Re-download NOT wanted** (keep in `downloaded.txt`): video has no spoken word (music-only, silent, ambient), live broadcast / premiere downloaded by mistake, video filtered by content rules, video known to be unusable.
+
+Re-downloading a video without spoken word wastes bandwidth and disk and will be filtered out again.
+
+**Default: keep entry in `downloaded.txt`.** Only remove on explicit user confirmation that re-download is desired.
+
 ## Playbook: Pipeline Stalls at LLM Step
 
 1. `just status` — verify LM Studio + required models loaded.
