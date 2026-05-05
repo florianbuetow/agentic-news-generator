@@ -268,3 +268,10 @@ summarize_transcripts:
     context_window_threshold: 90
     max_retries: 3
     retry_delay: 2.0
+
+
+# Language Analysis Configuration
+language_analysis:
+  # Minimum FastText confidence (0.0-1.0) for a non-English detection to count as non-English.
+  # Low-confidence hits (e.g. German proper nouns in English text) are treated as English.
+  min_detection_confidence: 0.7

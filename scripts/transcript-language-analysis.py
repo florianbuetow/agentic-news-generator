@@ -114,13 +114,21 @@ def chunk_text(text: str, target_words: int = 1000) -> list[str]:
     return chunks
 
 
-def analyze_file(txt_file: Path, detector: LanguageDetector, target_words: int = 1000) -> FileLanguageResult:
+def analyze_file(
+    txt_file: Path,
+    detector: LanguageDetector,
+    target_words: int = 1000,
+    min_confidence: float = 0.7,
+) -> FileLanguageResult:
     """Analyze language distribution in a single transcript file.
 
     Args:
         txt_file: Path to .txt transcript file.
         detector: Initialized LanguageDetector instance.
         target_words: Number of words per chunk for analysis.
+        min_confidence: Minimum FastText confidence for a non-English detection to be trusted.
+            Chunks detected as non-English below this threshold are treated as English,
+            preventing false positives from foreign proper nouns in otherwise-English text.
 
     Returns:
         FileLanguageResult with detected languages per chunk and word count.
@@ -142,10 +150,22 @@ def analyze_file(txt_file: Path, detector: LanguageDetector, target_words: int =
     # Detect language for each chunk
     languages = []
     for chunk in chunks:
-        lang_code = detector.detect_language(chunk)
+        result = detector.detect(chunk, k=1)
+        if not isinstance(result, list):
+            lang_code = result.language
+            confidence = result.confidence
+        else:
+            lang_code = result[0].language if result else "??"
+            confidence = result[0].confidence if result else 0.0
+
         if lang_code == "??":
             logger.warning(f"No alphabetic words found in chunk from {txt_file.name}")
-        languages.append(lang_code if lang_code else "unknown")
+            languages.append("??")
+        elif lang_code != "en" and confidence < min_confidence:
+            # Low-confidence non-English: treat as English to avoid false positives
+            languages.append("en")
+        else:
+            languages.append(lang_code if lang_code else "unknown")
 
     return FileLanguageResult(filename=txt_file.name, languages=languages, word_count=total_words)
 
@@ -261,6 +281,8 @@ def main() -> int:
     output_dir = config.getDataOutputDir() / "language_analysis"
     data_dir = config.getDataDir()
 
+    min_confidence = config.getLanguageAnalysisMinConfidence()
+
     # Initialize language detector
     model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
     try:
@@ -308,7 +330,7 @@ def main() -> int:
         # Analyze each file
         file_results = []
         for txt_file in txt_files:
-            result = analyze_file(txt_file, detector)
+            result = analyze_file(txt_file, detector, min_confidence=min_confidence)
             file_results.append(result)
 
             # Track non-English files

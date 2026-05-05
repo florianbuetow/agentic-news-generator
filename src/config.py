@@ -709,6 +709,10 @@ class Config:
             hc["intercept"],
         )
 
+    def getLanguageAnalysisMinConfidence(self) -> float:
+        """Get minimum FastText confidence for a non-English classification to be trusted."""
+        return cast(float, self._data["language_analysis"]["min_detection_confidence"])
+
     def getConfigPath(self) -> Path:
         """Get the path to config.yaml."""
         return self.config_path
