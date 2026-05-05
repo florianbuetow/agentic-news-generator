@@ -68,6 +68,12 @@ dev = [
 
     # Jupyter Notebooks
     "jupyter>=1.0.0",
+
+    # Security pins for transitive dependencies
+    "gitpython>=3.1.47",
+    "jupyter-server>=2.18.0",
+    "jupyterlab>=4.5.7",
+    "notebook>=7.5.6",
 ]
 
 [tool.ruff]
