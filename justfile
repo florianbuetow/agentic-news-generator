@@ -73,6 +73,7 @@ help:
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
     @printf "  %-38s %s\n" "analyze-transcripts-hallucinations" "Analyze transcripts for hallucinations"
     @printf "  %-38s %s\n" "transcripts-remove-hallucinations" "Remove hallucinations from transcripts using LLM"
+    @printf "  %-38s %s\n" "analyze-transcript-languages" "Analyze transcript languages"
     @printf "  %-38s %s\n" "summarize-transcripts" "Summarize cleaned transcripts using LLM"
     @echo ""
     @printf "\033[0;33mTopic Detection:\033[0m\n"
@@ -197,6 +198,7 @@ all:
     @just archive-videos
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
+    @just analyze-transcript-languages
     @just summarize-transcripts
     @just topics-all
 
@@ -210,6 +212,7 @@ ingestion-all:
     @just archive-videos
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
+    @just analyze-transcript-languages
     @just summarize-transcripts
 
 # Download YouTube videos from channels in config.yaml
@@ -258,9 +261,6 @@ transcribe:
     echo ""
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
     bash scripts/move-transcript-metadata.sh
-    echo ""
-    printf "\033[0;34m=== Analyzing Transcript Languages ===\033[0m\n"
-    uv run scripts/transcript-language-analysis.py
 
 # Archive processed videos
 archive-videos:
@@ -302,6 +302,13 @@ transcripts-remove-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
     @uv run python scripts/transcript-hallucination-removal.py
+    @echo ""
+
+# Analyze transcript languages (run after hallucination removal for accurate detection)
+analyze-transcript-languages:
+    @echo ""
+    @printf "\033[0;34m=== Analyzing Transcript Languages ===\033[0m\n"
+    @uv run scripts/transcript-language-analysis.py
     @echo ""
 
 # Summarize cleaned transcripts using LLM
@@ -890,6 +897,10 @@ all-quiet:
     printf "🚀 Starting transcripts-remove-hallucinations...\n"
     just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed transcripts-remove-hallucinations\n"
+
+    printf "🚀 Starting analyze-transcript-languages...\n"
+    just analyze-transcript-languages > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Analyze-transcript-languages failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed analyze-transcript-languages\n"
 
     printf "🚀 Starting summarize-transcripts...\n"
     just summarize-transcripts > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Summarize-transcripts failed\033[0m\n"; cat $TMPFILE; exit 1; }

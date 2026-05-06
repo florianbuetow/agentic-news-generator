@@ -247,33 +247,18 @@ class LanguageDetector:
         self._model = fasttext.load_model(str(self._model_path))
 
     @staticmethod
-    def _is_repetitive(word: str) -> bool:
-        """Detect words formed by repeating a short substring (Whisper hallucinations)."""
-        lowered = word.lower()
-        for plen in range(1, 5):
-            pattern = lowered[:plen]
-            if len(pattern) < plen:
-                break
-            if pattern * 5 in lowered and len(lowered) >= plen * 5:
-                return True
-        return False
-
-    @staticmethod
     def filter_alpha_words(text: str) -> str:
         """Filter text to keep only words containing alphabetic characters.
-
-        Also removes words with degenerate repetition patterns (e.g. Whisper
-        hallucinations like "Uiuiuiuiuiui...") that would poison detection.
 
         Args:
             text: Input text to filter.
 
         Returns:
-            Text with only valid alphabetic words.
-            Returns empty string if no valid words remain.
+            Text with only words containing at least one alphabetic character.
+            Returns empty string if no alphabetic words remain.
         """
         words = text.split()
-        alpha_words = [word for word in words if any(c.isalpha() for c in word) and not LanguageDetector._is_repetitive(word)]
+        alpha_words = [word for word in words if any(c.isalpha() for c in word)]
         return " ".join(alpha_words)
 
     def detect(self, text: str, k: int) -> DetectionResult | list[DetectionResult]:
