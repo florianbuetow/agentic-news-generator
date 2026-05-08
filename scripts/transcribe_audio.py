@@ -355,7 +355,7 @@ def main() -> int:  # noqa: C901
                 continue
 
             wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
-            wav_files = [f for f in wav_files if not f.name.startswith("._")]
+            wav_files = [f for f in wav_files if not f.name.startswith(".")]
 
             # Add files that need transcription (no existing transcript, not filtered)
             files_to_transcribe.extend(
@@ -429,9 +429,9 @@ def main() -> int:  # noqa: C901
         channel_limiter = transcription_limiter_by_channel[channel_name]
         transcribed_for_channel = 0
 
-        # Find WAV files (filter out macOS ._ files)
+        # Find WAV files (filter out hidden files: macOS ._ and extract-audio in-progress .temp.wav)
         wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
-        wav_files = [f for f in wav_files if not f.name.startswith("._")]
+        wav_files = [f for f in wav_files if not f.name.startswith(".")]
 
         for i, wav_file in enumerate(wav_files):
             if transcribed_for_channel >= channel_limiter:
