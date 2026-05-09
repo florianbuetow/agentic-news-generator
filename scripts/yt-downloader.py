@@ -40,6 +40,7 @@ def main() -> None:
 
     success_count = 0
     failure_count = 0
+    failed_channels: list[tuple[str, str]] = []
 
     for channel in channels:
         logger.info("")
@@ -68,15 +69,22 @@ def main() -> None:
                 logger.info(f"Successfully processed {channel.name}")
                 success_count += 1
             else:
-                logger.error(f"Failed to process {channel.name} (exit code: {result.returncode})")
+                reason = f"yt-downloader.sh exited with code {result.returncode}"
+                logger.error(f"Failed to process {channel.name}: {reason}")
                 failure_count += 1
+                failed_channels.append((channel.name, reason))
         except Exception as e:
-            logger.error(f"Error processing {channel.name}: {e}")
+            reason = str(e)
+            logger.error(f"Error processing {channel.name}: {reason}")
             failure_count += 1
+            failed_channels.append((channel.name, reason))
 
     logger.info(f"Summary: {success_count} succeeded, {failure_count} failed")
 
     if failure_count > 0:
+        logger.error("Failed channels:")
+        for name, reason in failed_channels:
+            logger.error(f"  - {name}: {reason}")
         sys.exit(1)
 
 
