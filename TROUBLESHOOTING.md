@@ -43,11 +43,11 @@ For each video ID, look up the existing WAV stem in the channel audio dir and fe
 ### `scripts/check-audio-track.sh` — `just check-audio-track <CHANNEL> <VIDEO_ID>`
 Uses `ffprobe` + `ffmpeg volumedetect` to check a single video for (a) presence of audio stream, (b) non-empty samples, (c) mean volume above -40 dB. Exit 0 ok, 1 missing/quiet, 2 usage error. Useful when transcript is empty and you suspect silent source.
 
-### `scripts/filter-short-videos.py`
-Dry-run scan: for each channel, flag files with no audio stream or duration < `--max-duration` (default 120s). Adds `Channel/video_id` entries to `config/filefilter.json`. Pass `--write` to persist. Pair with `remove-filtered-files.py`.
+### `scripts/filter-short-videos.py` — `just filter-videos` (step 1 of 2)
+For each channel, flags files with no audio stream or duration below `transcription.min_duration` (from `config.yaml`). Adds `Channel/video_id` entries to `config/filefilter.json`. Always writes; no CLI args. Run in tandem with `remove-filtered-files.py` via `just filter-videos`.
 
-### `scripts/remove-filtered-files.py`
-Sweep files listed in `config/filefilter.json` plus upstream copies (transcripts → audio → videos) by `[<video_id>]` substring. Dry-run by default; pass `--execute` to unlink.
+### `scripts/remove-filtered-files.py` — `just filter-videos` (step 2 of 2)
+Sweeps files listed in `config/filefilter.json` plus upstream copies (transcripts → audio → videos) by `[<video_id>]` substring. Always deletes; no CLI args, no dry-run mode.
 
 ### `scripts/clean-video-files.py` — `just clean-video-files VIDEO_ID=<id>`
 Interactive: lists every file containing `[<video_id>]`, asks which to delete, optionally removes the ID from yt-dlp `downloaded.txt` archive. Every destructive action confirmed.
@@ -142,7 +142,7 @@ Degenerate transcripts (Whisper hallucinations with repetitive tokens like "AI, 
 
 1. `just find-files <VIDEO_ID>` — confirm files exist.
 2. `just check-audio-track <CHANNEL> <VIDEO_ID>` — is source silent?
-3. If silent → `uv run scripts/filter-short-videos.py --channel <CHANNEL> --write` then `uv run scripts/remove-filtered-files.py --execute`.
+3. If silent → `just filter-videos` (sweeps every channel for short / no-audio videos and unlinks them).
 4. If audible but transcript empty → `just clean-video-files VIDEO_ID=<id>` and redownload (re-run `just download-videos`).
 
 ## Playbook: Corrupt Video Suspected

@@ -18,12 +18,11 @@ Matching is lexical on the yt-dlp ``[<id>]`` substring, so sibling metadata
 (``.info.json``, ``.silence_map.json``) and macOS AppleDouble sidecars
 (``._*``) are swept up automatically.
 
-Default mode is **dry-run**. Pass ``--execute`` to actually unlink.
+This script always deletes; there is no dry-run mode.
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import sys
 from pathlib import Path
@@ -31,6 +30,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from config import Config
+
+_PROJECT_ROOT = Path(__file__).parent.parent
+_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
+_FILTER_PATH = _PROJECT_ROOT / "config" / "filefilter.json"
 
 # Ordered upstream → downstream. A filter entry found under key K also
 # removes files under every key that appears BEFORE K in this list.
@@ -69,15 +72,6 @@ def find_matching_files(channel_dir: Path, video_id: str) -> list[Path]:
         return []
     token = f"[{video_id}]"
     return sorted(p for p in channel_dir.iterdir() if p.is_file() and token in p.name)
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--config", default="config/config.yaml", help="Path to config.yaml")
-    ap.add_argument("--filter", default="config/filefilter.json", help="Path to filefilter.json")
-    ap.add_argument("--execute", action="store_true", help="Actually delete files (default: dry-run)")
-    return ap.parse_args()
 
 
 def _resolve_entry_targets(config: Config, filter_key: str, entry: str) -> list[tuple[str, str, str, Path]]:
@@ -150,16 +144,13 @@ def _delete_targets(targets: list[tuple[str, str, str, Path]]) -> tuple[int, int
 
 
 def main() -> int:
-    """Resolve filter entries to on-disk files and optionally delete them."""
-    args = parse_args()
+    """Resolve filter entries to on-disk files and delete them."""
+    config = Config(_CONFIG_PATH)
 
-    config = Config(args.config)
-
-    filter_path = Path(args.filter)
-    if not filter_path.is_file():
-        print(f"ERROR: filter file not found: {filter_path}", file=sys.stderr)
+    if not _FILTER_PATH.is_file():
+        print(f"ERROR: filter file not found: {_FILTER_PATH}", file=sys.stderr)
         return 2
-    with filter_path.open() as f:
+    with _FILTER_PATH.open() as f:
         filter_data = json.load(f)
 
     targets = _resolve_all_targets(config, filter_data)
@@ -168,12 +159,7 @@ def main() -> int:
         print("No files on disk match any filtered entry. Nothing to do.")
         return 0
 
-    mode_label = "EXECUTE" if args.execute else "DRY RUN"
-    _print_targets(targets, mode_label)
-
-    if not args.execute:
-        print("\nDry-run only. Re-run with --execute to actually delete.")
-        return 0
+    _print_targets(targets, "EXECUTE")
 
     deleted, failed = _delete_targets(targets)
     print(f"\nDeleted: {deleted}  Failed: {failed}")

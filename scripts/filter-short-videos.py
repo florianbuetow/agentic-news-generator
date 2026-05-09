@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Add every downloaded file with no audio track or below a duration threshold to filefilter.json.
+"""Add every downloaded file with no audio track or below the configured transcription minimum duration to filefilter.json.
 
 Scans both ``data_downloads_videos_dir/<channel>/`` and
-``data_downloads_audio_dir/<channel>/`` for each channel (or a single
-channel via ``--channel``).
+``data_downloads_audio_dir/<channel>/`` for every channel.
 
 For each video file:
 - reads the matching ``.info.json`` under
@@ -13,21 +12,18 @@ For each video file:
 For each ``.wav`` in the audio dir with no corresponding video file
 (wav-only orphan), runs ``ffprobe`` on the wav for duration.
 
-Any file whose duration is below ``--max-duration`` (default 120s), or any
-video file with no audio stream, gets a ``<channel>/<video_id>`` entry
-added to ``config/filefilter.json`` under ``data_downloads_audio_dir``.
+Any file whose duration is below ``transcription.min_duration`` (from
+``config.yaml``), or any video file with no audio stream, gets a
+``<channel>/<video_id>`` entry added to ``config/filefilter.json`` under
+``data_downloads_audio_dir``.
 
 Does **not** delete any files. Pair with
-``scripts/remove-filtered-files.py --execute`` to sweep the newly-filtered
-files off disk (together with their upstream copies).
-
-Default is a dry-run that prints the entries it would add. Pass ``--write``
-to actually modify ``filefilter.json``.
+``scripts/remove-filtered-files.py`` to sweep the newly-filtered files
+off disk (together with their upstream copies).
 """
 
 from __future__ import annotations
 
-import argparse
 import json
 import re
 import subprocess
@@ -38,44 +34,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from config import Config
 
+_PROJECT_ROOT = Path(__file__).parent.parent
+_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
+_FILTER_PATH = _PROJECT_ROOT / "config" / "filefilter.json"
 _ID_RE = re.compile(r"\[([A-Za-z0-9_-]{11})\]\.[^.]+$")
 _VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".m4v"}
 _FILTER_KEY = "data_downloads_audio_dir"
-
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    ap = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    ap.add_argument(
-        "--max-duration",
-        type=int,
-        default=120,
-        help="Mark any file whose duration (seconds) is strictly less than this. Default: 120.",
-    )
-    ap.add_argument(
-        "--channel",
-        default=None,
-        help="Restrict to a single channel name. Default: all channels.",
-    )
-    ap.add_argument(
-        "--config",
-        default="config/config.yaml",
-        help="Path to config.yaml",
-    )
-    ap.add_argument(
-        "--filter",
-        default="config/filefilter.json",
-        help="Path to filefilter.json",
-    )
-    ap.add_argument(
-        "--write",
-        action="store_true",
-        help="Actually write the updated filter file (default: dry-run).",
-    )
-    return ap.parse_args()
 
 
 def _video_id_from_name(name: str) -> str | None:
@@ -166,10 +130,8 @@ def _ffprobe_has_audio(path: Path) -> bool:
     return bool(out.stdout.strip())
 
 
-def iter_channel_dirs(root: Path, only: str | None) -> list[Path]:
-    """Return every channel dir to scan under ``root``, or just ``only`` if given."""
-    if only is not None:
-        return [root / only]
+def iter_channel_dirs(root: Path) -> list[Path]:
+    """Return every channel dir under ``root``."""
     if not root.is_dir():
         return []
     return sorted(p for p in root.iterdir() if p.is_dir())
@@ -269,7 +231,6 @@ def collect_filter_matches(
     videos_dir: Path,
     audio_dir: Path,
     metadata_dir: Path,
-    channel_only: str | None,
     max_duration: int,
 ) -> tuple[list[tuple[str, str, int | None, str]], dict[str, int]]:
     """Walk every channel and return ``(matches, counters)`` across both dirs.
@@ -280,12 +241,8 @@ def collect_filter_matches(
     all_matches: list[tuple[str, str, int | None, str]] = []
     counters = {"channels": 0, "videos_scanned": 0, "audio_scanned": 0, "missing_info": 0}
 
-    video_channels = iter_channel_dirs(videos_dir, channel_only)
     video_names_seen: set[str] = set()
-    for v_ch in video_channels:
-        if not v_ch.is_dir():
-            print(f"WARN: channel dir not found: {v_ch}", file=sys.stderr)
-            continue
+    for v_ch in iter_channel_dirs(videos_dir):
         counters["channels"] += 1
         video_names_seen.add(v_ch.name)
         v_matches, seen_ids, v_scanned, v_missing = _scan_video_channel(v_ch, metadata_dir, max_duration)
@@ -296,8 +253,8 @@ def collect_filter_matches(
         all_matches.extend(a_matches)
         counters["audio_scanned"] += a_scanned
 
-    for a_ch in iter_channel_dirs(audio_dir, channel_only):
-        if a_ch.name in video_names_seen or not a_ch.is_dir():
+    for a_ch in iter_channel_dirs(audio_dir):
+        if a_ch.name in video_names_seen:
             continue
         counters["channels"] += 1
         a_matches, a_scanned = _scan_audio_channel(a_ch, set(), max_duration)
@@ -311,13 +268,12 @@ def _print_report(
     matches: list[tuple[str, str, int | None, str]],
     counters: dict[str, int],
     max_duration: int,
-    write_mode: bool,
     already: set[str],
     to_add: list[str],
 ) -> None:
-    """Print dry-run / write summary and the new entries grouped by channel."""
+    """Print scan summary and the new entries grouped by channel."""
     print("=" * 80)
-    print(f"{'WRITE' if write_mode else 'DRY RUN'} — filter-short-videos")
+    print("filter-short-videos")
     print("=" * 80)
     print(f"max_duration:        < {max_duration}s")
     print(f"channels scanned:    {counters['channels']}")
@@ -348,42 +304,34 @@ def _print_report(
 
 
 def main() -> int:
-    """Scan video + audio dirs, report matches, optionally update filter."""
-    args = parse_args()
-
-    config = Config(args.config)
+    """Scan every channel and merge any new short / no-audio entries into filefilter.json."""
+    config = Config(_CONFIG_PATH)
     videos_dir = config.getDataDownloadsVideosDir()
     audio_dir = config.getDataDownloadsAudioDir()
     metadata_dir = config.getDataDownloadsMetadataDir()
+    max_duration = config.getTranscriptionMinDuration()
 
     matches, counters = collect_filter_matches(
         videos_dir,
         audio_dir,
         metadata_dir,
-        args.channel,
-        args.max_duration,
+        max_duration,
     )
     if counters["channels"] == 0:
         print("No channels to scan.", file=sys.stderr)
         return 2
 
-    filter_path = Path(args.filter)
-    if not filter_path.is_file():
-        print(f"ERROR: filter file not found: {filter_path}", file=sys.stderr)
+    if not _FILTER_PATH.is_file():
+        print(f"ERROR: filter file not found: {_FILTER_PATH}", file=sys.stderr)
         return 2
-    filter_data = json.load(filter_path.open())
+    filter_data = json.load(_FILTER_PATH.open())
     existing = set(filter_data.get(_FILTER_KEY, []))
 
     new_keys = {f"{ch}/{vid}" for ch, vid, _, _ in matches}
     to_add = sorted(new_keys - existing)
     already = new_keys & existing
 
-    _print_report(matches, counters, args.max_duration, args.write, already, to_add)
-
-    if not args.write:
-        print()
-        print("Dry-run only. Re-run with --write to update the filter file.")
-        return 0
+    _print_report(matches, counters, max_duration, already, to_add)
 
     if not to_add:
         print()
@@ -392,9 +340,9 @@ def main() -> int:
 
     merged = sorted(existing | new_keys)
     filter_data[_FILTER_KEY] = merged
-    filter_path.write_text(json.dumps(filter_data, indent=4) + "\n")
+    _FILTER_PATH.write_text(json.dumps(filter_data, indent=4) + "\n")
     print()
-    print(f"Wrote {filter_path}: {len(existing)} → {len(merged)} entries")
+    print(f"Wrote {_FILTER_PATH}: {len(existing)} → {len(merged)} entries")
     return 0
 
 

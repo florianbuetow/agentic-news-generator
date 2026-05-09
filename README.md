@@ -171,8 +171,7 @@ just help
 #### Tools
 - `just find-files <video-id>` - Find all files for a video ID across all data directories
 - `just check-audio-track <channel> <video-id>` - Probe a downloaded video for audio stream presence + mean/max volume (flags `LOW_VOLUME` below `LOW_VOLUME_THRESHOLD_DB`, default `-40 dB`)
-- `uv run scripts/filter-short-videos.py [--write]` - Scan videos + audio dirs and add any file `<120s` (or any video with no audio stream) to `config/filefilter.json`
-- `uv run scripts/remove-filtered-files.py [--execute]` - Delete every file referenced by `filefilter.json` together with its upstream copies (video → audio → transcript pipeline)
+- `just filter-videos` - Scan videos + audio dirs, add any file shorter than `transcription.min_duration` (or any video with no audio stream) to `config/filefilter.json`, then delete every referenced file together with its upstream copies (video → audio → transcript pipeline)
 
 #### Development
 - `just init` - Initialize development environment
@@ -272,26 +271,15 @@ Individual videos can be excluded from transcription by adding them to `config/f
 2. Append `"<Channel>/<video_id>"` to the relevant key in `config/filefilter.json`
 3. Run `just transcribe` — matching files are skipped
 
-**Add entries automatically (short + no-audio sweep):**
+**Add entries automatically and delete the matching files (short + no-audio sweep):**
 ```bash
-# Scan every channel for files <120s OR videos with no audio stream
-uv run scripts/filter-short-videos.py              # dry run
-uv run scripts/filter-short-videos.py --write      # update filefilter.json
-
-# Optional: run for one channel only
-uv run scripts/filter-short-videos.py --channel Anthropic --write
-
-# Optional: change the threshold
-uv run scripts/filter-short-videos.py --max-duration 60 --write
+just filter-videos
 ```
-The scan walks `data_downloads_videos_dir/<channel>/` **and** `data_downloads_audio_dir/<channel>/` so orphan wav files without a matching video are also caught. For each video it runs `ffprobe` to verify an audio stream is present; videos without audio are added regardless of duration.
+This single target chains two scripts:
+1. `scripts/filter-short-videos.py` walks `data_downloads_videos_dir/<channel>/` **and** `data_downloads_audio_dir/<channel>/` (orphan wav files without a matching video are caught too). It uses `ffprobe` to verify audio presence and reads `.info.json` for duration. Any file shorter than `transcription.min_duration` (from `config.yaml`), or any video with no audio stream, is appended to `config/filefilter.json` under `data_downloads_audio_dir`.
+2. `scripts/remove-filtered-files.py` resolves every filter entry to concrete on-disk paths and unlinks them together with their upstream copies. The pipeline order is `videos → audio → transcripts`, so an entry under `data_downloads_audio_dir` also removes the video file; an entry under `data_downloads_transcripts_dir` removes audio and video too. Matching is lexical on the `[<video_id>]` substring, so every sibling file (`.info.json`, `.silence_map.json`, `._*` sidecars) is swept up automatically.
 
-**Delete already-filtered files from disk (with upstream cleanup):**
-```bash
-uv run scripts/remove-filtered-files.py            # dry run — shows what would be removed
-uv run scripts/remove-filtered-files.py --execute  # actually unlink
-```
-This resolves every entry in `filefilter.json` to concrete paths and removes them together with their upstream copies. The pipeline order is `videos → audio → transcripts`, so an entry under `data_downloads_audio_dir` also removes the video file; an entry under `data_downloads_transcripts_dir` removes audio and video too. Matching is lexical on the `[<video_id>]` substring, so every sibling file (`.info.json`, `.silence_map.json`, `._*` sidecars) is swept up automatically.
+The target is wired into `just all`, `just ingestion-all`, and `just all-quiet` immediately after `just check-video-integrity`. Both scripts read everything from `config/config.yaml` and operate on `config/filefilter.json`; they take no CLI arguments and there is no dry-run mode.
 
 **Probe a single video for audio health:**
 ```bash

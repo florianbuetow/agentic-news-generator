@@ -68,6 +68,7 @@ help:
     @printf "\033[0;33mData Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
     @printf "  %-38s %s\n" "check-video-integrity" "Check video files for corruption"
+    @printf "  %-38s %s\n" "filter-videos" "Filter and delete videos shorter than transcription.min_duration"
     @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
     @printf "  %-38s %s\n" "transcribe" "Transcribe audio files to text"
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
@@ -193,6 +194,7 @@ all:
     @just ci-quiet
     -@just download-videos
     @just check-video-integrity
+    @just filter-videos
     @just extract-audio
     @just transcribe
     @just archive-videos
@@ -207,6 +209,7 @@ ingestion-all:
     @just ci-quiet
     -@just download-videos
     @just check-video-integrity
+    @just filter-videos
     @just extract-audio
     @just transcribe
     @just archive-videos
@@ -246,6 +249,25 @@ check-video-integrity:
     @printf "\033[0;34m=== Checking Video File Integrity ===\033[0m\n"
     @uv run python scripts/check_video_integrity.py
     @echo ""
+
+# Filter and delete videos shorter than transcription.min_duration (or with no audio)
+filter-videos:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Filtering Short / No-Audio Videos ===\033[0m\n"
+    if ! uv run python scripts/filter-short-videos.py; then
+        printf "\033[0;31m✗ filter-videos failed: filter-short-videos.py errored\033[0m\n"
+        exit 1
+    fi
+    echo ""
+    printf "\033[0;34m=== Removing Filtered Files ===\033[0m\n"
+    if ! uv run python scripts/remove-filtered-files.py; then
+        printf "\033[0;31m✗ filter-videos failed: remove-filtered-files.py errored\033[0m\n"
+        exit 1
+    fi
+    printf "\033[0;32m✓ filter-videos completed successfully\033[0m\n"
+    echo ""
 
 # Transcribe audio files to text
 transcribe:
@@ -877,6 +899,10 @@ all-quiet:
     printf "🚀 Starting check-video-integrity...\n"
     just check-video-integrity > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Check-video-integrity failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed check-video-integrity\n"
+
+    printf "🚀 Starting filter-videos...\n"
+    just filter-videos > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Filter-videos failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "✅ Completed filter-videos\n"
 
     printf "🚀 Starting extract-audio...\n"
     just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
