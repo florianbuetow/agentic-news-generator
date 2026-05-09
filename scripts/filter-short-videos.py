@@ -40,6 +40,7 @@ _FILTER_PATH = _PROJECT_ROOT / "config" / "filefilter.json"
 _ID_RE = re.compile(r"\[([A-Za-z0-9_-]{11})\]\.[^.]+$")
 _VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".m4v"}
 _FILTER_KEY = "data_downloads_audio_dir"
+_PROGRESS_INTERVAL = 100
 
 
 def _video_id_from_name(name: str) -> str | None:
@@ -183,6 +184,7 @@ def _scan_video_channel(
     channel = ch_dir.name
     info_sub = metadata_dir / channel / "video"
 
+    print(f"Processing video channel: {channel}", flush=True)
     for video in sorted(ch_dir.iterdir()):
         if not video.is_file() or video.name.startswith("._"):
             continue
@@ -193,6 +195,8 @@ def _scan_video_channel(
             continue
         seen_ids.add(video_id)
         scanned += 1
+        if scanned % _PROGRESS_INTERVAL == 0:
+            print(f"  ... {channel}: scanned {scanned} videos ({len(matches)} matches so far)", flush=True)
         duration, reason, missing = _classify_video(video, info_sub, max_duration)
         if missing:
             missing_info += 1
@@ -212,6 +216,7 @@ def _scan_audio_channel(
     if not ch_dir.is_dir():
         return matches, scanned
     channel = ch_dir.name
+    announced = False
     for wav in sorted(ch_dir.iterdir()):
         if not wav.is_file() or wav.name.startswith("._"):
             continue
@@ -220,7 +225,12 @@ def _scan_audio_channel(
         video_id = _video_id_from_name(wav.name)
         if video_id is None or video_id in seen_ids:
             continue
+        if not announced:
+            print(f"Processing audio orphans: {channel}", flush=True)
+            announced = True
         scanned += 1
+        if scanned % _PROGRESS_INTERVAL == 0:
+            print(f"  ... {channel}: probed {scanned} wav orphans ({len(matches)} matches so far)", flush=True)
         duration = _ffprobe_duration(wav)
         if duration is not None and duration < max_duration:
             matches.append((channel, video_id, duration, "short_wav_orphan"))
