@@ -14,6 +14,7 @@ from pathlib import Path
 
 from src.config import Config
 from src.nlp.language_detector import LanguageDetector
+from src.util.channel_name import sanitize_channel_name
 from src.util.fs_util import FSUtil
 from src.util.log_util import configure_root_logger, get_logger
 
@@ -306,6 +307,9 @@ def main() -> int:
         logger.error(f"No channel directories found in {transcripts_dir}")
         return 1
 
+    # Build set of channel dir names configured as English
+    english_channel_dirs = {sanitize_channel_name(ch.name) for ch in config.get_channels() if ch.language == "en"}
+
     logger.info("Analyzing language distribution in transcripts...")
     logger.info("")
 
@@ -333,8 +337,8 @@ def main() -> int:
             result = analyze_file(txt_file, detector, min_confidence=min_confidence)
             file_results.append(result)
 
-            # Track non-English files
-            if not result.is_english_only:
+            # Track non-English files (only for channels configured as English)
+            if not result.is_english_only and channel_name in english_channel_dirs:
                 non_english_files_global.append((channel_name, txt_file, result))
 
             # Display progress
