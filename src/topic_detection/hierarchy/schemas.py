@@ -122,7 +122,7 @@ class LLMTopicLabelData(BaseModel):
 
     summary: str
     about: str
-    topic_labels: list[str]
+    topic_labels: list[str] = Field(..., min_length=2, max_length=5)
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
