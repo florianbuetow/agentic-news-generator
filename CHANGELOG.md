@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Topic tree visualization, MiniRAG export, and LM Studio status scripts
 - Comprehensive CI targets and development tooling in justfile
 - Configurable minimum video duration filter for transcription
+- LLM topic segmentation experiment with JSON schema enforcement on labels.
+- Sweep tool to detect short, silent, and no-audio video files.
+- Rate-throttled stats display and transcript summarization configuration.
+- Configurable minimum confidence threshold for language analysis.
+- Per-channel progress and failure reporting in video pipeline.
 
 ### Changed
 
@@ -50,6 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redesigned pipeline status display as a unified table layout
 - Improved English language detection using majority vote
 - Newspaper dev server port changed to 12000 with config-driven validation
+- Extracted language analysis into a standalone pipeline task.
+- Centralized application logging via shared utility module.
+- Redesigned topic-tree processing with fail-fast behavior and progress display.
 
 ### Removed
 
@@ -73,11 +81,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Non-alphabetic word filtering in language detection
 - Path construction in hallucination analysis notebook
 - Improved error message when LM Studio has no models loaded
+- Stats display uses correct transcript-based denominator and no longer reports false exit codes.
+- Language detection filters repetitive text patterns and respects configured English channels.
+- Transcription skips hidden WAV temp files from audio extraction.
+- Missing-SRT error messages now include directory path.
 
 ### Security
 
 - Pinned python-multipart>=0.0.22 to fix GHSA-wp53-j4wj-2cfg
 - Upgraded pip 25.3 to 26.0 for security fix
 - Upgraded vulnerable dependencies and suppressed yt-dlp format warning
+- Upgraded pillow, litellm, pip, nbconvert, and python-dotenv for CVE fixes.
+- Pinned transitive dependencies and bumped python-multipart and gitpython security pins.
 
 [Unreleased]: https://github.com/florianbuetow/agentic-news-generator/commits/main
