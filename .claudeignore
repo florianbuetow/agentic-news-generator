@@ -12,9 +12,15 @@
 # IDE/tool config
 .cursor/
 .playwright-mcp/
+.omx/
+
+# Generated files
+node_modules/
+uv.lock
 
 # Large non-source directories
 notebooks/
 reports/
 stubs/
 debug/
+docs/superpowers/
