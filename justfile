@@ -667,7 +667,7 @@ check-config-syntax:
 code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
-    @uv run pip-audit --skip-editable --ignore-vuln GHSA-xm59-rqc7-hhvf --ignore-vuln GHSA-7gcm-g887-7qv7 --ignore-vuln GHSA-5239-wwwm-4pmq  # TODO(2026-04-24): Review protobuf GHSA-7gcm-g887-7qv7 and pygments GHSA-5239-wwwm-4pmq for upstream fix
+    @uv run pip-audit --skip-editable
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""

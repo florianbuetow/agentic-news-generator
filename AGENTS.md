@@ -92,3 +92,50 @@
 - Contains playbooks for common failure modes (empty transcripts, corrupt videos, LLM pipeline stalls)
 - Check there first before writing new debug scripts
 
+<!-- progressive-disclosure:index:start -->
+## Documentation Index
+
+### Introduction
+- For project overview, features, and usage instructions, see [`README.md`](README.md)
+- For the newspaper frontend and its content system, see [`frontend/newspaper/README.md`](frontend/newspaper/README.md)
+- For a high-level technical walkthrough of the project, see [`docs/lightningtalk/project-blitz.md`](docs/lightningtalk/project-blitz.md)
+
+### Architecture
+- For the topic detection pipeline design, see [`docs/topic-detection.md`](docs/topic-detection.md)
+- For topic pipeline input/output specifications, see [`docs/topics_pipeline_specifications.md`](docs/topics_pipeline_specifications.md)
+- For the magnetic segment merging algorithm, see [`docs/magnetic_topics.md`](docs/magnetic_topics.md)
+- For the MiniSeg text segmentation approach, see [`docs/how to implement MiniSeg with python on text files.md`](docs/how%20to%20implement%20MiniSeg%20with%20python%20on%20text%20files.md)
+- For the transcription limit and date ordering design, see [`docs/superpowers/specs/2026-04-09-transcription-limit-and-date-ordering-design.md`](docs/superpowers/specs/2026-04-09-transcription-limit-and-date-ordering-design.md)
+- For the transcription limit implementation plan, see [`docs/superpowers/plans/2026-04-09-transcription-limit-and-date-ordering-plan.md`](docs/superpowers/plans/2026-04-09-transcription-limit-and-date-ordering-plan.md)
+
+### Research
+- For audio speech vs music detection approaches, see [`docs/research_music_vs_speech_detection.md`](docs/research_music_vs_speech_detection.md)
+- For text segmentation by semantic boundaries research, see [`reports/research_text_segmentation_semantic_boundaries.md`](reports/research_text_segmentation_semantic_boundaries.md)
+- For audio speech detection implementation research, see [`reports/research_audio_speech_detection.md`](reports/research_audio_speech_detection.md)
+
+### API & Reference
+- For the transcript summarization prompt template, see [`prompts/summarize-transcript.md`](prompts/summarize-transcript.md)
+
+### Development
+- For the shell script parameter detector tool, see [`tools/shellscript_analyzer/README.md`](tools/shellscript_analyzer/README.md)
+- For notebook restructuring tasks, see [`notebooks/shellscript_analyzer/NOTEBOOK_RESTRUCTURING_TODO.md`](notebooks/shellscript_analyzer/NOTEBOOK_RESTRUCTURING_TODO.md)
+
+### Operations
+- For diagnostic scripts and failure playbooks, see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
+- For the Gemini topics task investigation, see [`debug/gemini_topics_task.md`](debug/gemini_topics_task.md)
+
+### Reports
+- For topic detection quality comparison across LLMs, see [`reports/llm-topic-extraction-comparison/quality-review.md`](reports/llm-topic-extraction-comparison/quality-review.md)
+- For gap analysis between research and current pipeline, see [`reports/gap_analysis_merged.md`](reports/gap_analysis_merged.md)
+- For Codex-specific gap analysis, see [`reports/gap_analysis_codex.md`](reports/gap_analysis_codex.md)
+- For Gemini-specific gap analysis, see [`reports/gap_analysis_gemini.md`](reports/gap_analysis_gemini.md)
+- For agentic code evaluation results, see [`reports/agentic_code_evals.md`](reports/agentic_code_evals.md)
+- For model performance visualizations, see [`reports/visualizations/README.md`](reports/visualizations/README.md)
+- For shell environment variable violations, see [`reports/shell_env_var_violations.md`](reports/shell_env_var_violations.md)
+- For shell script parameter analysis, see [`reports/shell_script_params.md`](reports/shell_script_params.md)
+- For shell env detector test results, see [`reports/shell_env_detector_test_results.md`](reports/shell_env_detector_test_results.md)
+
+### Appendix
+- For the project changelog, see [`CHANGELOG.md`](CHANGELOG.md)
+<!-- progressive-disclosure:index:end -->
+
