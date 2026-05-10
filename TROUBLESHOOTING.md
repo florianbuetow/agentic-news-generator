@@ -16,6 +16,7 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | Total transcribed hours | `just audio-hours` |
 | Fetch missing `.info.json` | `just fetch-video-metadata <CHANNEL> <ID...>` |
 | Nuke every file for a video ID | `just clean-video-files VIDEO_ID=<id>` |
+| Find format-code artifacts | `find <audio_dir> -name '*.f[0-9]*.wav'` |
 
 ---
 
@@ -165,6 +166,41 @@ When deleting any artifact for a video ID (`.mp4`, `.mp4.part`, `.wav`, `.info.j
 Re-downloading a video without spoken word wastes bandwidth and disk and will be filtered out again.
 
 **Default: keep entry in `downloaded.txt`.** Only remove on explicit user confirmation that re-download is desired.
+
+## Playbook: Transcription Fails With "Metadata file not found"
+
+When `just transcribe` aborts with `Metadata file not found` for a `.f251-11.info.json` (or similar format-code suffix), the root cause is yt-dlp intermediate files left behind from a failed format merge.
+
+**How to identify:** The audio filename contains a format code like `.f251-11` between the video ID bracket and `.wav` — e.g. `Title [VIDEO_ID].f251-11.wav`. The corresponding `.wav` without the format code usually also exists. Metadata files never carry the format code, so the transcription script's stem-based lookup fails.
+
+**Steps:**
+
+1. `just find-files <VIDEO_ID>` — list all files for the video. Look for duplicate `.wav` entries with and without the format code.
+2. Remove **both** the `.f251-11.wav` artifact and the normal `.wav` (the normal one may also be from the same broken download session).
+3. Remove the video ID from `downloaded.txt` in the channel's videos directory:
+   ```bash
+   sed -i '' '/<VIDEO_ID>/d' /path/to/videos/<CHANNEL>/downloaded.txt
+   ```
+4. `just download-videos` — re-downloads the video cleanly.
+5. `just extract-audio` — regenerates the `.wav` from the fresh `.mp4`.
+6. Also clean up stale `.f251-11.silence_map.json` files under `metadata/<CHANNEL>/audio/` if they exist.
+7. `just transcribe` — should now succeed.
+
+**Why the normal `.wav` must also be removed:** The `.mp4` may still be intact on disk, so `just extract-audio` will skip extraction if a `.wav` already exists. Removing it forces re-extraction from the clean source.
+
+**Why `just transcribe` may show 0 pending after extract-audio:** If transcription was started before `extract-audio` finished, the channel's new `.wav` files aren't visible to that run. Run `just transcribe` again after `extract-audio` completes.
+
+---
+
+## Playbook: YouTube Cookies Expired During Download
+
+When `just download-videos` fails with `ERROR: YouTube cookies are expired or invalid. Aborting.`, Chrome's YouTube cookies have rotated mid-session. Channels processed before the rotation succeed; those after fail.
+
+1. Open Chrome, visit youtube.com, ensure you're logged in.
+2. Re-run `just download-videos` — yt-dlp re-extracts fresh cookies from Chrome on each channel.
+3. If it keeps failing, see yt-dlp wiki: https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies
+
+---
 
 ## Playbook: Pipeline Stalls at LLM Step
 
