@@ -79,11 +79,6 @@ help:
     @echo ""
     @printf "\033[0;33mTopic Detection:\033[0m\n"
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
-    @printf "  %-38s %s\n" "topics-tree" "Build hierarchical topic trees (TreeSeg-style)"
-    @printf "  %-38s %s\n" "topics-embed" "Generate embeddings from SRT transcripts (Step 1)"
-    @printf "  %-38s %s\n" "topics-boundaries" "Detect topic boundaries from embeddings (Step 2)"
-    @printf "  %-38s %s\n" "topics-extract" "Extract topics from segments using LLM (Step 3)"
-    @printf "  %-38s %s\n" "topics-visualize" "Generate visualizations from embeddings (Step 4)"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
     @echo ""
     @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
@@ -340,41 +335,6 @@ summarize-transcripts:
     @uv run python scripts/summarize-transcripts.py
     @echo ""
 
-# Generate embeddings from SRT transcripts (Step 1)
-topics-embed:
-    @echo ""
-    @printf "\033[0;34m=== Generating Embeddings from Transcripts ===\033[0m\n"
-    @uv run python scripts/generate-embeddings.py
-    @echo ""
-
-# Detect topic boundaries from embeddings (Step 2)
-topics-boundaries:
-    @echo ""
-    @printf "\033[0;34m=== Detecting Topic Boundaries ===\033[0m\n"
-    @uv run python scripts/detect-boundaries.py
-    @echo ""
-
-# Extract topics from segments using LLM (Step 3)
-topics-extract:
-    @echo ""
-    @printf "\033[0;34m=== Extracting Topics from Segments ===\033[0m\n"
-    @uv run python scripts/extract-topics.py
-    @echo ""
-
-# Build deterministic hierarchical topic trees (TreeSeg-style)
-topics-tree:
-    @echo ""
-    @printf "\033[0;34m=== Building Hierarchical Topic Trees ===\033[0m\n"
-    @uv run python scripts/topic-tree.py
-    @echo ""
-
-# Generate visualizations from embeddings (Step 4)
-topics-visualize:
-    @echo ""
-    @printf "\033[0;34m=== Generating Embedding Visualizations ===\033[0m\n"
-    @uv run python scripts/visualize-embeddings.py
-    @echo ""
-
 # Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
 topics-experiment:
     #!/usr/bin/env bash
@@ -395,11 +355,10 @@ export-to-minirag *ARGS:
     @uv run python scripts/export-to-minirag.py {{ ARGS }}
     @echo ""
 
-# Run complete topic detection pipeline (all 4 steps)
+# Run complete topic detection pipeline (placeholder; pipeline steps to be re-added)
 topics-all:
     @echo ""
     @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
-    @just topics-tree
     @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 

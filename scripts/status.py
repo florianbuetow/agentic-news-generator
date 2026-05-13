@@ -35,7 +35,6 @@ def get_channel_stats(  # noqa: C901
     transcripts_hallucinations_dir: Path,
     transcripts_cleaned_dir: Path,
     transcripts_summaries_dir: Path,
-    topics_dir: Path,
 ) -> dict[str, dict[str, int | float]]:
     """Get statistics for each channel across all pipeline stages.
 
@@ -50,10 +49,6 @@ def get_channel_stats(  # noqa: C901
             "hall_analysis": 0,
             "cleaned_transcripts": 0,
             "summaries": 0,
-            "topics_embeddings": 0,
-            "topics_segmentations": 0,
-            "topics_extracted": 0,
-            "topics_visualizations": 0,
             "total_size_bytes": 0,
         }
     )
@@ -119,28 +114,6 @@ def get_channel_stats(  # noqa: C901
                 count = sum(1 for f in channel_dir.iterdir() if f.suffix == ".md" and not f.name.startswith("._"))
                 stats[channel_dir.name]["summaries"] = count
 
-    # Count topic detection outputs
-    if topics_dir.exists():
-        for channel_dir in topics_dir.iterdir():
-            if channel_dir.is_dir():
-                channel_name = channel_dir.name
-
-                # Embeddings
-                emb_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_embeddings.json") and not f.name.startswith("._"))
-                stats[channel_name]["topics_embeddings"] = emb_count
-
-                # Segmentations
-                seg_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_segmentation.json") and not f.name.startswith("._"))
-                stats[channel_name]["topics_segmentations"] = seg_count
-
-                # Topics extracted
-                topics_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_topics.json") and not f.name.startswith("._"))
-                stats[channel_name]["topics_extracted"] = topics_count
-
-                # Visualizations
-                viz_count = sum(1 for f in channel_dir.iterdir() if f.name.endswith("_similarity.jpg") and not f.name.startswith("._"))
-                stats[channel_name]["topics_visualizations"] = viz_count
-
     return dict(stats)
 
 
@@ -171,10 +144,6 @@ STAT_KEYS = [
     "hall_analysis",
     "cleaned_transcripts",
     "summaries",
-    "topics_embeddings",
-    "topics_segmentations",
-    "topics_extracted",
-    "topics_visualizations",
 ]
 
 
@@ -227,10 +196,6 @@ def main() -> int:
     transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
     transcripts_summaries_dir = config.getDataDownloadsTranscriptsSummariesDir()
 
-    # Topics output directory
-    td_config = config.get_topic_detection_config()
-    topics_dir = config.getDataDir() / td_config.output_dir
-
     if not downloads_dir.exists():
         print(f"Error: Downloads directory not found: {downloads_dir}")
         return 1
@@ -242,7 +207,6 @@ def main() -> int:
         transcripts_hallucinations_dir,
         transcripts_cleaned_dir,
         transcripts_summaries_dir,
-        topics_dir,
     )
 
     if not channel_stats:
@@ -258,10 +222,6 @@ def main() -> int:
         "hall_analysis": sum(int(s["hall_analysis"]) for s in channel_stats.values()),
         "cleaned_transcripts": sum(int(s["cleaned_transcripts"]) for s in channel_stats.values()),
         "summaries": sum(int(s["summaries"]) for s in channel_stats.values()),
-        "topics_embeddings": sum(int(s["topics_embeddings"]) for s in channel_stats.values()),
-        "topics_segmentations": sum(int(s["topics_segmentations"]) for s in channel_stats.values()),
-        "topics_extracted": sum(int(s["topics_extracted"]) for s in channel_stats.values()),
-        "topics_visualizations": sum(int(s["topics_visualizations"]) for s in channel_stats.values()),
         "total_size_bytes": sum(float(s["total_size_bytes"]) for s in channel_stats.values()),
     }
 
@@ -278,7 +238,7 @@ def main() -> int:
 
     total_transcripts = int(totals["transcripts"])
     if total_transcripts > 0:
-        overall_pct = (totals["topics_extracted"] / total_transcripts) * 100
+        overall_pct = (totals["summaries"] / total_transcripts) * 100
         print(f"Overall Pipeline Completion: {overall_pct:.1f}%")
         print()
 
@@ -299,10 +259,6 @@ def main() -> int:
         ("Hall.", "Analysis", col_width),
         ("Cleaned", "Trans.", col_width),
         ("", "Summ.", col_width),
-        ("Topics", "Embed.", col_width),
-        ("Topics", "Segment.", col_width),
-        ("Topics", "Extract.", col_width),
-        ("Topics", "Visual.", col_width),
         ("", "%", col_width),
         ("", "GB", col_width),
     ]
@@ -330,7 +286,7 @@ def main() -> int:
     for channel_name in sorted(channel_stats.keys()):
         s = channel_stats[channel_name]
         transcripts_total = int(s["transcripts"])
-        completion_pct = (s["topics_extracted"] / transcripts_total * 100) if transcripts_total > 0 else 0.0
+        completion_pct = (s["summaries"] / transcripts_total * 100) if transcripts_total > 0 else 0.0
         size_gb = float(s["total_size_bytes"]) / (1024**3)
         display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
         prev_ch: dict[str, int] | None = prev_channels.get(channel_name)
@@ -338,7 +294,7 @@ def main() -> int:
 
     # Print totals row
     print("-" * line_width)
-    overall_pct = (totals["topics_extracted"] / total_transcripts * 100) if total_transcripts > 0 else 0.0
+    overall_pct = (totals["summaries"] / total_transcripts * 100) if total_transcripts > 0 else 0.0
     total_size_gb = float(totals["total_size_bytes"]) / (1024**3)
     prev_totals: dict[str, int] | None = previous.get("totals") if previous else None
     _print_stat_row("TOTAL", totals, prev_totals, overall_pct, total_size_gb, channel_width, col_width)

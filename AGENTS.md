@@ -10,12 +10,6 @@ For coding conventions, git rules, and project standards, see [`CONVENTIONS.md`]
 - For the newspaper frontend and its content system, see [`frontend/newspaper/README.md`](frontend/newspaper/README.md)
 - For a high-level technical walkthrough of the project, see [`docs/lightningtalk/project-blitz.md`](docs/lightningtalk/project-blitz.md)
 
-### Architecture
-- For the topic detection pipeline design, see [`docs/topic-detection.md`](docs/topic-detection.md)
-- For topic pipeline input/output specifications, see [`docs/topics_pipeline_specifications.md`](docs/topics_pipeline_specifications.md)
-- For the magnetic segment merging algorithm, see [`docs/magnetic_topics.md`](docs/magnetic_topics.md)
-- For the MiniSeg text segmentation approach, see [`docs/how to implement MiniSeg with python on text files.md`](docs/how%20to%20implement%20MiniSeg%20with%20python%20on%20text%20files.md)
-
 ### Research
 - For audio speech vs music detection approaches, see [`docs/research_music_vs_speech_detection.md`](docs/research_music_vs_speech_detection.md)
 

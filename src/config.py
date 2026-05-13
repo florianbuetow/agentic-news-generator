@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 
 class ParagraphConfig(BaseModel):
@@ -139,153 +139,6 @@ class TopicSegmentationConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class TopicDetectionEmbeddingConfig(BaseModel):
-    """Configuration for topic detection embedding generation."""
-
-    provider: str = Field(..., description="Embedding provider type (e.g., 'lmstudio')")
-    model_name: str = Field(..., description="Model name for embedding generation")
-    api_base: str | None = Field(..., description="API base URL for the embedding service")
-    api_key: str | None = Field(..., description="API key for the embedding service (use 'lm-studio' for local LM Studio)")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicDetectionSlidingWindowConfig(BaseModel):
-    """Configuration for topic detection sliding window segmenter."""
-
-    window_size: int = Field(..., gt=0, description="Number of words per chunk for embedding")
-    stride: int = Field(..., gt=0, description="Number of words to advance between chunks")
-    threshold_method: str = Field(..., description="Method for determining boundaries ('relative', 'absolute', 'percentile')")
-    threshold_value: float = Field(..., description="Threshold value for boundary detection")
-    smoothing_passes: int = Field(..., ge=0, description="Number of smoothing passes on similarity curve")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicDetectionHierarchicalSegmentationConfig(BaseModel):
-    """Configuration for deterministic hierarchical topic segmentation."""
-
-    enabled: bool = Field(..., description="Enable hierarchical topic segmentation output")
-    method: str = Field(..., description="Segmentation method identifier")
-    context_window_entries: int = Field(..., gt=0, description="Number of SRT entries in each embedding context block")
-    max_depth: int = Field(..., ge=0, description="Maximum depth of the binary topic tree (0=root only)")
-    min_leaf_entries: int = Field(..., gt=0, description="Minimum SRT entries in each leaf node")
-    min_leaf_seconds: float = Field(..., ge=0, description="Minimum duration in seconds for each leaf node")
-    min_gain: float = Field(..., ge=0, description="Minimum SSE gain required to accept a split")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    @field_validator("method")
-    @classmethod
-    def validate_method(cls, method: str) -> str:
-        """Validate supported hierarchical segmentation methods."""
-        valid = {"treeseg_divisive_sse"}
-        if method not in valid:
-            raise ValueError(f"Invalid hierarchical segmentation method: '{method}'. Supported: {', '.join(sorted(valid))}")
-        return method
-
-
-class TopicDetectionTaxonomyConfig(BaseModel):
-    """Configuration for deterministic taxonomy mapping."""
-
-    enabled: bool = Field(..., description="Enable taxonomy label mapping for each node")
-    taxonomy_name: str = Field(..., min_length=1, description="Taxonomy identifier (e.g., 'acm_ccs_2012')")
-    acm_ccs_2012_xml_path: str = Field(..., min_length=1, description="Path to ACM CCS 2012 SKOS XML (relative to data_dir)")
-    cache_dir: str = Field(..., min_length=1, description="Directory for cached taxonomy embeddings (relative to data_dir)")
-    top_k_per_node: int = Field(..., gt=0, description="Top-K taxonomy labels to emit per node")
-    min_similarity: float = Field(..., ge=0.0, le=1.0, description="Minimum cosine similarity threshold to emit a label")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicDetectionTFIDFKeyphrasesConfig(BaseModel):
-    """Configuration for deterministic TF-IDF keyphrase extraction."""
-
-    enabled: bool = Field(..., description="Enable TF-IDF keyphrase extraction for each node")
-    top_k_per_node: int = Field(..., gt=0, description="Top-K TF-IDF keyphrases to emit per node")
-    ngram_range_min: int = Field(..., ge=1, description="Minimum n-gram length for keyphrases")
-    ngram_range_max: int = Field(..., ge=1, description="Maximum n-gram length for keyphrases")
-    min_df: int = Field(..., ge=1, description="Minimum document frequency for terms")
-    max_df: float = Field(..., gt=0.0, le=1.0, description="Maximum document frequency fraction for terms (0-1)")
-    stop_words: str | None = Field(..., description="Stop word list name (e.g., 'english') or None")
-    max_features: int = Field(..., gt=0, description="Maximum vocabulary size for TF-IDF")
-    lowercase: bool = Field(..., description="Lowercase text before tokenization")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    @field_validator("ngram_range_max")
-    @classmethod
-    def validate_ngram_range(cls, ngram_range_max: int, info: ValidationInfo) -> int:
-        """Validate that ngram_range_max is >= ngram_range_min."""
-        ngram_range_min_raw = info.data.get("ngram_range_min")
-        if ngram_range_min_raw is None:
-            raise ValueError("ngram_range_min must be provided")
-
-        ngram_range_min = cast(int, ngram_range_min_raw)
-        if ngram_range_max < ngram_range_min:
-            raise ValueError("ngram_range_max must be >= ngram_range_min")
-        return ngram_range_max
-
-
-class TopicDetectionYAKEKeyphrasesConfig(BaseModel):
-    """Configuration for YAKE keyphrase extraction."""
-
-    enabled: bool = Field(..., description="Enable YAKE keyphrase extraction for each node")
-    top_k_per_node: int = Field(..., gt=0, description="Top-K YAKE keyphrases to emit per node")
-    max_ngram_size: int = Field(..., ge=1, description="Maximum n-gram size for keyphrases")
-    deduplication_threshold: float = Field(..., ge=0.0, le=1.0, description="Deduplication threshold for similar keyphrases")
-    deduplication_algo: str = Field(..., description="Deduplication algorithm ('seqm' or 'lev')")
-    window_size: int = Field(..., ge=1, description="Window size for co-occurrence statistics")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicDetectionKeyBERTKeyphrasesConfig(BaseModel):
-    """Configuration for KeyBERT keyphrase extraction."""
-
-    enabled: bool = Field(..., description="Enable KeyBERT keyphrase extraction for each node")
-    top_k_per_node: int = Field(..., gt=0, description="Top-K KeyBERT keyphrases to emit per node")
-    keyphrase_ngram_range_min: int = Field(..., ge=1, description="Minimum n-gram length for keyphrases")
-    keyphrase_ngram_range_max: int = Field(..., ge=1, description="Maximum n-gram length for keyphrases")
-    use_mmr: bool = Field(..., description="Use Maximal Marginal Relevance for diverse keyphrases")
-    mmr_diversity: float = Field(..., ge=0.0, le=1.0, description="MMR diversity parameter (0=most similar, 1=most diverse)")
-    stop_words: str | None = Field(..., description="Stop word list name (e.g., 'english') or None")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    @field_validator("keyphrase_ngram_range_max")
-    @classmethod
-    def validate_ngram_range(cls, keyphrase_ngram_range_max: int, info: ValidationInfo) -> int:
-        """Validate that keyphrase_ngram_range_max is >= keyphrase_ngram_range_min."""
-        keyphrase_ngram_range_min_raw = info.data.get("keyphrase_ngram_range_min")
-        if keyphrase_ngram_range_min_raw is None:
-            raise ValueError("keyphrase_ngram_range_min must be provided")
-
-        keyphrase_ngram_range_min = cast(int, keyphrase_ngram_range_min_raw)
-        if keyphrase_ngram_range_max < keyphrase_ngram_range_min:
-            raise ValueError("keyphrase_ngram_range_max must be >= keyphrase_ngram_range_min")
-        return keyphrase_ngram_range_max
-
-
-class TopicDetectionKeyphrasesConfig(BaseModel):
-    """Container configuration for all keyphrase extraction methods."""
-
-    tfidf: TopicDetectionTFIDFKeyphrasesConfig = Field(..., description="TF-IDF keyphrase extraction configuration")
-    yake: TopicDetectionYAKEKeyphrasesConfig = Field(..., description="YAKE keyphrase extraction configuration")
-    keybert: TopicDetectionKeyBERTKeyphrasesConfig = Field(..., description="KeyBERT keyphrase extraction configuration")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicDetectionLLMLabelConfig(BaseModel):
-    """Configuration for LLM-based topic labeling."""
-
-    enabled: bool = Field(..., description="Enable LLM topic labeling for each node")
-    llm: LLMConfig = Field(..., description="LLM connection configuration")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
 class TopicsExperimentConfig(BaseModel):
     """Configuration for the experimental LLM topic segmentation script."""
 
@@ -313,19 +166,11 @@ class SummarizeTranscriptsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class TopicDetectionConfig(BaseModel):
-    """Complete topic detection configuration."""
+class TopicsConfig(BaseModel):
+    """Configuration for topic extraction from hallucination-freed SRT transcripts."""
 
-    embedding: TopicDetectionEmbeddingConfig = Field(..., description="Embedding generator configuration")
-    sliding_window: TopicDetectionSlidingWindowConfig = Field(..., description="Sliding window segmenter configuration")
-    topic_detection_llm: LLMConfig = Field(..., description="LLM config for topic extraction agent")
-    hierarchical_segmentation: TopicDetectionHierarchicalSegmentationConfig = Field(
-        ..., description="Hierarchical topic segmentation configuration"
-    )
-    taxonomy: TopicDetectionTaxonomyConfig = Field(..., description="Taxonomy mapping configuration")
-    keyphrases: TopicDetectionKeyphrasesConfig = Field(..., description="Keyphrase extraction configuration")
-    llm_label: TopicDetectionLLMLabelConfig = Field(..., description="LLM-based topic labeling configuration")
-    output_dir: str = Field(..., description="Output directory for topic detection results")
+    input_dir: str = Field(..., min_length=1, description="Input directory of hallucination-freed SRT files (relative to data_dir)")
+    output_dir: str = Field(..., min_length=1, description="Output directory for topic extraction results (relative to data_dir)")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -430,10 +275,6 @@ class Config:
         # Validate transcription section if present
         if "transcription" in self._data:
             self._transcription = self._validate_transcription()
-
-        # Validate topic_detection section if present
-        if "topic_detection" in self._data:
-            self._topic_detection = self._validate_topic_detection()
 
         # Validate topics_experiment section if present
         if "topics_experiment" in self._data:
@@ -600,21 +441,6 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Summarize transcripts configuration validation failed: {error_messages}") from e
 
-    def _validate_topic_detection(self) -> TopicDetectionConfig:
-        """Validate topic detection configuration.
-
-        Returns:
-            Validated TopicDetectionConfig instance.
-
-        Raises:
-            ValueError: If topic detection configuration is invalid.
-        """
-        try:
-            return TopicDetectionConfig.model_validate(self._data["topic_detection"])
-        except ValidationError as e:
-            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
-            raise ValueError(f"Topic detection configuration validation failed: {error_messages}") from e
-
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -666,19 +492,6 @@ class Config:
         if not hasattr(self, "_summarize_transcripts"):
             raise KeyError("Missing required key 'summarize_transcripts' in config file")
         return self._summarize_transcripts
-
-    def get_topic_detection_config(self) -> TopicDetectionConfig:
-        """Get topic detection configuration.
-
-        Returns:
-            TopicDetectionConfig instance.
-
-        Raises:
-            KeyError: If topic_detection section is not configured.
-        """
-        if not hasattr(self, "_topic_detection"):
-            raise KeyError("Missing required key 'topic_detection' in config file")
-        return self._topic_detection
 
     def getEncodingName(self) -> str:
         """Get default tiktoken encoding for token counting."""

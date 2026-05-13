@@ -59,38 +59,6 @@ def collect_required_models(config: _Cfg) -> list[RequiredModel]:
                 )
             )
 
-    td = _sub(config, "topic_detection")
-    emb = _sub(td, "embedding")
-    if emb.get("api_base"):
-        models.append(
-            RequiredModel(
-                section="topic_detection.embedding",
-                model=str(emb["model_name"]),
-                api_base=str(emb["api_base"]),
-            )
-        )
-
-    td_llm = _sub(td, "topic_detection_llm")
-    if td_llm.get("api_base"):
-        models.append(
-            RequiredModel(
-                section="topic_detection.topic_detection_llm",
-                model=str(td_llm["model"]),
-                api_base=str(td_llm["api_base"]),
-            )
-        )
-
-    llm_label = _sub(td, "llm_label")
-    llm_label_llm = _sub(llm_label, "llm")
-    if llm_label_llm.get("api_base"):
-        models.append(
-            RequiredModel(
-                section="topic_detection.llm_label.llm",
-                model=str(llm_label_llm["model"]),
-                api_base=str(llm_label_llm["api_base"]),
-            )
-        )
-
     return models
 
 
