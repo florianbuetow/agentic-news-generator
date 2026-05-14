@@ -79,6 +79,7 @@ help:
     @echo ""
     @printf "\033[0;33mTopic Detection:\033[0m\n"
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
+    @printf "  %-38s %s\n" "extract-topics" "Extract topics from hallucination-freed SRT transcripts"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
     @echo ""
     @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
@@ -333,6 +334,13 @@ summarize-transcripts:
     @echo ""
     @printf "\033[0;34m=== Summarizing Cleaned Transcripts ===\033[0m\n"
     @uv run python scripts/summarize-transcripts.py
+    @echo ""
+
+# Extract topics from hallucination-freed SRT transcripts
+extract-topics:
+    @echo ""
+    @printf "\033[0;34m=== Extracting Topics from Transcripts ===\033[0m\n"
+    @uv run python scripts/extract-topics.py
     @echo ""
 
 # Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)

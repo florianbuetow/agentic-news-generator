@@ -171,6 +171,7 @@ class TopicsConfig(BaseModel):
 
     input_dir: str = Field(..., min_length=1, description="Input directory of hallucination-freed SRT files (relative to data_dir)")
     output_dir: str = Field(..., min_length=1, description="Output directory for topic extraction results (relative to data_dir)")
+    launcher_script: str = Field(..., min_length=1, description="Absolute path to the topic-boundary launcher shell script")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -283,6 +284,10 @@ class Config:
         # Validate summarize_transcripts section if present
         if "summarize_transcripts" in self._data:
             self._summarize_transcripts = self._validate_summarize_transcripts()
+
+        # Validate topics section if present
+        if "topics" in self._data:
+            self._topics = self._validate_topics()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -441,6 +446,14 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Summarize transcripts configuration validation failed: {error_messages}") from e
 
+    def _validate_topics(self) -> TopicsConfig:
+        """Validate topics configuration."""
+        try:
+            return TopicsConfig.model_validate(self._data["topics"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Topics configuration validation failed: {error_messages}") from e
+
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -492,6 +505,12 @@ class Config:
         if not hasattr(self, "_summarize_transcripts"):
             raise KeyError("Missing required key 'summarize_transcripts' in config file")
         return self._summarize_transcripts
+
+    def get_topics_config(self) -> TopicsConfig:
+        """Get topics configuration."""
+        if not hasattr(self, "_topics"):
+            raise KeyError("Missing required key 'topics' in config file")
+        return self._topics
 
     def getEncodingName(self) -> str:
         """Get default tiktoken encoding for token counting."""
