@@ -139,8 +139,10 @@ topics:
   input_dir: downloads/transcripts_cleaned
   # Output directory for topic extraction results (relative to data_dir)
   output_dir: output/topics
-  # Topic-boundary launcher script (invokes Codex with PROMPT.generated.md)
-  launcher_script: /path/to/blogpost-topic-boundary-detection/scripts/run_codex_prompt.sh
+  # Codex model passed to `codex exec -m` (mini variant for speed/cost)
+  codex_model: gpt-5.4-mini
+  # Prompt template (relative to project root)
+  prompt_template: prompts/extract-topic-boundaries.md
 
 # Default parameter values
 defaults:

@@ -82,17 +82,19 @@ if [ "$COOKIE_ERROR" -eq 1 ]; then
     echo ""
     echo "ERROR: YouTube cookies are expired or invalid. Aborting."
     echo "Re-export cookies from your browser to fix this."
-    exit 1
+    exit 10
 fi
 
-# Exit code 0: All videos succeeded
-# Exit code 1: Some videos failed (private, members-only, deleted, etc.)
-# Exit code > 1: Fatal error (network, auth, etc.)
+# Exit codes consumed by scripts/yt-downloader.py:
+#   0  = success (all videos downloaded, OR some unavailable but no fatal error)
+#   10 = cookie / bot-detection failure (handled above)
+#   11 = yt-dlp reported a fatal error (network, auth, parser, etc.)
 #
-# We treat exit code 1 as success since we expect some videos to be unavailable
-# and the goal is to download as many videos as possible, not all of them.
+# yt-dlp exit codes 0 and 1 are both treated as success: code 1 means some
+# items were skipped (private, members-only, deleted) which is expected and
+# not actionable. Anything higher is a fatal error we want to surface.
 if [ $exit_code -eq 0 ] || [ $exit_code -eq 1 ]; then
     exit 0
 else
-    exit $exit_code
+    exit 11
 fi

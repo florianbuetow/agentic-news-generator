@@ -12,6 +12,14 @@ from src.util.log_util import configure_root_logger, get_logger
 
 logger = get_logger(__name__)
 
+EXIT_CODE_REASONS: dict[int, str] = {
+    10: (
+        "YouTube cookies are expired or invalid - re-export cookies from your browser "
+        "(see reports/video-download.log for the yt-dlp warning that triggered this)"
+    ),
+    11: ("yt-dlp reported a fatal error (network, auth, parser, etc.) - see reports/video-download.log for details"),
+}
+
 
 def main() -> None:
     """Read config.yaml and invoke yt-downloader.sh for each channel."""
@@ -69,7 +77,10 @@ def main() -> None:
                 logger.info(f"Successfully processed {channel.name}")
                 success_count += 1
             else:
-                reason = f"yt-downloader.sh exited with code {result.returncode}"
+                reason = EXIT_CODE_REASONS.get(
+                    result.returncode,
+                    f"yt-downloader.sh exited with unmapped code {result.returncode}",
+                )
                 logger.error(f"Failed to process {channel.name}: {reason}")
                 failure_count += 1
                 failed_channels.append((channel.name, reason))

@@ -171,7 +171,12 @@ class TopicsConfig(BaseModel):
 
     input_dir: str = Field(..., min_length=1, description="Input directory of hallucination-freed SRT files (relative to data_dir)")
     output_dir: str = Field(..., min_length=1, description="Output directory for topic extraction results (relative to data_dir)")
-    launcher_script: str = Field(..., min_length=1, description="Absolute path to the topic-boundary launcher shell script")
+    codex_model: str = Field(..., min_length=1, description="Codex model identifier passed to `codex exec -m`")
+    prompt_template: str = Field(
+        ...,
+        min_length=1,
+        description="Prompt template path (relative to project root) with {{INPUT_SRT_FILE}} and {{OUTPUT_JSON_FILE}} placeholders",
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
