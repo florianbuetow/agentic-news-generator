@@ -821,11 +821,14 @@ search QUERY="":
         done
     else
         export _SUMMARIES_DIR="$summaries_dir"
-        selected=$(rg --line-number --no-heading --color=always "." "$summaries_dir" --glob "*.md" \
-            | sed "s|${summaries_dir}/||" \
-            | fzf --ansi --delimiter : \
-                  --preview 'clean=$(echo {} | sed "s/\x1b\[[0-9;]*m//g"); f=$(echo "$clean" | cut -d: -f1); glow "$_SUMMARIES_DIR/$f" | (rg --passthru --color=always -- {q} 2>/dev/null || cat)' \
-                  --preview-window right:60%) || true
+        selected=$(
+            : | fzf --disabled --ansi --delimiter : \
+                  --header 'Type to search summaries | Enter opens in Sublime Text' \
+                  --bind "start:reload(rg --line-number --no-heading --color=always --colors 'path:none' --colors 'line:none' --colors 'match:fg:cyan' '.' \"$summaries_dir\" --glob '*.md' | sed 's|${summaries_dir}/||')" \
+                  --bind "change:reload(rg --line-number --no-heading --color=always --colors 'path:none' --colors 'line:none' --colors 'match:fg:cyan' --fixed-strings -- {q} \"$summaries_dir\" --glob '*.md' 2>/dev/null | sed 's|${summaries_dir}/||' || true)" \
+                  --preview 'f=$(echo {1} | sed "s/\x1b\[[0-9;]*m//g"); if [[ -n "$FZF_QUERY" ]]; then glow "$_SUMMARIES_DIR/$f" 2>/dev/null | rg --passthru --color=always --colors "match:fg:cyan" --fixed-strings --ignore-case -- "$FZF_QUERY" 2>/dev/null || glow "$_SUMMARIES_DIR/$f" 2>/dev/null; else glow "$_SUMMARIES_DIR/$f" 2>/dev/null; fi' \
+                  --preview-window right:60%
+        ) || true
         if [[ -n "$selected" ]]; then
             clean=$(echo "$selected" | sed 's/\x1b\[[0-9;]*m//g')
             file="${summaries_dir}/$(echo "$clean" | cut -d: -f1)"
