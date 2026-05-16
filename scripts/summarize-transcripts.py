@@ -210,7 +210,8 @@ def process_pending(
         logger.info(f"[{idx}/{len(pending)}] {idx / len(pending) * 100:5.1f}% ETA {format_eta(eta_seconds)}  {rel_path}")
 
         status, success, error = process_single_file(txt_file, output_file, prompt_template, llm, encoder)
-        logger.info(f"  -> {status}")
+        if status != "ok":
+            logger.info(f"  -> {status}")
 
         if error:
             logger.warning(f"  Note: {error}")
