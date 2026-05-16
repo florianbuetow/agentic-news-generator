@@ -797,7 +797,7 @@ find QUERY="":
             printf "%4d  %s/%s\n" "$count" "$(basename "$(dirname "$f")")" "$(basename "$f")"
         done
     else
-        selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1 --nth -2,-1 --tiebreak=length --preview 'bat --color=always {} | GREP_COLOR="01;33" grep --color=always -iE "({q}|$)"' --preview-window right:60%) || true
+        selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1 --nth -2,-1 --tiebreak=length --preview 'bat --color=always {}' --preview-window right:60%) || true
         if [[ -n "$selected" ]]; then
             subl "$selected"
             printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$selected")"
