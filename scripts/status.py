@@ -376,11 +376,11 @@ def main() -> int:  # noqa: C901
     columns.extend(
         [
             ("Tran-", "scripts", col_width),
-        ("Hall.", "Analysis", col_width),
-        ("Cleaned", "Trans.", col_width),
-        ("", "Summ.", col_width),
-        ("", "%", col_width),
-        ("", "GB", col_width),
+            ("Hall.", "Analysis", col_width),
+            ("Cleaned", "Trans.", col_width),
+            ("", "Summ.", col_width),
+            ("", "%", col_width),
+            ("", "GB", col_width),
         ]
     )
 
