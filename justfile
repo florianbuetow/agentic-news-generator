@@ -820,13 +820,15 @@ search QUERY="":
             printf "%4d  %s/%s\n" "$count" "$(basename "$(dirname "$f")")" "$(basename "$f")"
         done
     else
-        selected=$(rg --line-number --no-heading --color=never "" "$summaries_dir" --glob "*.md" \
+        export _SUMMARIES_DIR="$summaries_dir"
+        selected=$(rg --line-number --no-heading --color=always "." "$summaries_dir" --glob "*.md" \
             | sed "s|${summaries_dir}/||" \
-            | fzf --delimiter : \
-                  --preview "p=\"${summaries_dir}/{1}\"; glow \"\$p\"" \
+            | fzf --ansi --delimiter : \
+                  --preview 'clean=$(echo {} | sed "s/\x1b\[[0-9;]*m//g"); f=$(echo "$clean" | cut -d: -f1); glow "$_SUMMARIES_DIR/$f" | (rg --passthru --color=always -- {q} 2>/dev/null || cat)' \
                   --preview-window right:60%) || true
         if [[ -n "$selected" ]]; then
-            file="${summaries_dir}/$(echo "$selected" | cut -d: -f1)"
+            clean=$(echo "$selected" | sed 's/\x1b\[[0-9;]*m//g')
+            file="${summaries_dir}/$(echo "$clean" | cut -d: -f1)"
             subl "$file"
             printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$file")"
         fi
