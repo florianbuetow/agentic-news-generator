@@ -783,7 +783,7 @@ find:
     printf "\033[0;34m=== Finding Cleaned Transcripts ===\033[0m\n"
     echo ""
     cleaned_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.getDataDownloadsTranscriptsCleanedDir())")
-    selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1) || true
+    selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1 --preview 'bat --color=always {}' --preview-window right:60%) || true
     if [[ -n "$selected" ]]; then
         subl "$selected"
         printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$selected")"
