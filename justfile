@@ -63,6 +63,7 @@ help:
     @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @printf "  %-38s %s\n" "stats [hour|day]" "Show processing status (throttle: once per hour/day)"
+    @printf "  %-38s %s\n" "totals [hour|day]" "Show processing status with transcript time totals"
     @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
     @echo ""
     @printf "\033[0;33mData Pipeline:\033[0m\n"
@@ -112,6 +113,7 @@ help:
     @printf "  %-38s %s\n" "ai-review-shell-scripts-nocache" "Run AI-powered shell script reviewer (no cache)"
     @echo ""
     @printf "\033[0;33mTools:\033[0m\n"
+    @printf "  %-38s %s\n" "find" "Interactively search cleaned transcripts with fzf and open in Sublime Text"
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-38s %s\n" "fetch-video-metadata <channel> <id...>" "Fetch missing .info.json for video IDs"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
@@ -405,6 +407,40 @@ stats period="":
     clear
     echo ""
     uv run scripts/status.py $cache_flag
+    echo ""
+    if [[ -n "$stats_from" ]]; then
+        printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
+    fi
+
+# Show processing status of downloads with transcript time totals enabled
+totals period="":
+    #!/usr/bin/env bash
+    cache_flag=""
+    stats_from=""
+    if [[ "{{period}}" == "hour" ]]; then
+        stamp="/tmp/stats-hour.stamp"
+        now=$(date +%s)
+        if [[ ! -f "$stamp" ]] || (( now - $(stat -f "%m" "$stamp") >= 3600 )); then
+            touch "$stamp"
+        else
+            cache_flag="--no-update-cache"
+        fi
+        stats_from=$(date -r "$(stat -f "%m" "$stamp")" "+%Y-%m-%d %H:%M:%S")
+    elif [[ "{{period}}" == "day" ]]; then
+        stamp="/tmp/stats-day.stamp"
+        if [[ ! -f "$stamp" || "$(stat -f "%Sm" -t "%Y-%m-%d" "$stamp")" != "$(date +%Y-%m-%d)" ]]; then
+            touch "$stamp"
+        else
+            cache_flag="--no-update-cache"
+        fi
+        stats_from=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M:%S" "$stamp")
+    elif [[ -n "{{period}}" ]]; then
+        echo "Unknown period: {{period}}. Use 'hour' or 'day'."
+        exit 1
+    fi
+    clear
+    echo ""
+    SHOW_TIM=True SHOW_TIME=True uv run scripts/status.py $cache_flag
     echo ""
     if [[ -n "$stats_from" ]]; then
         printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
@@ -739,6 +775,20 @@ fetch-video-metadata CHANNEL +VIDEO_IDS:
     @echo ""
     @uv run python scripts/fetch-video-metadata.py {{ CHANNEL }} {{ VIDEO_IDS }}
     @echo ""
+
+# Interactively search cleaned transcripts with fzf and open selected file in Sublime Text
+find:
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Finding Cleaned Transcripts ===\033[0m\n"
+    echo ""
+    cleaned_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.getDataDownloadsTranscriptsCleanedDir())")
+    selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1) || true
+    if [[ -n "$selected" ]]; then
+        subl "$selected"
+        printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$selected")"
+    fi
+    echo ""
 
 # Find all files for a video ID across all data directories
 find-files VIDEO_ID:
