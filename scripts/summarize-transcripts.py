@@ -186,6 +186,12 @@ def collect_pending_files(
 
         pending.append((txt_file, output_file))
 
+    pending_per_channel: dict[str, int] = {}
+    for txt_file, _ in pending:
+        pending_per_channel[txt_file.parent.name] = pending_per_channel.get(txt_file.parent.name, 0) + 1
+
+    pending.sort(key=lambda pair: (pending_per_channel[pair[0].parent.name], pair[0].parent.name, pair[0].name))
+
     return pending, len(txt_files), already_done, empty_files
 
 
