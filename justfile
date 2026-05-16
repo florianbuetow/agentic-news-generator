@@ -113,7 +113,7 @@ help:
     @printf "  %-38s %s\n" "ai-review-shell-scripts-nocache" "Run AI-powered shell script reviewer (no cache)"
     @echo ""
     @printf "\033[0;33mTools:\033[0m\n"
-    @printf "  %-38s %s\n" "find" "Interactively search cleaned transcripts with fzf and open in Sublime Text"
+    @printf "  %-38s %s\n" "find [query]" "Interactively search cleaned transcripts; with query, list matching files"
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-38s %s\n" "fetch-video-metadata <channel> <id...>" "Fetch missing .info.json for video IDs"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
@@ -182,10 +182,16 @@ check:
 
 # Run the main application
 run:
-    @echo ""
-    @printf "\033[0;34m=== Running Application ===\033[0m\n"
-    @uv run src/main.py
-    @echo ""
+    @just download-videos
+    @just check-video-integrity
+    @just filter-videos
+    @just extract-audio
+    @just transcribe
+    @just archive-videos
+    @just analyze-transcripts-hallucinations
+    @just transcripts-remove-hallucinations
+    @just analyze-transcript-languages
+    @just summarize-transcripts
 
 # Run the complete pipeline
 all:
@@ -440,7 +446,7 @@ totals period="":
     fi
     clear
     echo ""
-    SHOW_TIM=True SHOW_TIME=True uv run scripts/status.py $cache_flag
+    SHOW_TIME=True uv run scripts/status.py $cache_flag
     echo ""
     if [[ -n "$stats_from" ]]; then
         printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
@@ -777,16 +783,25 @@ fetch-video-metadata CHANNEL +VIDEO_IDS:
     @echo ""
 
 # Interactively search cleaned transcripts with fzf and open selected file in Sublime Text
-find:
+# Optionally provide a QUERY to list all files containing the search term
+find QUERY="":
     #!/usr/bin/env bash
     echo ""
     printf "\033[0;34m=== Finding Cleaned Transcripts ===\033[0m\n"
     echo ""
     cleaned_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.getDataDownloadsTranscriptsCleanedDir())")
-    selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1 --preview 'bat --color=always {}' --preview-window right:60%) || true
-    if [[ -n "$selected" ]]; then
-        subl "$selected"
-        printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$selected")"
+    if [[ -n "{{ QUERY }}" ]]; then
+        rg -c --color=never "{{ QUERY }}" "$cleaned_dir" --glob "*.txt" | sort -t: -k2 -rn | while IFS= read -r line; do
+            f="${line%:*}"
+            count="${line##*:}"
+            printf "%4d  %s/%s\n" "$count" "$(basename "$(dirname "$f")")" "$(basename "$f")"
+        done
+    else
+        selected=$(find "$cleaned_dir" -type f -name "*.txt" | fzf --delimiter / --with-nth -2,-1 --nth -2,-1 --tiebreak=length --preview 'bat --color=always {} | GREP_COLOR="01;33" grep --color=always -iE "({q}|$)"' --preview-window right:60%) || true
+        if [[ -n "$selected" ]]; then
+            subl "$selected"
+            printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$selected")"
+        fi
     fi
     echo ""
 

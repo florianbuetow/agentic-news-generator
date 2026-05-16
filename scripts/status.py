@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 import sys
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +15,8 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config
+
+TIMESTAMP_RE = re.compile(r"(?P<hours>\d+):(?P<minutes>[0-5]\d):(?P<seconds>[0-5]\d)[,.](?P<millis>\d{3})")
 
 
 def count_files_by_suffix(directory: Path, suffix: str) -> int:
@@ -27,6 +31,98 @@ def count_files_by_pattern(directory: Path, pattern: str) -> int:
     if not directory.exists():
         return 0
     return sum(1 for f in directory.rglob(pattern) if f.is_file() and not f.name.startswith("._"))
+
+
+def _parse_bool_flag(raw: str | None) -> bool:
+    """Parse common truthy/falsey flag values."""
+    if raw is None:
+        return False
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off", ""}:
+        return False
+    return False
+
+
+def _timestamp_to_seconds(timestamp: str) -> int | None:
+    """Convert `HH:MM:SS,mmm` (or dot millis) to integer seconds."""
+    match = TIMESTAMP_RE.fullmatch(timestamp.strip())
+    if match is None:
+        return None
+    hours = int(match.group("hours"))
+    minutes = int(match.group("minutes"))
+    seconds = int(match.group("seconds"))
+    millis = int(match.group("millis"))
+    return (hours * 3600) + (minutes * 60) + seconds + (millis // 1000)
+
+
+def _extract_last_timestamp_seconds_from_srt(path: Path, tail_line_count: int = 30) -> int | None:
+    """Extract the last timestamp from the final lines of an SRT file."""
+    tail_lines: deque[str] = deque(maxlen=tail_line_count)
+    try:
+        with path.open("r", encoding="utf-8", errors="replace") as handle:
+            for line in handle:
+                tail_lines.append(line)
+    except OSError:
+        return None
+
+    last_seconds: int | None = None
+    for line in tail_lines:
+        for match in TIMESTAMP_RE.finditer(line):
+            parsed_seconds = _timestamp_to_seconds(match.group(0))
+            if parsed_seconds is not None:
+                last_seconds = parsed_seconds
+
+    return last_seconds
+
+
+def _sum_channel_cleaned_srt_seconds(channel_dir: Path) -> int:
+    """Sum per-file end timestamps from cleaned SRT files for one channel."""
+    if not channel_dir.exists():
+        return 0
+
+    total_seconds = 0
+    for srt_file in channel_dir.rglob("*.srt"):
+        if not srt_file.is_file() or srt_file.name.startswith("._"):
+            continue
+        last_seconds = _extract_last_timestamp_seconds_from_srt(srt_file)
+        if last_seconds is None or last_seconds < 0:
+            continue
+        total_seconds += last_seconds
+    return total_seconds
+
+
+def _format_seconds_as_dhm(total_seconds: int) -> str:
+    """Format absolute seconds as `<days>d<hours>h<minutes>m`."""
+    if total_seconds < 0:
+        total_seconds = 0
+    days, rem = divmod(total_seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, _ = divmod(rem, 60)
+    return f"{days}d{hours}h{minutes}m"
+
+
+def _compute_channel_time_seconds_map(transcripts_cleaned_dir: Path, show_progress: bool = False) -> dict[str, int]:
+    """Compute total cleaned transcript duration (seconds) for each channel."""
+    per_channel_seconds: dict[str, int] = {}
+    if not transcripts_cleaned_dir.exists():
+        return per_channel_seconds
+
+    channel_dirs = sorted((channel_dir for channel_dir in transcripts_cleaned_dir.iterdir() if channel_dir.is_dir()), key=lambda p: p.name)
+    if show_progress:
+        print(f"Computing transcript time totals for {len(channel_dirs)} channel(s)...", flush=True)
+
+    for index, channel_dir in enumerate(channel_dirs, start=1):
+        if show_progress:
+            print(f"[{index}/{len(channel_dirs)}] Analyzing channel: {channel_dir.name}", flush=True)
+        if not channel_dir.is_dir():
+            continue
+        per_channel_seconds[channel_dir.name] = _sum_channel_cleaned_srt_seconds(channel_dir)
+
+    if show_progress:
+        print("Finished transcript time totals.", flush=True)
+    return per_channel_seconds
 
 
 def get_channel_stats(  # noqa: C901
@@ -166,6 +262,9 @@ def _print_stat_row(
     prev: dict[str, int] | None,
     completion_pct: float,
     size_gb: float,
+    show_time: bool,
+    time_value: str,
+    time_col_width: int,
     channel_width: int,
     col_width: int,
 ) -> None:
@@ -175,14 +274,17 @@ def _print_stat_row(
     for key in STAT_KEYS:
         prev_val = prev.get(key) if prev else None
         parts.append(_fmt_cell(int(stats[key]), prev_val, num_w))
+        if show_time and key == "audio":
+            parts.append(f"{time_value:>{time_col_width}}")
     parts.append(f"{completion_pct:>{col_width - 1}.1f}%")
     parts.append(f"{size_gb:>{col_width}.1f}")
     print(" ".join(parts))
 
 
-def main() -> int:
+def main() -> int:  # noqa: C901
     """Main entry point."""
     update_cache = "--no-update-cache" not in sys.argv
+    show_time = _parse_bool_flag(os.environ.get("SHOW_TIME"))
 
     # Load configuration
     project_root = Path(__file__).parent.parent
@@ -225,6 +327,11 @@ def main() -> int:
         "total_size_bytes": sum(float(s["total_size_bytes"]) for s in channel_stats.values()),
     }
 
+    channel_time_seconds: dict[str, int] = {}
+    if show_time:
+        channel_time_seconds = _compute_channel_time_seconds_map(transcripts_cleaned_dir, show_progress=True)
+    total_time_seconds = sum(channel_time_seconds.values()) if show_time else 0
+
     total_videos = totals["videos_active"] + totals["videos_archived"]
 
     # Print summary
@@ -249,23 +356,36 @@ def main() -> int:
         previous = json.loads(cache_file.read_text())
 
     col_width = 8
+    time_col_width = 10
     channel_width = 40
 
     columns = [
         ("", "Videos", col_width),
         ("Arch.", "Videos", col_width),
         ("", "Audio", col_width),
-        ("Tran-", "scripts", col_width),
+    ]
+    if show_time:
+        formatted_time_values = [_format_seconds_as_dhm(seconds) for seconds in channel_time_seconds.values()]
+        formatted_total_time = _format_seconds_as_dhm(total_time_seconds)
+        max_time_len = max([len(formatted_total_time), *(len(value) for value in formatted_time_values)], default=time_col_width)
+        time_col_width = max(time_col_width, max_time_len)
+        columns.append(("", "Time", time_col_width))
+    else:
+        formatted_total_time = ""
+
+    columns.extend(
+        [
+            ("Tran-", "scripts", col_width),
         ("Hall.", "Analysis", col_width),
         ("Cleaned", "Trans.", col_width),
         ("", "Summ.", col_width),
         ("", "%", col_width),
         ("", "GB", col_width),
-    ]
+        ]
+    )
 
-    # Calculate total line width: channel + space + (col_width + space) * num_columns
-    num_columns = len(columns)
-    line_width = channel_width + 1 + (col_width + 1) * num_columns
+    # Calculate total line width from effective column widths
+    line_width = channel_width + 1 + sum(width + 1 for _, _, width in columns)
 
     # Generate header rows
     header_row1, header_row2 = print_two_row_header(columns)
@@ -290,14 +410,37 @@ def main() -> int:
         size_gb = float(s["total_size_bytes"]) / (1024**3)
         display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
         prev_ch: dict[str, int] | None = prev_channels.get(channel_name)
-        _print_stat_row(display_name, s, prev_ch, completion_pct, size_gb, channel_width, col_width)
+        channel_time_label = _format_seconds_as_dhm(channel_time_seconds.get(channel_name, 0)) if show_time else ""
+        _print_stat_row(
+            display_name,
+            s,
+            prev_ch,
+            completion_pct,
+            size_gb,
+            show_time,
+            channel_time_label,
+            time_col_width,
+            channel_width,
+            col_width,
+        )
 
     # Print totals row
     print("-" * line_width)
     overall_pct = (totals["summaries"] / total_transcripts * 100) if total_transcripts > 0 else 0.0
     total_size_gb = float(totals["total_size_bytes"]) / (1024**3)
     prev_totals: dict[str, int] | None = previous.get("totals") if previous else None
-    _print_stat_row("TOTAL", totals, prev_totals, overall_pct, total_size_gb, channel_width, col_width)
+    _print_stat_row(
+        "TOTAL",
+        totals,
+        prev_totals,
+        overall_pct,
+        total_size_gb,
+        show_time,
+        formatted_total_time,
+        time_col_width,
+        channel_width,
+        col_width,
+    )
 
     # Print percentage row: each column as % of total transcripts
     pct_keys = set(STAT_KEYS[STAT_KEYS.index("transcripts") :])
@@ -310,6 +453,8 @@ def main() -> int:
             pct_parts.append(f"{pct_str:>{num_w}}   ")
         else:
             pct_parts.append(f"{'':>{num_w}}   ")
+        if show_time and key == "audio":
+            pct_parts.append(f"{'':>{time_col_width}}")
     pct_parts.append(f"{'':>{col_width}}")
     pct_parts.append(f"{'':>{col_width}}")
     print(" ".join(pct_parts))
