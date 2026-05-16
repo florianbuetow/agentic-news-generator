@@ -114,6 +114,7 @@ help:
     @echo ""
     @printf "\033[0;33mTools:\033[0m\n"
     @printf "  %-38s %s\n" "find [query]" "Interactively search cleaned transcripts; with query, list matching files"
+    @printf "  %-38s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-38s %s\n" "fetch-video-metadata <channel> <id...>" "Fetch missing .info.json for video IDs"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
@@ -801,6 +802,33 @@ find QUERY="":
         if [[ -n "$selected" ]]; then
             subl "$selected"
             printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$selected")"
+        fi
+    fi
+    echo ""
+
+# Interactively search summary files with fzf and open selected file in Sublime Text
+search QUERY="":
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Searching Transcript Summaries ===\033[0m\n"
+    echo ""
+    summaries_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.getDataDownloadsTranscriptsSummariesDir())")
+    if [[ -n "{{ QUERY }}" ]]; then
+        rg -c --color=never "{{ QUERY }}" "$summaries_dir" --glob "*.md" | sort -t: -k2 -rn | while IFS= read -r line; do
+            f="${line%:*}"
+            count="${line##*:}"
+            printf "%4d  %s/%s\n" "$count" "$(basename "$(dirname "$f")")" "$(basename "$f")"
+        done
+    else
+        selected=$(rg --line-number --no-heading --color=never "" "$summaries_dir" --glob "*.md" \
+            | sed "s|${summaries_dir}/||" \
+            | fzf --delimiter : \
+                  --preview "p=\"${summaries_dir}/{1}\"; glow \"\$p\"" \
+                  --preview-window right:60%) || true
+        if [[ -n "$selected" ]]; then
+            file="${summaries_dir}/$(echo "$selected" | cut -d: -f1)"
+            subl "$file"
+            printf "\033[0;32m✓ Opened: %s\033[0m\n" "$(basename "$file")"
         fi
     fi
     echo ""
