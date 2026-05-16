@@ -2,6 +2,7 @@
 """Remove hallucinations from SRT transcripts using deterministic string replacement."""
 
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -150,6 +151,7 @@ def log_summary(
     total_files: int,
     cleaned_files: int,
     copied_files: int,
+    skipped_files: int,
     failed_files: list[tuple[str, str]],
 ) -> None:
     """Log processing summary."""
@@ -158,6 +160,8 @@ def log_summary(
     logger.info("Summary")
     logger.info("=" * 50)
     logger.info(f"Total files processed: {total_files}")
+    if skipped_files:
+        logger.info(f"Files skipped (existing output): {skipped_files}")
     logger.info(f"Files cleaned: {cleaned_files}")
     logger.info(f"Files copied unchanged: {copied_files}")
 
@@ -165,6 +169,63 @@ def log_summary(
         logger.error(f"Failed files ({len(failed_files)}):")
         for filename, error in failed_files:
             logger.error(f"  - {filename}: {error}")
+
+
+def process_all_files(
+    srt_files: list[Path],
+    data_dir: Path,
+    output_dir: Path,
+    hallucinations_lookup: dict,
+    detector: RepetitionDetector,
+    skip_existing: bool,
+) -> tuple[int, int, int, list[tuple[str, str]]]:
+    """Process all SRT files, optionally skipping existing outputs.
+
+    Returns:
+        Tuple of (cleaned_files, copied_files, skipped_files, failed_files).
+    """
+    failed_files: list[tuple[str, str]] = []
+    cleaned_files = 0
+    copied_files = 0
+    skipped_files = 0
+    skipped_channels: set[str] = set()
+    processed_channels: set[str] = set()
+
+    for srt_file in srt_files:
+        channel_name = srt_file.parent.name
+        output_file = output_dir / channel_name / srt_file.name
+
+        if skip_existing and output_file.exists():
+            skipped_channels.add(channel_name)
+            skipped_files += 1
+            continue
+
+        processed_channels.add(channel_name)
+        relative_path = srt_file.relative_to(data_dir)
+        logger.info(f"Processing: {relative_path}")
+
+        try:
+            file_type, success, error = process_single_file(srt_file, data_dir, output_dir, hallucinations_lookup, detector)
+
+            if success:
+                if file_type == "cleaned":
+                    cleaned_files += 1
+                else:
+                    copied_files += 1
+            else:
+                failed_files.append((str(relative_path), error or "Unknown error"))
+
+        except Exception as e:
+            failed_files.append((str(relative_path), str(e)))
+            logger.error(f"  Error: {e}")
+            logger.info("")
+
+    if skip_existing and skipped_channels:
+        fully_skipped = skipped_channels - processed_channels
+        if fully_skipped:
+            logger.info(f"[skip] {len(fully_skipped)} channel(s) fully skipped")
+
+    return cleaned_files, copied_files, skipped_files, failed_files
 
 
 def main() -> int:
@@ -197,33 +258,18 @@ def main() -> int:
         logger.error(f"No SRT files found in transcripts directory: {transcripts_dir}")
         return 1
 
+    skip_existing = os.environ.get("SKIP_EXISTING", "").lower() in ("1", "true", "yes")
+
     logger.info(f"Phase 2: Processing {len(srt_files)} transcript file(s)")
+    if skip_existing:
+        logger.info("SKIP_EXISTING=true: skipping files with existing output")
     logger.info("")
 
-    failed_files = []
-    cleaned_files = 0
-    copied_files = 0
+    cleaned_files, copied_files, skipped_files, failed_files = process_all_files(
+        srt_files, data_dir, output_dir, hallucinations_lookup, detector, skip_existing
+    )
 
-    for srt_file in srt_files:
-        try:
-            file_type, success, error = process_single_file(srt_file, data_dir, output_dir, hallucinations_lookup, detector)
-
-            if success:
-                if file_type == "cleaned":
-                    cleaned_files += 1
-                else:
-                    copied_files += 1
-            else:
-                relative_path = srt_file.relative_to(data_dir)
-                failed_files.append((str(relative_path), error or "Unknown error"))
-
-        except Exception as e:
-            relative_path = srt_file.relative_to(data_dir)
-            failed_files.append((str(relative_path), str(e)))
-            logger.error(f"  Error: {e}")
-            logger.info("")
-
-    log_summary(len(srt_files), cleaned_files, copied_files, failed_files)
+    log_summary(len(srt_files), cleaned_files, copied_files, skipped_files, failed_files)
     return 1 if failed_files else 0
 
 

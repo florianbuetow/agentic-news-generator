@@ -2,6 +2,7 @@
 """Detect hallucinations in SRT transcripts using repetition detection."""
 
 import argparse
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -310,7 +311,11 @@ Examples:
         logger.error(f"No SRT files found in transcripts directory: {transcripts_dir}")
         return 1
 
+    skip_existing = os.environ.get("SKIP_EXISTING", "").lower() in ("1", "true", "yes")
+
     logger.info(f"Found {len(srt_files)} SRT file(s) to process")
+    if skip_existing:
+        logger.info("SKIP_EXISTING=true: skipping files with existing output")
     logger.info("")
 
     # Initialize detector (SVM classifier decides what's a hallucination)
@@ -324,9 +329,22 @@ Examples:
     total_files = 0
     files_with_hallucinations = 0
     total_hallucinations = 0
+    skipped_files = 0
     failed_files = []
+    skipped_channels: set[str] = set()
+    processed_channels: set[str] = set()
 
     for srt_file in srt_files:
+        channel_name = srt_file.parent.name
+        output_file = transcripts_hallucinations_dir / channel_name / f"{srt_file.stem}.json"
+
+        if skip_existing and output_file.exists():
+            skipped_channels.add(channel_name)
+            skipped_files += 1
+            continue
+
+        processed_channels.add(channel_name)
+
         # Display relative path for cleaner output
         relative_path = srt_file.relative_to(transcripts_dir)
         logger.info(f"Processing: {relative_path}")
@@ -349,15 +367,14 @@ Examples:
             # Load the result to get an example if hallucinations were found
             example = None
             if hallucination_count > 0:
-                channel_name = srt_file.parent.name
                 analysis_dir = transcripts_hallucinations_dir / channel_name
-                output_file = analysis_dir / f"{srt_file.stem}.json"
+                result_file = analysis_dir / f"{srt_file.stem}.json"
 
                 # Read back the JSON to get an example if hallucinations were found
                 try:
                     import json
 
-                    with output_file.open("r", encoding="utf-8") as f:
+                    with result_file.open("r", encoding="utf-8") as f:
                         result_data = json.load(f)
                         if result_data["hallucinations_detected"]:
                             example = result_data["hallucinations_detected"][0]
@@ -371,11 +388,18 @@ Examples:
 
         logger.info("")  # Blank line between files
 
+    if skip_existing and skipped_channels:
+        fully_skipped = skipped_channels - processed_channels
+        if fully_skipped:
+            logger.info(f"[skip] {len(fully_skipped)} channel(s) fully skipped")
+
     # Log summary
     logger.info("=" * 50)
     logger.info("Summary")
     logger.info("=" * 50)
     logger.info(f"Total files processed: {total_files}")
+    if skipped_files:
+        logger.info(f"Files skipped (existing output): {skipped_files}")
     logger.info(f"Files with hallucinations: {files_with_hallucinations}")
     logger.info(f"Total hallucinations detected: {total_hallucinations}")
 

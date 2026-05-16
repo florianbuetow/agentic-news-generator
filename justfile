@@ -309,7 +309,7 @@ clean-video-files VIDEO_ID:
 analyze-transcripts-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Analyzing Transcripts for Hallucinations ===\033[0m\n"
-    @uv run scripts/transcript-hallucination-detection.py
+    @SKIP_EXISTING=true uv run scripts/transcript-hallucination-detection.py
     @echo ""
     @printf "\033[0;34m=== Creating Transcript Hallucination Digest ===\033[0m\n"
     @uv run scripts/create-hallucination-digest.py
@@ -319,7 +319,7 @@ analyze-transcripts-hallucinations:
 transcripts-remove-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
-    @uv run python scripts/transcript-hallucination-removal.py
+    @SKIP_EXISTING=true uv run python scripts/transcript-hallucination-removal.py
     @echo ""
 
 # Analyze transcript languages (run after hallucination removal for accurate detection)
