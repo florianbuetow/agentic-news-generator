@@ -81,6 +81,7 @@ help:
     @printf "\033[0;33mTopic Detection:\033[0m\n"
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
     @printf "  %-38s %s\n" "extract-topics" "Extract topics from hallucination-freed SRT transcripts"
+    @printf "  %-38s %s\n" "detect-topic-boundaries" "Detect topic boundaries in cleaned TXT transcripts"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
     @echo ""
     @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
@@ -352,6 +353,13 @@ extract-topics:
     @uv run python scripts/extract-topics.py
     @echo ""
 
+# Detect topic boundaries in cleaned TXT transcripts
+detect-topic-boundaries:
+    @echo ""
+    @printf "\033[0;34m=== Detecting Topic Boundaries from Cleaned Transcripts ===\033[0m\n"
+    @uv run python scripts/detect-topic-boundaries.py
+    @echo ""
+
 # Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
 topics-experiment:
     #!/usr/bin/env bash
@@ -372,10 +380,12 @@ export-to-minirag *ARGS:
     @uv run python scripts/export-to-minirag.py {{ ARGS }}
     @echo ""
 
-# Run complete topic detection pipeline (placeholder; pipeline steps to be re-added)
+# Run complete topic detection pipeline
 topics-all:
     @echo ""
     @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
+    @just extract-topics
+    @just detect-topic-boundaries
     @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 
