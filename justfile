@@ -82,6 +82,7 @@ help:
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
     @printf "  %-38s %s\n" "extract-topics" "Extract topics from hallucination-freed SRT transcripts"
     @printf "  %-38s %s\n" "detect-topic-boundaries" "Detect topic boundaries in cleaned TXT transcripts"
+    @printf "  %-38s %s\n" "evaluate-indexing-chunks" "Evaluate topic-boundary chunking guardrails from saved predictions"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
     @echo ""
     @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
@@ -118,6 +119,7 @@ help:
     @printf "  %-38s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-38s %s\n" "fetch-video-metadata <channel> <id...>" "Fetch missing .info.json for video IDs"
+    @printf "  %-38s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
@@ -358,6 +360,24 @@ detect-topic-boundaries:
     @echo ""
     @printf "\033[0;34m=== Detecting Topic Boundaries from Cleaned Transcripts ===\033[0m\n"
     @uv run python scripts/detect-topic-boundaries.py
+    @echo ""
+
+# Evaluate chunking guardrails from saved topic-boundary predictions
+evaluate-indexing-chunks:
+    @echo ""
+    @printf "\033[0;34m=== Evaluating Topic Boundary Chunking Guardrails ===\033[0m\n"
+    @mkdir -p data/tmp/indexing-guardrail-report-all-docs-min50
+    @UV_CACHE_DIR=/private/tmp/uv-cache uv run python scripts/simulate-boundary-indexing.py \
+        --predictions data/tmp/remote-boundary-eval-full-v2/per_example_results.jsonl \
+        --raw-output-jsonl /Users/flo/Developer/github/llm-funted-topicboundaries/reports/eval/qwen3-0.6b-exp03-raw-outputs.jsonl \
+        --raw-output-jsonl /Users/flo/Developer/github/llm-funted-topicboundaries/reports/eval/mlx-community-llama-3-2-3b-instruct-4bit-exp01-raw-outputs.jsonl \
+        --labeled-examples /Users/flo/Developer/github/llm-funted-topicboundaries/data/input/labeled_examples.json \
+        --output-json data/tmp/indexing-guardrail-report-all-docs-min50/indexing_guardrail_simulation.json \
+        --report-md data/tmp/indexing-guardrail-report-all-docs-min50/indexing_guardrail_report.md \
+        --manual-review data/tmp/indexing-guardrail-report-all-docs-min50/indexing_guardrail_manual_review.txt \
+        --padding-lines 30 \
+        --min-segment-lines 50 \
+        --max-segment-lines 300
     @echo ""
 
 # Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
@@ -791,6 +811,14 @@ fetch-video-metadata CHANNEL +VIDEO_IDS:
     @printf "\033[0;34m=== Fetching Video Metadata ===\033[0m\n"
     @echo ""
     @uv run python scripts/fetch-video-metadata.py {{ CHANNEL }} {{ VIDEO_IDS }}
+    @echo ""
+
+# Check all channels for WAV files missing .info.json and fetch them automatically
+check-missing-metadata:
+    @echo ""
+    @printf "\033[0;34m=== Checking for Missing Metadata ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/check-missing-metadata.py
     @echo ""
 
 # Interactively search cleaned transcripts with fzf and open selected file in Sublime Text
