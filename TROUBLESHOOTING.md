@@ -169,7 +169,21 @@ Re-downloading a video without spoken word wastes bandwidth and disk and will be
 
 ## Playbook: Transcription Fails With "Metadata file not found"
 
-When `just transcribe` aborts with `Metadata file not found` for a `.f251-11.info.json` (or similar format-code suffix), the root cause is yt-dlp intermediate files left behind from a failed format merge.
+When `just transcribe` aborts with `Metadata file not found`, run `just find-files <VIDEO_ID>` first to identify which case applies.
+
+### Case 1: `.info.json` exists in `videos/` but not in `metadata/<CHANNEL>/video/`
+
+The video was downloaded but its metadata was never placed where the transcription script expects it. Fix immediately — no confirmation needed:
+
+```bash
+just fetch-video-metadata <CHANNEL> <VIDEO_ID>
+```
+
+Then re-run `just transcribe`.
+
+### Case 2: Format-code artifact (`.f251-11.wav` or similar)
+
+The root cause is yt-dlp intermediate files left behind from a failed format merge.
 
 **How to identify:** The audio filename contains a format code like `.f251-11` between the video ID bracket and `.wav` — e.g. `Title [VIDEO_ID].f251-11.wav`. The corresponding `.wav` without the format code usually also exists. Metadata files never carry the format code, so the transcription script's stem-based lookup fails.
 
