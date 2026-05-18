@@ -31,6 +31,7 @@ class TopicBoundaryResponse(RootModel[list[int]]):
     @field_validator("root")
     @classmethod
     def validate_root(cls, value: list[int]) -> list[int]:
+        """Validate that boundaries start at 1 and are strictly increasing."""
         if not value:
             raise ValueError("Boundary list must not be empty")
         if value[0] != 1:
@@ -71,15 +72,10 @@ def strip_llm_wrapping(text: str) -> str:
 
 
 def split_sentences(transcript: str) -> list[str]:
-    """Split transcript text into numbered sentence candidates."""
-    merged = " ".join(line.strip() for line in transcript.splitlines() if line.strip())
-    if not merged:
-        raise ValueError("Transcript has no non-empty content")
-
-    rough = re.split(r"(?<=[.!?])\s+", merged)
-    sentences = [s.strip() for s in rough if s.strip()]
+    """Read one transcript sentence per non-empty TXT line."""
+    sentences = [line.strip() for line in transcript.splitlines() if line.strip()]
     if not sentences:
-        raise ValueError("Failed to derive sentences from transcript")
+        raise ValueError("Transcript has no non-empty content")
     return sentences
 
 
@@ -90,9 +86,7 @@ def build_numbered_sentences(sentences: list[str]) -> str:
 
 def build_prompt(prompt_template: str, txt_file: Path, numbered_sentences: str) -> str:
     """Render prompt template with file path and sentence list."""
-    return (
-        prompt_template.replace("{{INPUT_TXT_FILE}}", str(txt_file)).replace("{{NUMBERED_SENTENCES}}", numbered_sentences)
-    )
+    return prompt_template.replace("{{INPUT_TXT_FILE}}", str(txt_file)).replace("{{NUMBERED_SENTENCES}}", numbered_sentences)
 
 
 def call_llm(prompt: str, llm: LLMConfig) -> str:
@@ -190,9 +184,7 @@ def process_single_file(
     input_tokens = len(encoder.encode(prompt, disallowed_special=()))
     threshold = int(llm.context_window * llm.context_window_threshold / 100)
     if input_tokens > threshold:
-        raise ValueError(
-            f"Input tokens ({input_tokens:,}) exceed {llm.context_window_threshold}% of context window ({threshold:,})"
-        )
+        raise ValueError(f"Input tokens ({input_tokens:,}) exceed {llm.context_window_threshold}% of context window ({threshold:,})")
 
     last_error: str | None = None
     for attempt in range(1, llm.max_retries + 1):
@@ -201,9 +193,7 @@ def process_single_file(
             boundaries = parse_and_validate_boundaries(raw_response, len(sentences))
             output_file.parent.mkdir(parents=True, exist_ok=True)
             output_file.write_text(json.dumps(boundaries, indent=2, ensure_ascii=False), encoding="utf-8")
-            logger.info(
-                f"Detected {len(boundaries)} boundary point(s) for {txt_file.parent.name}/{txt_file.name} -> {output_file.name}"
-            )
+            logger.info(f"Detected {len(boundaries)} boundary point(s) for {txt_file.parent.name}/{txt_file.name} -> {output_file.name}")
             return
         except Exception as e:
             last_error = str(e)
