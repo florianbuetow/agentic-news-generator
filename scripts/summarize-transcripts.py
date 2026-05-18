@@ -112,18 +112,17 @@ def process_single_file(
     prompt_template: str,
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
-) -> tuple[str, bool, str | None]:
+) -> tuple[str, str | None]:
     """Process a single transcript file.
 
-    Returns:
-        Tuple of (status, success, error_message).
+    Returns (status, note). Raises on persistent LLM failure.
     """
     if output_file.exists():
-        return "skip", True, None
+        return "skip", None
 
     transcript = FSUtil.read_text_file(txt_file)
     if not transcript.strip():
-        return "skip (empty)", True, None
+        return "skip (empty)", None
 
     prompt = prompt_template.replace("{transcript}", transcript)
 
@@ -132,23 +131,21 @@ def process_single_file(
     if input_tokens > threshold:
         return (
             "skip (oversized)",
-            True,
             f"Input tokens ({input_tokens:,}) exceed {llm.context_window_threshold}% of context window ({threshold:,})",
         )
 
-    last_error: str | None = None
     for attempt in range(1, llm.max_retries + 1):
         try:
             summary = call_llm(prompt, llm)
             FSUtil.write_text_file(output_file, summary, create_parents=True)
-            return "ok", True, None
+            return "ok", None
         except Exception as e:
-            last_error = str(e)
-            logger.warning(f"  Attempt {attempt}/{llm.max_retries} failed: {last_error}")
-            if attempt < llm.max_retries:
-                time.sleep(llm.retry_delay)
+            logger.warning(f"  Attempt {attempt}/{llm.max_retries} failed: {e}")
+            if attempt == llm.max_retries:
+                raise
+            time.sleep(llm.retry_delay)
 
-    return "failed", False, last_error
+    raise RuntimeError("unreachable")
 
 
 def format_eta(seconds_remaining: float) -> str:
@@ -200,10 +197,10 @@ def process_pending(
     prompt_template: str,
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
-) -> list[tuple[str, str]]:
-    """Process all pending files. Returns list of (filename, error) for failures."""
-    failed_files: list[tuple[str, str]] = []
+) -> None:
+    """Process all pending files. Raises on persistent LLM failure."""
     success_count = 0
+    skipped_count = 0
     start_time = time.monotonic()
 
     for idx, (txt_file, output_file) in enumerate(pending, start=1):
@@ -215,17 +212,15 @@ def process_pending(
         rel_path = f"{txt_file.parent.name}/{txt_file.name}"
         logger.info(f"[{idx}/{len(pending)}] {idx / len(pending) * 100:5.1f}% ETA {format_eta(eta_seconds)}  {rel_path}")
 
-        status, success, error = process_single_file(txt_file, output_file, prompt_template, llm, encoder)
+        status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder)
         if status != "ok":
             logger.info(f"  -> {status}")
-
-        if error:
-            logger.warning(f"  Note: {error}")
-
-        if success and status == "ok":
+            skipped_count += 1
+        else:
             success_count += 1
-        elif not success:
-            failed_files.append((rel_path, error or "Unknown error"))
+
+        if note:
+            logger.warning(f"  Note: {note}")
 
     logger.info("---")
     logger.info("=" * 50)
@@ -233,14 +228,7 @@ def process_pending(
     logger.info("=" * 50)
     logger.info(f"Total pending: {len(pending)}")
     logger.info(f"Summarized: {success_count}")
-    logger.info(f"Skipped: {len(pending) - success_count - len(failed_files)}")
-
-    if failed_files:
-        logger.error(f"Failed ({len(failed_files)}):")
-        for filename, error in failed_files:
-            logger.error(f"  - {filename}: {error}")
-
-    return failed_files
+    logger.info(f"Skipped: {skipped_count}")
 
 
 def main() -> int:
@@ -266,9 +254,8 @@ def main() -> int:
         logger.info("Nothing to do — all files already processed.")
         return 0
 
-    failed_files = process_pending(pending, prompt_template, llm, encoder)
-
-    return 1 if failed_files else 0
+    process_pending(pending, prompt_template, llm, encoder)
+    return 0
 
 
 if __name__ == "__main__":
