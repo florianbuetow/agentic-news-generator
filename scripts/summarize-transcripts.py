@@ -112,6 +112,7 @@ def process_single_file(
     prompt_template: str,
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
+    skip_threshold_pct: int,
 ) -> tuple[str, str | None]:
     """Process a single transcript file.
 
@@ -124,15 +125,15 @@ def process_single_file(
     if not transcript.strip():
         return "skip (empty)", None
 
-    prompt = prompt_template.replace("{transcript}", transcript)
-
-    input_tokens = len(encoder.encode(prompt, disallowed_special=()))
-    threshold = int(llm.context_window * llm.context_window_threshold / 100)
-    if input_tokens > threshold:
+    transcript_tokens = len(encoder.encode(transcript, disallowed_special=()))
+    token_limit = int(llm.context_window * skip_threshold_pct / 100)
+    if transcript_tokens > token_limit:
         return (
             "skip (oversized)",
-            f"Input tokens ({input_tokens:,}) exceed {llm.context_window_threshold}% of context window ({threshold:,})",
+            f"Transcript tokens ({transcript_tokens:,}) exceed {skip_threshold_pct}% of context window ({token_limit:,})",
         )
+
+    prompt = prompt_template.replace("{transcript}", transcript)
 
     for attempt in range(1, llm.max_retries + 1):
         try:
@@ -197,10 +198,12 @@ def process_pending(
     prompt_template: str,
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
+    skip_threshold_pct: int,
 ) -> None:
     """Process all pending files. Raises on persistent LLM failure."""
     success_count = 0
     skipped_count = 0
+    oversized_files: list[str] = []
     start_time = time.monotonic()
 
     for idx, (txt_file, output_file) in enumerate(pending, start=1):
@@ -212,15 +215,16 @@ def process_pending(
         rel_path = f"{txt_file.parent.name}/{txt_file.name}"
         logger.info(f"[{idx}/{len(pending)}] {idx / len(pending) * 100:5.1f}% ETA {format_eta(eta_seconds)}  {rel_path}")
 
-        status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder)
+        status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder, skip_threshold_pct)
         if status != "ok":
             logger.info(f"  -> {status}")
+            if note:
+                logger.info(f"  {note}")
             skipped_count += 1
+            if status == "skip (oversized)":
+                oversized_files.append(rel_path)
         else:
             success_count += 1
-
-        if note:
-            logger.warning(f"  Note: {note}")
 
     logger.info("---")
     logger.info("=" * 50)
@@ -229,6 +233,15 @@ def process_pending(
     logger.info(f"Total pending: {len(pending)}")
     logger.info(f"Summarized: {success_count}")
     logger.info(f"Skipped: {skipped_count}")
+
+    if oversized_files:
+        logger.warning("=" * 50)
+        logger.warning(
+            f"Skipped {len(oversized_files)} oversized transcript(s) — transcript tokens exceed {skip_threshold_pct}% of context window:"
+        )
+        for path in oversized_files:
+            logger.warning(f"  - {path}")
+        logger.warning("=" * 50)
 
 
 def main() -> int:
@@ -254,7 +267,7 @@ def main() -> int:
         logger.info("Nothing to do — all files already processed.")
         return 0
 
-    process_pending(pending, prompt_template, llm, encoder)
+    process_pending(pending, prompt_template, llm, encoder, summarize_cfg.skip_transcripts_above_context_window_pct)
     return 0
 
 

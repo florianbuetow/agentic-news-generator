@@ -7,7 +7,7 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from src.config import Config, LLMConfig, TopicSegmentationConfig
+from src.config import Config, LLMConfig, SummarizeTranscriptsConfig, TopicSegmentationConfig
 
 
 def get_valid_paths_config() -> dict[str, str]:
@@ -691,3 +691,64 @@ class TestConfigWithTopicSegmentation:
             assert "retry_limit" in str(exc_info.value).lower()
         finally:
             Path(temp_path).unlink()
+
+
+def _make_llm() -> LLMConfig:
+    return LLMConfig(
+        model="openai/test-model",
+        api_base="http://127.0.0.1:1234/v1",
+        api_key="test-key",
+        context_window=131072,
+        max_tokens=4096,
+        temperature=0.3,
+        context_window_threshold=90,
+        max_retries=3,
+        retry_delay=2.0,
+    )
+
+
+class TestSummarizeTranscriptsConfig:
+    """Tests for SummarizeTranscriptsConfig model."""
+
+    def test_valid_config_explicit_threshold(self) -> None:
+        config = SummarizeTranscriptsConfig(
+            llm=_make_llm(),
+            skip_transcripts_above_context_window_pct=75,
+        )
+        assert config.skip_transcripts_above_context_window_pct == 75
+
+    def test_default_threshold_is_60(self) -> None:
+        field_default = SummarizeTranscriptsConfig.model_fields["skip_transcripts_above_context_window_pct"].default
+        assert field_default == 60
+
+    def test_threshold_boundary_zero(self) -> None:
+        config = SummarizeTranscriptsConfig(
+            llm=_make_llm(),
+            skip_transcripts_above_context_window_pct=0,
+        )
+        assert config.skip_transcripts_above_context_window_pct == 0
+
+    def test_threshold_boundary_100(self) -> None:
+        config = SummarizeTranscriptsConfig(
+            llm=_make_llm(),
+            skip_transcripts_above_context_window_pct=100,
+        )
+        assert config.skip_transcripts_above_context_window_pct == 100
+
+    def test_threshold_below_zero_rejected(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig(
+                llm=_make_llm(),
+                skip_transcripts_above_context_window_pct=-1,
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "greater_than_equal" for err in errors)
+
+    def test_threshold_above_100_rejected(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig(
+                llm=_make_llm(),
+                skip_transcripts_above_context_window_pct=101,
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "less_than_equal" for err in errors)

@@ -162,6 +162,12 @@ class SummarizeTranscriptsConfig(BaseModel):
     """Configuration for transcript summarization via LLM."""
 
     llm: LLMConfig = Field(..., description="LLM config for transcript summarization")
+    skip_transcripts_above_context_window_pct: int = Field(
+        60,
+        ge=0,
+        le=100,
+        description="Skip summarization when transcript token count exceeds this percentage of the model context window",
+    )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

@@ -224,6 +224,40 @@ When `just download-videos` fails with `ERROR: YouTube cookies are expired or in
 
 ---
 
+## Playbook: `just summarize-transcripts` Fails With "LLM returned empty response"
+
+Symptom: `summarize-transcripts.py` aborts with `ValueError: LLM returned empty response` after `Attempt 1/3`…`Attempt 3/3 failed` warnings.
+
+What the code does (verified at `scripts/summarize-transcripts.py:81-148`):
+
+- `call_llm` raises `ValueError("LLM returned empty response")` when `response.choices[0].message.content` is `None` or whitespace-only.
+- `process_single_file` retries `summarize_transcripts.llm.max_retries` times with `time.sleep(summarize_transcripts.llm.retry_delay)` between attempts; after the last attempt the exception propagates and the recipe exits 1.
+- If consecutive attempt timestamps in the log are much further apart than `retry_delay`, the LLM call itself is taking that long to return — the script is not stuck in the sleep.
+- The log line immediately before `Attempt 1/3 failed` is `[N/M] X.X% ETA ... <channel>/<file>.txt` — that path under `downloads/transcripts_cleaned/<channel>/` is the input that triggered the failure.
+
+Possible causes (not ranked — verify each before acting):
+
+- LM Studio is reachable but the loaded model is no longer responding (unloaded, crashed, or swapped). `just status` will show which models are currently loaded.
+- The configured model returns content that is empty after LM Studio's own processing (for example, reasoning content is delivered out-of-band and the visible `content` field is empty). Confirm by inspecting LM Studio's server log or `reports/` for the actual response payload before claiming this is the cause.
+- The specific transcript is degenerate (hallucinated repetition, near-empty after cleaning) and the model returns no output for it. The size threshold check in `process_single_file` only rejects oversized inputs, not low-quality ones.
+
+Steps:
+
+1. `just status` — record which models are loaded. Compare against `summarize_transcripts.llm.model` in `config/config.yaml`.
+2. Read the log line preceding `Attempt 1/3 failed` to identify the offending transcript path.
+3. Inspect that transcript: `ls -lh <path>` for size, then read the first ~20 lines. If it shows hallucination patterns (repeated tokens, single phrase repeated) → treat as corrupt transcript and follow **Playbook: Empty Transcript for a Video**. See **Playbook: Non-English / Language Detection False Positive** for the same content-sanity checks.
+4. If the model from step 1 is not loaded or differs from config, load the configured one:
+   ```bash
+   lms unload --all
+   lms load <model-name-from-config>
+   ```
+   Re-run `just summarize-transcripts`. The script skips files whose output already exists (`process_single_file` early-returns on `output_file.exists()`), so it resumes at the failed file.
+5. If steps 1–4 do not identify a cause, capture the next failure with LM Studio's server log open (or add a temporary `logger.warning(response)` before the empty check in `call_llm`) to see what LM Studio actually returned. Decide remediation from that evidence rather than guessing.
+
+Do not delete the source transcript to skip the file — the next run will hit it again. Either fix the transcript (step 3) or resolve the LLM-side cause (steps 4–5).
+
+---
+
 ## Temporary Debug Scripts
 
 - All ad-hoc test/debug scripts go in `debug/` subfolder
