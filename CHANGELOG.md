@@ -62,6 +62,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - Legacy bash transcription implementation
+- Topic detection (topic extraction agent and hierarchical topic modeling pipeline)
 
 ### Fixed
 

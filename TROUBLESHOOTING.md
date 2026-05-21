@@ -146,6 +146,41 @@ Degenerate transcripts (Whisper hallucinations with repetitive tokens like "AI, 
 3. If silent → `just filter-videos` (sweeps every channel for short / no-audio videos and unlinks them).
 4. If audible but transcript empty → `just clean-video-files VIDEO_ID=<id>` and redownload (re-run `just download-videos`).
 
+## Playbook: Extract-Audio Fails With "No Audio Stream Found"
+
+When `just extract-audio` reports `❌ FAILED: No audio stream found (video-only file)`, first confirm the downloaded file has no audio stream, then determine whether YouTube had audio available.
+
+**Step 1 — Confirm with ffprobe that the MP4 has no audio stream:**
+
+```bash
+ffprobe -v error -select_streams a:0 -show_entries stream=codec_name \
+  -of default=noprint_wrappers=1:nokey=1 "path/to/videos/<CHANNEL>/<TITLE> [VIDEO_ID].mp4"
+```
+
+Empty output = no audio stream in the file. Non-empty = audio present (extract-audio should not have failed; investigate elsewhere).
+
+**Step 2 — Inspect the `.info.json` to check what formats were available on YouTube:**
+
+```python
+import json, os
+path = 'path/to/metadata/<CHANNEL>/video/<TITLE> [VIDEO_ID].info.json'
+with open(path) as f:
+    d = json.load(f)
+audio_formats = [(fmt['format_id'], fmt['acodec'], fmt['ext'])
+                 for fmt in d.get('formats', [])
+                 if fmt.get('acodec') not in (None, 'none')]
+print(len(audio_formats), 'audio formats available')
+```
+
+- **Audio formats present** → YouTube has audio; the download failed to merge it (yt-dlp picked a video-only stream or the merge step failed). Re-download:
+  1. `just clean-video-files VIDEO_ID=<id>` — remove the video-only MP4 and WAV artifacts, remove from `downloaded.txt`.
+  2. `just download-videos` — re-fetches with proper format selection.
+  3. `just extract-audio` — regenerates the WAV.
+
+- **No audio formats** → genuinely audio-free content (music video, silent, ambient). Treat as per **Playbook: Empty Transcript for a Video** step 3: `just filter-videos`.
+
+---
+
 ## Playbook: Corrupt Video Suspected
 
 1. `just check-video-integrity` — flags all corrupt files.

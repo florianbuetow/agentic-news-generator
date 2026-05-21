@@ -60,6 +60,7 @@ help:
     @printf "  %-38s %s\n" "run" "Run the main application"
     @printf "  %-38s %s\n" "all" "Run the complete pipeline"
     @printf "  %-38s %s\n" "ingestion-all" "Run pipeline without topic detection"
+    @printf "  %-38s %s\n" "maintenance" "Run all read-only data pipeline health checks"
     @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @printf "  %-38s %s\n" "stats [hour|day]" "Show processing status (throttle: once per hour/day)"
@@ -225,6 +226,17 @@ ingestion-all:
     @just transcripts-remove-hallucinations
     @just analyze-transcript-languages
     @just summarize-transcripts
+
+# Run all read-only data pipeline health checks (no data modified or deleted)
+maintenance:
+    @just check
+    @just check-video-integrity
+    @just check-missing-metadata
+    @just check-config-syntax
+    @just find-empty-transcripts
+    @just analyze-transcripts-hallucinations
+    @just analyze-transcript-languages
+    @printf "\033[0;32m✓ maintenance completed successfully\033[0m\n"
 
 # Download YouTube videos from channels in config.yaml
 download-videos:
