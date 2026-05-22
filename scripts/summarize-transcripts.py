@@ -66,6 +66,7 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
     logger.info(f"Summaries output directory: {summaries_dir}")
     logger.info(f"Model: {summarize_cfg.llm.model}")
     logger.info(f"Context window: {summarize_cfg.llm.context_window:,} tokens")
+    logger.info(f"Skip threshold: {summarize_cfg.skip_transcripts_above_context_window_pct}%")
 
     return summarize_cfg, cleaned_dir, summaries_dir, prompt_template, encoding_name
 
@@ -128,9 +129,10 @@ def process_single_file(
     transcript_tokens = len(encoder.encode(transcript, disallowed_special=()))
     token_limit = int(llm.context_window * skip_threshold_pct / 100)
     if transcript_tokens > token_limit:
+        usage_pct = (transcript_tokens / llm.context_window * 100.0) if llm.context_window > 0 else 0.0
         return (
             "skip (oversized)",
-            f"Transcript tokens ({transcript_tokens:,}) exceed {skip_threshold_pct}% of context window ({token_limit:,})",
+            f"contains {transcript_tokens:,} tokens ({usage_pct:.1f}% of context window {llm.context_window:,}; threshold: {skip_threshold_pct}%/{token_limit:,} tokens)",
         )
 
     prompt = prompt_template.replace("{transcript}", transcript)
@@ -203,7 +205,7 @@ def process_pending(
     """Process all pending files. Raises on persistent LLM failure."""
     success_count = 0
     skipped_count = 0
-    oversized_files: list[str] = []
+    oversized_files: list[tuple[str, str]] = []
     start_time = time.monotonic()
 
     for idx, (txt_file, output_file) in enumerate(pending, start=1):
@@ -217,12 +219,15 @@ def process_pending(
 
         status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder, skip_threshold_pct)
         if status != "ok":
-            logger.info(f"  -> {status}")
-            if note:
-                logger.info(f"  {note}")
             skipped_count += 1
             if status == "skip (oversized)":
-                oversized_files.append(rel_path)
+                detail = note or ""
+                oversized_files.append((rel_path, detail))
+                logger.warning(f"WARNING skipping file {rel_path}: {detail}")
+            else:
+                logger.info(f"  -> {status}")
+                if note:
+                    logger.info(f"  {note}")
         else:
             success_count += 1
 
@@ -239,8 +244,8 @@ def process_pending(
         logger.warning(
             f"Skipped {len(oversized_files)} oversized transcript(s) — transcript tokens exceed {skip_threshold_pct}% of context window:"
         )
-        for path in oversized_files:
-            logger.warning(f"  - {path}")
+        for path, detail in oversized_files:
+            logger.warning(f"  - {path}: {detail}")
         logger.warning("=" * 50)
 
 

@@ -176,7 +176,7 @@ article_compiler:
 
 # Transcript Summarization Configuration
 summarize_transcripts:
-  skip_transcripts_above_context_window_pct: 60
+  skip_transcripts_above_context_window_pct: 80
   llm:
     model: openai/qwen/qwen3.6-35b-a3b
     api_base: http://127.0.0.1:1234/v1
