@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added interactive transcript summary search with fzf preview and colorized query highlights.
+- Added configurable context window threshold and fewest-pending channel ordering to transcript summarization.
+- Added script to scan and auto-fetch missing video metadata (.info.json) files.
+- Added optional time totals view to pipeline stats display.
+- Added SKIP_EXISTING flag to skip already-processed files in hallucination detection scripts.
 - Per-channel transcription limiter and video file cleaner script
 - FileProcessingFilter class for config-aware file skipping
 - `find-files` tool to locate video files across data directories
@@ -47,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Updated transcript summarization default model to qwen3.6-35b-a3b.
 - Rewrote FileProcessingFilter to use video ID matching and made transcription fail fast on missing metadata
 - Ordered channels globally by pending count instead of per-language group during transcription
 - Rewrote video integrity checker from bash to Python with result caching
@@ -66,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed transcript summarization to exit non-zero after exceeding max retries.
 - Skip empty transcripts produced by speechless videos
 - `yt-downloader` now uses `--merge-output-format mp4` to avoid format selection issues
 - `convert-to-audio` exits non-zero when a video has no audio stream
