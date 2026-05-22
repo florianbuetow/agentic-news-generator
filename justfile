@@ -741,7 +741,8 @@ check-config-syntax:
 code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
-    @uv run pip-audit --skip-editable
+    @uv run pip-audit --skip-editable \
+        --ignore-vuln PYSEC-2026-139  # torch: local-only deserialization; no fix released yet; torch is unused at runtime (mlx-whisper declares it but never imports torch_whisper.py)
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""
