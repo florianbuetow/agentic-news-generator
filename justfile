@@ -119,7 +119,7 @@ help:
     @printf "  %-38s %s\n" "find [query]" "Interactively search cleaned transcripts; with query, list matching files"
     @printf "  %-38s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
-    @printf "  %-38s %s\n" "fetch-video-metadata <channel> <id...>" "Fetch missing .info.json for video IDs"
+    @printf "  %-38s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
     @printf "  %-38s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @echo ""
@@ -217,6 +217,7 @@ all:
 ingestion-all:
     @just ci-quiet
     -@just download-videos
+    @just fetch-video-metadata
     @just check-video-integrity
     @just filter-videos
     @just extract-audio
@@ -818,12 +819,12 @@ test-coverage: init
     @echo "  HTML: reports/coverage/html/index.html"
     @echo ""
 
-# Fetch missing .info.json metadata for specific video IDs into the channel metadata dir
-fetch-video-metadata CHANNEL +VIDEO_IDS:
+# Fetch missing .info.json metadata. With no args, scans all non-archived video files. With args: CHANNEL VIDEO_ID [...]
+fetch-video-metadata *ARGS:
     @echo ""
     @printf "\033[0;34m=== Fetching Video Metadata ===\033[0m\n"
     @echo ""
-    @uv run python scripts/fetch-video-metadata.py {{ CHANNEL }} {{ VIDEO_IDS }}
+    @uv run python scripts/fetch-video-metadata.py {{ ARGS }}
     @echo ""
 
 # Check all channels for WAV files missing .info.json and fetch them automatically

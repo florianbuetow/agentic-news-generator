@@ -132,7 +132,8 @@ def process_single_file(
         usage_pct = (transcript_tokens / llm.context_window * 100.0) if llm.context_window > 0 else 0.0
         return (
             "skip (oversized)",
-            f"contains {transcript_tokens:,} tokens ({usage_pct:.1f}% of context window {llm.context_window:,}; threshold: {skip_threshold_pct}%/{token_limit:,} tokens)",
+            f"contains {transcript_tokens:,} tokens ({usage_pct:.1f}% of context window"
+            f" {llm.context_window:,}; threshold: {skip_threshold_pct}%/{token_limit:,} tokens)",
         )
 
     prompt = prompt_template.replace("{transcript}", transcript)

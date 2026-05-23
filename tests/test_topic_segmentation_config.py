@@ -719,9 +719,7 @@ class TestSummarizeTranscriptsConfig:
 
     def test_threshold_is_required(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            SummarizeTranscriptsConfig(
-                llm=_make_llm(),
-            )
+            SummarizeTranscriptsConfig.model_validate({"llm": _make_llm().model_dump()})
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "missing" for err in errors)
 
@@ -746,10 +744,7 @@ class TestSummarizeTranscriptsConfig:
                 skip_transcripts_above_context_window_pct=-1,
             )
         errors = exc_info.value.errors()
-        assert any(
-            err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "greater_than_equal"
-            for err in errors
-        )
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "greater_than_equal" for err in errors)
 
     def test_threshold_above_100_rejected(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
@@ -758,7 +753,4 @@ class TestSummarizeTranscriptsConfig:
                 skip_transcripts_above_context_window_pct=101,
             )
         errors = exc_info.value.errors()
-        assert any(
-            err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "less_than_equal"
-            for err in errors
-        )
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "less_than_equal" for err in errors)
