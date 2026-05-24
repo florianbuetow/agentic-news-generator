@@ -31,7 +31,7 @@ class TestHallucinationRelativePaths:
     def test_relative_path_format_in_detect_hallucinations_in_file(self, temp_config_with_paths: tuple[Path, Config]) -> None:
         """Test that detect_hallucinations_in_file generates relative paths."""
         temp_dir, config = temp_config_with_paths
-        data_dir = temp_dir / config.getDataDir()
+        data_dir = temp_dir / config.get_data_dir()
 
         # Create test SRT file
         srt_dir = data_dir / "downloads" / "transcripts" / "test_channel"
@@ -50,8 +50,8 @@ More test content
 
         # Initialize detector
         detector = RepetitionDetector(
-            min_k=config.getRepetitionMinK(),
-            min_repetitions=config.getRepetitionMinRepetitions(),
+            min_k=config.get_repetition_min_k(),
+            min_repetitions=config.get_repetition_min_repetitions(),
             config=config,
         )
 
@@ -73,7 +73,7 @@ More test content
     def test_relative_path_uses_posix_format(self, temp_config_with_paths: tuple[Path, Config]) -> None:
         """Test that generated paths use forward slashes (POSIX format)."""
         temp_dir, config = temp_config_with_paths
-        data_dir = temp_dir / config.getDataDir()
+        data_dir = temp_dir / config.get_data_dir()
 
         # Create test SRT file
         srt_dir = data_dir / "downloads" / "transcripts" / "test_channel"
@@ -83,8 +83,8 @@ More test content
 
         # Initialize detector
         detector = RepetitionDetector(
-            min_k=config.getRepetitionMinK(),
-            min_repetitions=config.getRepetitionMinRepetitions(),
+            min_k=config.get_repetition_min_k(),
+            min_repetitions=config.get_repetition_min_repetitions(),
             config=config,
         )
 
@@ -105,7 +105,7 @@ More test content
     def test_relative_path_can_be_resolved_back_to_file(self, temp_config_with_paths: tuple[Path, Config]) -> None:
         """Test that relative paths can be resolved back to the original file."""
         temp_dir, config = temp_config_with_paths
-        data_dir = temp_dir / config.getDataDir()
+        data_dir = temp_dir / config.get_data_dir()
 
         # Create test SRT file
         srt_dir = data_dir / "downloads" / "transcripts" / "test_channel"
@@ -115,8 +115,8 @@ More test content
 
         # Initialize detector
         detector = RepetitionDetector(
-            min_k=config.getRepetitionMinK(),
-            min_repetitions=config.getRepetitionMinRepetitions(),
+            min_k=config.get_repetition_min_k(),
+            min_repetitions=config.get_repetition_min_repetitions(),
             config=config,
         )
 
@@ -140,7 +140,7 @@ More test content
     def test_relative_path_raises_error_if_file_outside_data_dir(self, temp_config_with_paths: tuple[Path, Config]) -> None:
         """Test that files outside data_dir raise ValueError."""
         temp_dir, config = temp_config_with_paths
-        data_dir = temp_dir / config.getDataDir()
+        data_dir = temp_dir / config.get_data_dir()
 
         # Create SRT file OUTSIDE data_dir
         outside_dir = temp_dir / "outside"
@@ -150,8 +150,8 @@ More test content
 
         # Initialize detector
         detector = RepetitionDetector(
-            min_k=config.getRepetitionMinK(),
-            min_repetitions=config.getRepetitionMinRepetitions(),
+            min_k=config.get_repetition_min_k(),
+            min_repetitions=config.get_repetition_min_repetitions(),
             config=config,
         )
 
@@ -168,7 +168,7 @@ More test content
     def test_process_srt_file_creates_json_with_relative_paths(self, temp_config_with_paths: tuple[Path, Config]) -> None:
         """Test that process_srt_file writes JSON with relative paths."""
         temp_dir, config = temp_config_with_paths
-        data_dir = temp_dir / config.getDataDir()
+        data_dir = temp_dir / config.get_data_dir()
 
         # Create test SRT file
         srt_dir = data_dir / "downloads" / "transcripts" / "test_channel"
@@ -182,8 +182,8 @@ More test content
 
         # Initialize detector
         detector = RepetitionDetector(
-            min_k=config.getRepetitionMinK(),
-            min_repetitions=config.getRepetitionMinRepetitions(),
+            min_k=config.get_repetition_min_k(),
+            min_repetitions=config.get_repetition_min_repetitions(),
             config=config,
         )
 

@@ -44,9 +44,9 @@ _PIPELINE_ORDER: list[str] = [
 ]
 
 _DIR_ACCESSOR = {
-    "data_downloads_videos_dir": "getDataDownloadsVideosDir",
-    "data_downloads_audio_dir": "getDataDownloadsAudioDir",
-    "data_downloads_transcripts_dir": "getDataDownloadsTranscriptsDir",
+    "data_downloads_videos_dir": "get_data_downloads_videos_dir",
+    "data_downloads_audio_dir": "get_data_downloads_audio_dir",
+    "data_downloads_transcripts_dir": "get_data_downloads_transcripts_dir",
 }
 
 

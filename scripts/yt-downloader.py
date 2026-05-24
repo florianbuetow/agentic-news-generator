@@ -36,7 +36,7 @@ def main() -> None:
         print(f"Error loading config: {e}", file=sys.stderr)
         sys.exit(1)
 
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     channels = config.get_channels()
 
@@ -61,7 +61,7 @@ def main() -> None:
 
         max_downloads = 99999 if channel.download_limiter == -1 else channel.download_limiter
         sanitized_name = sanitize_channel_name(channel.name)
-        output_dir = config.getDataDownloadsVideosDir() / sanitized_name
+        output_dir = config.get_data_downloads_videos_dir() / sanitized_name
 
         logger.info(f"Processing channel: {channel.name} ({channel.url})")
         logger.info(f"  Output directory: {output_dir}")

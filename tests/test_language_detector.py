@@ -94,7 +94,7 @@ class TestLanguageDetectorWithModel:
     def detector(self) -> LanguageDetector:
         """Create a LanguageDetector instance with downloaded model."""
         config = Config(Path("config/config.yaml"))
-        model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
+        model_path = config.get_data_models_dir() / "fasttext" / "lid.176.ftz"
 
         if not model_path.exists():
             pytest.fail("FastText model not downloaded. Run 'just init' first.")

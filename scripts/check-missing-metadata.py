@@ -45,9 +45,9 @@ def main() -> int:
         print(f"Error loading config: {e}", file=sys.stderr)
         return 1
 
-    audio_dir = Path(config.getDataDownloadsAudioDir())
-    metadata_dir = Path(config.getDataDownloadsMetadataDir())
-    metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
+    audio_dir = Path(config.get_data_downloads_audio_dir())
+    metadata_dir = Path(config.get_data_downloads_metadata_dir())
+    metadata_video_subdir = config.get_transcription_metadata_video_subdir()
 
     if not audio_dir.exists():
         print(f"Error: audio directory not found: {audio_dir}", file=sys.stderr)

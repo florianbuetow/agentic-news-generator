@@ -50,7 +50,7 @@ warnings.filterwarnings("ignore")
 _config = Config("config/config.yaml")
 
 # Configuration constants
-REPORTS_DIR = _config.getReportsDir()
+REPORTS_DIR = _config.get_reports_dir()
 OUTPUT_DIR = Path(__file__).parent / "gfx"  # Save images in same folder as notebook
 CSV_PATTERN = "*.csv"
 JPEG_DPI = 300

@@ -316,10 +316,10 @@ def _print_report(
 def main() -> int:
     """Scan every channel and merge any new short / no-audio entries into filefilter.json."""
     config = Config(_CONFIG_PATH)
-    videos_dir = config.getDataDownloadsVideosDir()
-    audio_dir = config.getDataDownloadsAudioDir()
-    metadata_dir = config.getDataDownloadsMetadataDir()
-    max_duration = config.getTranscriptionMinDuration()
+    videos_dir = config.get_data_downloads_videos_dir()
+    audio_dir = config.get_data_downloads_audio_dir()
+    metadata_dir = config.get_data_downloads_metadata_dir()
+    max_duration = config.get_transcription_min_duration()
 
     matches, counters = collect_filter_matches(
         videos_dir,

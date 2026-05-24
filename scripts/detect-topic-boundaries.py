@@ -214,7 +214,7 @@ def main() -> int:
         return 1
 
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
     logging.getLogger("litellm").setLevel(logging.WARNING)
@@ -222,8 +222,8 @@ def main() -> int:
 
     boundary_cfg = config.get_topic_boundaries_config()
     llm = boundary_cfg.llm
-    input_dir = config.getDataDir() / boundary_cfg.input_dir
-    output_dir = config.getDataDir() / boundary_cfg.output_dir
+    input_dir = config.get_data_dir() / boundary_cfg.input_dir
+    output_dir = config.get_data_dir() / boundary_cfg.output_dir
 
     if not input_dir.exists():
         raise FileNotFoundError(f"Input directory not found: {input_dir}")
@@ -233,7 +233,7 @@ def main() -> int:
         raise FileNotFoundError(f"Prompt template not found: {prompt_path}")
 
     prompt_template = FSUtil.read_text_file(prompt_path)
-    encoder = tiktoken.get_encoding(config.getEncodingName())
+    encoder = tiktoken.get_encoding(config.get_encoding_name())
 
     target_file = args.file.resolve() if args.file is not None else None
     txt_files = collect_target_files(input_dir, target_file)

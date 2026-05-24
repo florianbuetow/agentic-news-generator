@@ -399,7 +399,7 @@ from src.nlp import LanguageDetector
 config = Config(Path("config/config.yaml"))
 
 # Initialize detector with model path from config
-model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
+model_path = config.get_data_models_dir() / "fasttext" / "lid.176.ftz"
 detector = LanguageDetector(model_path=model_path)
 
 # Detect language
@@ -860,9 +860,9 @@ The project follows strict configuration principles:
 from src.config import Config
 
 config = Config(config_path)
-encoding = config.getEncodingName()          # Returns "o200k_base"
-min_k = config.getRepetitionMinK()           # Returns 1
-min_reps = config.getRepetitionMinRepetitions()  # Returns 5
+encoding = config.get_encoding_name()          # Returns "o200k_base"
+min_k = config.get_repetition_min_k()           # Returns 1
+min_reps = config.get_repetition_min_repetitions()  # Returns 5
 ```
 
 This approach ensures:

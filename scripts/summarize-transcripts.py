@@ -36,7 +36,7 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
         return 1
 
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
     logging.getLogger("litellm").setLevel(logging.WARNING)
@@ -48,8 +48,8 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
         logger.error(f"Error: {e}")
         return 1
 
-    cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
-    summaries_dir = config.getDataDownloadsTranscriptsSummariesDir()
+    cleaned_dir = config.get_data_downloads_transcripts_cleaned_dir()
+    summaries_dir = config.get_data_downloads_transcripts_summaries_dir()
 
     if not cleaned_dir.exists():
         logger.error(f"Cleaned transcripts directory not found: {cleaned_dir}")
@@ -61,7 +61,7 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
         return 1
 
     prompt_template = FSUtil.read_text_file(prompt_path)
-    encoding_name = config.getEncodingName()
+    encoding_name = config.get_encoding_name()
 
     logger.info(f"Cleaned transcripts directory: {cleaned_dir}")
     logger.info(f"Summaries output directory: {summaries_dir}")

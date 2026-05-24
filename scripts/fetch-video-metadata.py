@@ -98,9 +98,9 @@ def _fetch_items(
 
 def _scan_and_fetch(config: Config, shell_script: Path) -> int:
     """Scan non-archived video files and fetch any missing metadata."""
-    videos_dir = config.getDataDownloadsVideosDir()
-    metadata_dir = config.getDataDownloadsMetadataDir()
-    metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
+    videos_dir = config.get_data_downloads_videos_dir()
+    metadata_dir = config.get_data_downloads_metadata_dir()
+    metadata_video_subdir = config.get_transcription_metadata_video_subdir()
 
     if not videos_dir.exists():
         print(f"Error: videos directory not found: {videos_dir}", file=sys.stderr)
@@ -175,9 +175,9 @@ def main() -> int:
     if not args.video_ids:
         parser.error("video_ids required when channel_name is given")
 
-    audio_dir = config.getDataDownloadsAudioDir()
-    metadata_dir = config.getDataDownloadsMetadataDir()
-    metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
+    audio_dir = config.get_data_downloads_audio_dir()
+    metadata_dir = config.get_data_downloads_metadata_dir()
+    metadata_video_subdir = config.get_transcription_metadata_video_subdir()
 
     audio_channel_dir = audio_dir / args.channel_name
     metadata_channel_video_dir = metadata_dir / args.channel_name / metadata_video_subdir

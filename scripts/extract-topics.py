@@ -193,7 +193,7 @@ def main() -> None:
     config = Config(project_root / "config" / "config.yaml")
 
     topics_config = config.get_topics_config()
-    data_dir = config.getDataDir()
+    data_dir = config.get_data_dir()
     input_dir = data_dir / topics_config.input_dir
     output_dir = data_dir / topics_config.output_dir
     prompt_template_path = project_root / topics_config.prompt_template

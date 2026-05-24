@@ -278,7 +278,7 @@ def main() -> None:
     download_log_path = Path("reports/video-download.log")
 
     config = load_config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     if not download_log_path.exists():
         logger.info(f"No download log found at {download_log_path}")
@@ -295,7 +295,7 @@ def main() -> None:
     logger.info(f"Found {total_videos} members-only videos to archive")
 
     url_to_channel = build_url_to_channel_map(config.get_channels())
-    videos_dir = config.getDataDownloadsVideosDir()
+    videos_dir = config.get_data_downloads_videos_dir()
 
     total_archived, total_duplicates, unknown_urls = process_all_channels(url_to_video_ids, url_to_channel, videos_dir)
 

@@ -66,7 +66,7 @@ PROJECT_ROOT = Path.cwd().parent.parent
 _config = Config(PROJECT_ROOT / "config" / "config.yaml")
 
 # Configuration constants
-REPORTS_DIR = PROJECT_ROOT / _config.getReportsDir()
+REPORTS_DIR = PROJECT_ROOT / _config.get_reports_dir()
 OUTPUT_DIR = PROJECT_ROOT / NOTEBOOK_LOCATION / "gfx"
 CSV_PATTERN = "*.csv"
 JPEG_DPI = 300

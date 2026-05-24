@@ -25,10 +25,10 @@ def main() -> int:  # noqa: C901
 
     # Load Config class
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     # Get hallucination detection output directory from Config
-    transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
+    transcripts_hallucinations_dir = config.get_data_downloads_transcripts_hallucinations_dir()
 
     if not transcripts_hallucinations_dir.exists():
         logger.error(f"Hallucination output directory not found: {transcripts_hallucinations_dir}")
@@ -86,7 +86,7 @@ def main() -> int:  # noqa: C901
         return 0
 
     # Generate markdown digest
-    output_file = config.getDataOutputDir() / "hallucination_digest.md"
+    output_file = config.get_data_output_dir() / "hallucination_digest.md"
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     total_hallucinations = sum(len(v) for v in hallucinations_by_file.values())

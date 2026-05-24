@@ -70,7 +70,7 @@ def collect_srt_files(*, config: Config, encoder: tiktoken.Encoding) -> CollectR
     picked file on new byte-size max to find the largest candidate across the
     collected set (used to size the LLM context window).
     """
-    cleaned_root = config.getDataDownloadsTranscriptsCleanedDir()
+    cleaned_root = config.get_data_downloads_transcripts_cleaned_dir()
     if not cleaned_root.exists():
         raise FileNotFoundError(f"Cleaned transcripts directory not found: {cleaned_root}")
 
@@ -194,7 +194,7 @@ def main() -> int:
     config = Config(config_path)
     experiment_cfg = config.get_topics_experiment_config()
 
-    encoder = tiktoken.get_encoding(config.getEncodingName())
+    encoder = tiktoken.get_encoding(config.get_encoding_name())
 
     print("Walking cleaned-transcripts root and measuring largest SRT...")
     collect = collect_srt_files(config=config, encoder=encoder)
@@ -233,7 +233,7 @@ def main() -> int:
         retry_delay=experiment_cfg.retry_delay,
     )
 
-    output_root = config.getDataOutputDir() / experiment_cfg.output_subdir
+    output_root = config.get_data_output_dir() / experiment_cfg.output_subdir
     print(f"Output root: {output_root}")
 
     print("Pre-scanning pending files (detecting already-processed and empty SRTs)...")

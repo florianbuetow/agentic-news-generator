@@ -20,7 +20,7 @@ class HallucinationClassifier:
             config: Config object with hallucination detection settings.
         """
         # Load model coefficients from Config
-        self.coef_repetitions, self.coef_sequence_length, self.intercept = config.getHallucinationClassifierModel()
+        self.coef_repetitions, self.coef_sequence_length, self.intercept = config.get_hallucination_classifier_model()
 
     def predict(self, repetitions: float, sequence_length: float) -> bool:
         """Predict if input is a hallucination.

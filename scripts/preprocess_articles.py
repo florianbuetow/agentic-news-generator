@@ -97,7 +97,7 @@ def main() -> None:
     config = Config(config_path=str(config_path))
 
     # Define paths from config
-    input_dir = config.getDataInputDir() / "newspaper" / "articles"
+    input_dir = config.get_data_input_dir() / "newspaper" / "articles"
     output_dir = project_root / "frontend" / "newspaper" / "content" / "articles"
 
     # Validate input directory

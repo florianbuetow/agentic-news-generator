@@ -292,11 +292,11 @@ def main() -> int:  # noqa: C901
     config = Config(config_path)
 
     # Get directories from Config
-    downloads_dir = config.getDataDownloadsDir()
-    archive_dir = config.getDataArchiveDir()
-    transcripts_hallucinations_dir = config.getDataDownloadsTranscriptsHallucinationsDir()
-    transcripts_cleaned_dir = config.getDataDownloadsTranscriptsCleanedDir()
-    transcripts_summaries_dir = config.getDataDownloadsTranscriptsSummariesDir()
+    downloads_dir = config.get_data_downloads_dir()
+    archive_dir = config.get_data_archive_dir()
+    transcripts_hallucinations_dir = config.get_data_downloads_transcripts_hallucinations_dir()
+    transcripts_cleaned_dir = config.get_data_downloads_transcripts_cleaned_dir()
+    transcripts_summaries_dir = config.get_data_downloads_transcripts_summaries_dir()
 
     if not downloads_dir.exists():
         print(f"Error: Downloads directory not found: {downloads_dir}")

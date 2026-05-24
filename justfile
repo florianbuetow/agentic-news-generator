@@ -299,7 +299,7 @@ transcribe:
     uv run python scripts/transcribe_audio.py
     echo ""
     printf "\033[0;34m=== Cleaning Up Empty Transcripts ===\033[0m\n"
-    transcripts_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(Path('.') / c.getDataDownloadsTranscriptsDir())")
+    transcripts_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(Path('.') / c.get_data_downloads_transcripts_dir())")
     bash scripts/cleanup-empty-transcripts.sh "$transcripts_dir"
     echo ""
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
@@ -842,7 +842,7 @@ find QUERY="":
     echo ""
     printf "\033[0;34m=== Finding Cleaned Transcripts ===\033[0m\n"
     echo ""
-    cleaned_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.getDataDownloadsTranscriptsCleanedDir())")
+    cleaned_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.get_data_downloads_transcripts_cleaned_dir())")
     if [[ -n "{{ QUERY }}" ]]; then
         rg -c --color=never "{{ QUERY }}" "$cleaned_dir" --glob "*.txt" | sort -t: -k2 -rn | while IFS= read -r line; do
             f="${line%:*}"
@@ -864,7 +864,7 @@ search QUERY="":
     echo ""
     printf "\033[0;34m=== Searching Transcript Summaries ===\033[0m\n"
     echo ""
-    summaries_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.getDataDownloadsTranscriptsSummariesDir())")
+    summaries_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.get_data_downloads_transcripts_summaries_dir())")
     if [[ -n "{{ QUERY }}" ]]; then
         rg -c --color=never "{{ QUERY }}" "$summaries_dir" --glob "*.md" | sort -t: -k2 -rn | while IFS= read -r line; do
             f="${line%:*}"

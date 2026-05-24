@@ -305,25 +305,25 @@ def main() -> int:  # noqa: C901
     file_filter = FileProcessingFilter(config)
 
     # Get paths from config
-    audio_dir = project_root / config.getDataDownloadsAudioDir()
-    transcripts_dir = project_root / config.getDataDownloadsTranscriptsDir()
-    metadata_dir = project_root / config.getDataDownloadsMetadataDir()
-    logs_dir = Path(config.getDataLogsDir())
+    audio_dir = project_root / config.get_data_downloads_audio_dir()
+    transcripts_dir = project_root / config.get_data_downloads_transcripts_dir()
+    metadata_dir = project_root / config.get_data_downloads_metadata_dir()
+    logs_dir = Path(config.get_data_logs_dir())
     FSUtil.ensure_directory_exists(logs_dir)
     configure_root_logger(logs_dir)
     empty_transcript_log = logs_dir / "empty_transcripts.log"
 
     # Get transcription settings from config
-    model_en_repo = config.getTranscriptionModelEnRepo()
-    model_multi_repo = config.getTranscriptionModelMultiRepo()
-    hallucination_silence_threshold = config.getTranscriptionHallucinationSilenceThreshold()
-    compression_ratio_threshold = config.getTranscriptionCompressionRatioThreshold()
-    use_youtube_metadata = config.getTranscriptionUseYoutubeMetadata()
-    description_max_length = config.getTranscriptionDescriptionMaxLength()
-    sleep_between_files = config.getTranscriptionSleepBetweenFiles()
-    min_duration = config.getTranscriptionMinDuration()
-    metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
-    verbose = config.getTranscriptionVerbose()
+    model_en_repo = config.get_transcription_model_en_repo()
+    model_multi_repo = config.get_transcription_model_multi_repo()
+    hallucination_silence_threshold = config.get_transcription_hallucination_silence_threshold()
+    compression_ratio_threshold = config.get_transcription_compression_ratio_threshold()
+    use_youtube_metadata = config.get_transcription_use_youtube_metadata()
+    description_max_length = config.get_transcription_description_max_length()
+    sleep_between_files = config.get_transcription_sleep_between_files()
+    min_duration = config.get_transcription_min_duration()
+    metadata_video_subdir = config.get_transcription_metadata_video_subdir()
+    verbose = config.get_transcription_verbose()
 
     # Get language names from WhisperLanguages
     supported_languages = WhisperLanguages.get_supported_languages()
@@ -381,8 +381,8 @@ def main() -> int:  # noqa: C901
     progress = ProgressTracker(total_files=len(files_to_transcribe))
 
     logger.info("Starting batch transcription with language grouping")
-    logger.info(f"English model: {config.getTranscriptionModelEnName()} ({model_en_repo})")
-    logger.info(f"Multilingual model: {config.getTranscriptionModelMultiName()} ({model_multi_repo})")
+    logger.info(f"English model: {config.get_transcription_model_en_name()} ({model_en_repo})")
+    logger.info(f"Multilingual model: {config.get_transcription_model_multi_name()} ({model_multi_repo})")
     logger.info(f"Hallucination silence threshold: {hallucination_silence_threshold}s")
     logger.info(f"Compression ratio threshold: {compression_ratio_threshold}")
     logger.info(f"Use YouTube metadata: {use_youtube_metadata}")

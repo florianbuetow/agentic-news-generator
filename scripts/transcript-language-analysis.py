@@ -275,17 +275,17 @@ def main() -> int:
     # Load configuration
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     # Get paths
-    transcripts_dir = config.getDataDownloadsTranscriptsDir()
-    output_dir = config.getDataOutputDir() / "language_analysis"
-    data_dir = config.getDataDir()
+    transcripts_dir = config.get_data_downloads_transcripts_dir()
+    output_dir = config.get_data_output_dir() / "language_analysis"
+    data_dir = config.get_data_dir()
 
-    min_confidence = config.getLanguageAnalysisMinConfidence()
+    min_confidence = config.get_language_analysis_min_confidence()
 
     # Initialize language detector
-    model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
+    model_path = config.get_data_models_dir() / "fasttext" / "lid.176.ftz"
     try:
         detector = LanguageDetector(model_path=model_path)
     except FileNotFoundError as e:

@@ -25,7 +25,7 @@ def main() -> None:
     config = Config(config_path=str(config_path))
 
     # Get articles directory from config
-    articles_dir = config.getDataInputDir() / "newspaper" / "articles"
+    articles_dir = config.get_data_input_dir() / "newspaper" / "articles"
 
     # Check if directory exists
     if not articles_dir.exists():

@@ -87,9 +87,9 @@ class TestConfigPaths:
 
         try:
             config = Config(temp_path)
-            assert config.getDataDir() == Path("./data/")
-            assert config.getDataDownloadsDir() == Path("./data/downloads")
-            assert config.getDataArchiveVideosDir() == Path("./data/archive/videos")
+            assert config.get_data_dir() == Path("./data/")
+            assert config.get_data_downloads_dir() == Path("./data/downloads")
+            assert config.get_data_archive_videos_dir() == Path("./data/archive/videos")
         finally:
             temp_path.unlink()
 
@@ -160,19 +160,19 @@ class TestConfigPaths:
 
         try:
             config = Config(temp_path)
-            assert isinstance(config.getDataDir(), Path)
-            assert isinstance(config.getDataModelsDir(), Path)
-            assert isinstance(config.getDataDownloadsDir(), Path)
-            assert isinstance(config.getDataDownloadsVideosDir(), Path)
-            assert isinstance(config.getDataDownloadsTranscriptsDir(), Path)
-            assert isinstance(config.getDataDownloadsTranscriptsHallucinationsDir(), Path)
-            assert isinstance(config.getDataDownloadsAudioDir(), Path)
-            assert isinstance(config.getDataDownloadsMetadataDir(), Path)
-            assert isinstance(config.getDataOutputDir(), Path)
-            assert isinstance(config.getDataInputDir(), Path)
-            assert isinstance(config.getDataTempDir(), Path)
-            assert isinstance(config.getDataArchiveDir(), Path)
-            assert isinstance(config.getDataArchiveVideosDir(), Path)
+            assert isinstance(config.get_data_dir(), Path)
+            assert isinstance(config.get_data_models_dir(), Path)
+            assert isinstance(config.get_data_downloads_dir(), Path)
+            assert isinstance(config.get_data_downloads_videos_dir(), Path)
+            assert isinstance(config.get_data_downloads_transcripts_dir(), Path)
+            assert isinstance(config.get_data_downloads_transcripts_hallucinations_dir(), Path)
+            assert isinstance(config.get_data_downloads_audio_dir(), Path)
+            assert isinstance(config.get_data_downloads_metadata_dir(), Path)
+            assert isinstance(config.get_data_output_dir(), Path)
+            assert isinstance(config.get_data_input_dir(), Path)
+            assert isinstance(config.get_data_temp_dir(), Path)
+            assert isinstance(config.get_data_archive_dir(), Path)
+            assert isinstance(config.get_data_archive_videos_dir(), Path)
         finally:
             temp_path.unlink()
 
@@ -189,19 +189,19 @@ class TestConfigPaths:
         try:
             config = Config(temp_path)
             # Path normalizes paths, so "./data/" becomes "data"
-            assert config.getDataDir() == Path("./data/")
-            assert config.getDataModelsDir() == Path("./data/models/")
-            assert config.getDataDownloadsDir() == Path("./data/downloads")
-            assert config.getDataDownloadsVideosDir() == Path("./data/downloads/videos/")
-            assert config.getDataDownloadsTranscriptsDir() == Path("./data/downloads/transcripts")
-            assert config.getDataDownloadsTranscriptsHallucinationsDir() == Path("./data/downloads/transcripts-hallucinations")
-            assert config.getDataDownloadsAudioDir() == Path("./data/downloads/audio")
-            assert config.getDataDownloadsMetadataDir() == Path("./data/downloads/metadata")
-            assert config.getDataOutputDir() == Path("./data/output/")
-            assert config.getDataInputDir() == Path("./data/input/")
-            assert config.getDataTempDir() == Path("./data/temp")
-            assert config.getDataArchiveDir() == Path("./data/archive")
-            assert config.getDataArchiveVideosDir() == Path("./data/archive/videos")
+            assert config.get_data_dir() == Path("./data/")
+            assert config.get_data_models_dir() == Path("./data/models/")
+            assert config.get_data_downloads_dir() == Path("./data/downloads")
+            assert config.get_data_downloads_videos_dir() == Path("./data/downloads/videos/")
+            assert config.get_data_downloads_transcripts_dir() == Path("./data/downloads/transcripts")
+            assert config.get_data_downloads_transcripts_hallucinations_dir() == Path("./data/downloads/transcripts-hallucinations")
+            assert config.get_data_downloads_audio_dir() == Path("./data/downloads/audio")
+            assert config.get_data_downloads_metadata_dir() == Path("./data/downloads/metadata")
+            assert config.get_data_output_dir() == Path("./data/output/")
+            assert config.get_data_input_dir() == Path("./data/input/")
+            assert config.get_data_temp_dir() == Path("./data/temp")
+            assert config.get_data_archive_dir() == Path("./data/archive")
+            assert config.get_data_archive_videos_dir() == Path("./data/archive/videos")
         finally:
             temp_path.unlink()
 
@@ -219,6 +219,6 @@ class TestConfigPaths:
 
         try:
             config = Config(temp_path)
-            assert str(config.getDataDir()) == "/absolute/path/to/data"
+            assert str(config.get_data_dir()) == "/absolute/path/to/data"
         finally:
             temp_path.unlink()

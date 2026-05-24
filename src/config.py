@@ -552,23 +552,23 @@ class Config:
             raise KeyError("Missing required key 'topic_boundaries' in config file")
         return self._topic_boundaries
 
-    def getEncodingName(self) -> str:
+    def get_encoding_name(self) -> str:
         """Get default tiktoken encoding for token counting."""
         return cast(str, self._data["defaults"]["encoding_name"])
 
-    def getRepetitionMinK(self) -> int:
+    def get_repetition_min_k(self) -> int:
         """Get default minimum phrase length for repetition detection."""
         return cast(int, self._data["defaults"]["repetition_min_k"])
 
-    def getRepetitionMinRepetitions(self) -> int:
+    def get_repetition_min_repetitions(self) -> int:
         """Get default minimum consecutive repetitions for detection."""
         return cast(int, self._data["defaults"]["repetition_min_repetitions"])
 
-    def getDetectMinK(self) -> int:
+    def get_detect_min_k(self) -> int:
         """Get default min_k for detect() method."""
         return cast(int, self._data["defaults"]["detect_min_k"])
 
-    def getHallucinationClassifierModel(self) -> tuple[float, float, float]:
+    def get_hallucination_classifier_model(self) -> tuple[float, float, float]:
         """Get SVM model coefficients for hallucination classification.
 
         Returns:
@@ -581,15 +581,15 @@ class Config:
             hc["intercept"],
         )
 
-    def getLanguageAnalysisMinConfidence(self) -> float:
+    def get_language_analysis_min_confidence(self) -> float:
         """Get minimum FastText confidence for a non-English classification to be trusted."""
         return cast(float, self._data["language_analysis"]["min_detection_confidence"])
 
-    def getConfigPath(self) -> Path:
+    def get_config_path(self) -> Path:
         """Get the path to config.yaml."""
         return self.config_path
 
-    def getDataDir(self) -> Path:
+    def get_data_dir(self) -> Path:
         """Get the data directory path.
 
         Returns:
@@ -597,7 +597,7 @@ class Config:
         """
         return Path(self._paths.data_dir)
 
-    def getDataModelsDir(self) -> Path:
+    def get_data_models_dir(self) -> Path:
         """Get the data models directory path.
 
         Returns:
@@ -605,7 +605,7 @@ class Config:
         """
         return Path(self._paths.data_models_dir)
 
-    def getDataDownloadsDir(self) -> Path:
+    def get_data_downloads_dir(self) -> Path:
         """Get the data downloads directory path.
 
         Returns:
@@ -613,7 +613,7 @@ class Config:
         """
         return Path(self._paths.data_downloads_dir)
 
-    def getDataDownloadsVideosDir(self) -> Path:
+    def get_data_downloads_videos_dir(self) -> Path:
         """Get the data downloads videos directory path.
 
         Returns:
@@ -621,7 +621,7 @@ class Config:
         """
         return Path(self._paths.data_downloads_videos_dir)
 
-    def getDataDownloadsTranscriptsDir(self) -> Path:
+    def get_data_downloads_transcripts_dir(self) -> Path:
         """Get the data downloads transcripts directory path.
 
         Returns:
@@ -629,7 +629,7 @@ class Config:
         """
         return Path(self._paths.data_downloads_transcripts_dir)
 
-    def getDataDownloadsTranscriptsHallucinationsDir(self) -> Path:
+    def get_data_downloads_transcripts_hallucinations_dir(self) -> Path:
         """Get the data downloads transcripts hallucinations directory path.
 
         Returns:
@@ -637,7 +637,7 @@ class Config:
         """
         return Path(self._paths.data_downloads_transcripts_hallucinations_dir)
 
-    def getDataDownloadsTranscriptsCleanedDir(self) -> Path:
+    def get_data_downloads_transcripts_cleaned_dir(self) -> Path:
         """Get the data downloads cleaned transcripts directory path.
 
         Returns:
@@ -645,16 +645,16 @@ class Config:
         """
         return Path(self._paths.data_downloads_transcripts_cleaned_dir)
 
-    def getDataDownloadsTranscriptsSummariesDir(self) -> Path:
+    def get_data_downloads_transcripts_summaries_dir(self) -> Path:
         """Get the transcript summaries directory path."""
         return Path(self._paths.data_downloads_transcripts_summaries_dir)
 
-    def getDataDownloadsTranscriptsTopicBoundariesDir(self) -> Path:
+    def get_data_downloads_transcripts_topic_boundaries_dir(self) -> Path:
         """Get the transcript topic boundaries directory path from topic_boundaries config."""
         topic_boundaries = self.get_topic_boundaries_config()
-        return self.getDataDir() / Path(topic_boundaries.output_dir)
+        return self.get_data_dir() / Path(topic_boundaries.output_dir)
 
-    def getDataDownloadsAudioDir(self) -> Path:
+    def get_data_downloads_audio_dir(self) -> Path:
         """Get the data downloads audio directory path.
 
         Returns:
@@ -662,7 +662,7 @@ class Config:
         """
         return Path(self._paths.data_downloads_audio_dir)
 
-    def getDataDownloadsMetadataDir(self) -> Path:
+    def get_data_downloads_metadata_dir(self) -> Path:
         """Get the data downloads metadata directory path.
 
         Returns:
@@ -670,7 +670,7 @@ class Config:
         """
         return Path(self._paths.data_downloads_metadata_dir)
 
-    def getDataOutputDir(self) -> Path:
+    def get_data_output_dir(self) -> Path:
         """Get the data output directory path.
 
         Returns:
@@ -678,7 +678,7 @@ class Config:
         """
         return Path(self._paths.data_output_dir)
 
-    def getDataInputDir(self) -> Path:
+    def get_data_input_dir(self) -> Path:
         """Get the data input directory path.
 
         Returns:
@@ -686,7 +686,7 @@ class Config:
         """
         return Path(self._paths.data_input_dir)
 
-    def getDataTempDir(self) -> Path:
+    def get_data_temp_dir(self) -> Path:
         """Get the data temp directory path.
 
         Returns:
@@ -694,7 +694,7 @@ class Config:
         """
         return Path(self._paths.data_temp_dir)
 
-    def getDataArchiveDir(self) -> Path:
+    def get_data_archive_dir(self) -> Path:
         """Get the data archive directory path.
 
         Returns:
@@ -702,7 +702,7 @@ class Config:
         """
         return Path(self._paths.data_archive_dir)
 
-    def getDataArchiveVideosDir(self) -> Path:
+    def get_data_archive_videos_dir(self) -> Path:
         """Get the data archive videos directory path.
 
         Returns:
@@ -710,7 +710,7 @@ class Config:
         """
         return Path(self._paths.data_archive_videos_dir)
 
-    def getDataLogsDir(self) -> Path:
+    def get_data_logs_dir(self) -> Path:
         """Get the data logs directory path.
 
         Returns:
@@ -718,7 +718,7 @@ class Config:
         """
         return Path(self._paths.data_logs_dir)
 
-    def getReportsDir(self) -> Path:
+    def get_reports_dir(self) -> Path:
         """Get the reports directory path.
 
         Returns:
@@ -741,7 +741,7 @@ class Config:
 
     # Transcription Configuration Getters
 
-    def getTranscriptionModelEnName(self) -> str:
+    def get_transcription_model_en_name(self) -> str:
         """Get English Whisper model name.
 
         Raises:
@@ -751,7 +751,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.model_en_name
 
-    def getTranscriptionModelEnRepo(self) -> str:
+    def get_transcription_model_en_repo(self) -> str:
         """Get English Whisper model repository.
 
         Raises:
@@ -761,7 +761,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.model_en_repo
 
-    def getTranscriptionModelMultiName(self) -> str:
+    def get_transcription_model_multi_name(self) -> str:
         """Get multilingual Whisper model name.
 
         Raises:
@@ -771,7 +771,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.model_multi_name
 
-    def getTranscriptionModelMultiRepo(self) -> str:
+    def get_transcription_model_multi_repo(self) -> str:
         """Get multilingual Whisper model repository.
 
         Raises:
@@ -781,7 +781,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.model_multi_repo
 
-    def getTranscriptionHallucinationSilenceThreshold(self) -> float:
+    def get_transcription_hallucination_silence_threshold(self) -> float:
         """Get hallucination silence threshold in seconds.
 
         Raises:
@@ -791,7 +791,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.hallucination_silence_threshold
 
-    def getTranscriptionCompressionRatioThreshold(self) -> float:
+    def get_transcription_compression_ratio_threshold(self) -> float:
         """Get compression ratio threshold.
 
         Raises:
@@ -801,7 +801,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.compression_ratio_threshold
 
-    def getTranscriptionUseYoutubeMetadata(self) -> bool:
+    def get_transcription_use_youtube_metadata(self) -> bool:
         """Get whether to use YouTube metadata in prompts.
 
         Raises:
@@ -811,7 +811,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.use_youtube_metadata
 
-    def getTranscriptionMetadataVideoSubdir(self) -> str:
+    def get_transcription_metadata_video_subdir(self) -> str:
         """Get metadata video subdirectory name.
 
         Raises:
@@ -821,7 +821,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.metadata_video_subdir
 
-    def getTranscriptionVerbose(self) -> bool:
+    def get_transcription_verbose(self) -> bool:
         """Get verbose output flag.
 
         Raises:
@@ -831,7 +831,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.verbose
 
-    def getTranscriptionDescriptionMaxLength(self) -> int:
+    def get_transcription_description_max_length(self) -> int:
         """Get maximum description length in characters.
 
         Raises:
@@ -841,7 +841,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.description_max_length
 
-    def getTranscriptionSleepBetweenFiles(self) -> int:
+    def get_transcription_sleep_between_files(self) -> int:
         """Get sleep duration between files in seconds.
 
         Raises:
@@ -851,7 +851,7 @@ class Config:
             raise KeyError("Missing required key 'transcription' in config file")
         return self._transcription.sleep_between_files
 
-    def getTranscriptionMinDuration(self) -> int:
+    def get_transcription_min_duration(self) -> int:
         """Get minimum video duration in seconds for transcription.
 
         Raises:

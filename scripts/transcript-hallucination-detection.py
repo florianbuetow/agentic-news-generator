@@ -234,9 +234,9 @@ def main() -> int:  # noqa: C901
 
     # Load Config class for data_dir
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
-    data_dir = Path(__file__).parent.parent / config.getDataDir()
+    data_dir = Path(__file__).parent.parent / config.get_data_dir()
 
     # Load raw YAML to access hallucination_detection config
     with open(config_path, encoding="utf-8") as f:
@@ -294,13 +294,13 @@ Examples:
         return 1
 
     # Find all SRT files (using paths from config)
-    transcripts_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsDir()
+    transcripts_dir = Path(__file__).parent.parent / config.get_data_downloads_transcripts_dir()
     if not transcripts_dir.exists():
         logger.error(f"Transcripts directory not found: {transcripts_dir}")
         return 1
 
     # Hallucination detection output directory from config
-    transcripts_hallucinations_dir = Path(__file__).parent.parent / config.getDataDownloadsTranscriptsHallucinationsDir()
+    transcripts_hallucinations_dir = Path(__file__).parent.parent / config.get_data_downloads_transcripts_hallucinations_dir()
 
     srt_files = FSUtil.find_files_by_extension(transcripts_dir, ".srt", recursive=True)
 
@@ -320,8 +320,8 @@ Examples:
 
     # Initialize detector (SVM classifier decides what's a hallucination)
     detector = RepetitionDetector(
-        min_k=config.getRepetitionMinK(),
-        min_repetitions=config.getRepetitionMinRepetitions(),
+        min_k=config.get_repetition_min_k(),
+        min_repetitions=config.get_repetition_min_repetitions(),
         config=config,
     )
 

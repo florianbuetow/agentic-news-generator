@@ -75,13 +75,13 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
         return 1
 
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
     base_dir = Path(__file__).parent.parent
-    data_dir = base_dir / config.getDataDir()
-    transcripts_dir = base_dir / config.getDataDownloadsTranscriptsDir()
-    hallucinations_dir = base_dir / config.getDataDownloadsTranscriptsHallucinationsDir()
-    output_dir = base_dir / config.getDataDownloadsTranscriptsCleanedDir()
+    data_dir = base_dir / config.get_data_dir()
+    transcripts_dir = base_dir / config.get_data_downloads_transcripts_dir()
+    hallucinations_dir = base_dir / config.get_data_downloads_transcripts_hallucinations_dir()
+    output_dir = base_dir / config.get_data_downloads_transcripts_cleaned_dir()
 
     if not transcripts_dir.exists():
         logger.error(f"Transcripts directory not found: {transcripts_dir}")
@@ -92,8 +92,8 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
 
     try:
         detector = RepetitionDetector(
-            min_k=config.getRepetitionMinK(),
-            min_repetitions=config.getRepetitionMinRepetitions(),
+            min_k=config.get_repetition_min_k(),
+            min_repetitions=config.get_repetition_min_repetitions(),
             config=config,
         )
     except KeyError as e:

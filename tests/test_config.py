@@ -949,32 +949,32 @@ class TestChannelConfigLanguage:
             config = Config(temp_path)
 
             # Test default getters
-            assert config.getEncodingName() == "o200k_base"
-            assert config.getRepetitionMinK() == 1
-            assert config.getRepetitionMinRepetitions() == 5
-            assert config.getDetectMinK() == 3
+            assert config.get_encoding_name() == "o200k_base"
+            assert config.get_repetition_min_k() == 1
+            assert config.get_repetition_min_repetitions() == 5
+            assert config.get_detect_min_k() == 3
 
             # Test hallucination classifier model getter
-            coefs = config.getHallucinationClassifierModel()
+            coefs = config.get_hallucination_classifier_model()
             assert coefs == (0.1, 0.2, -0.5)
 
             # Test config path getter
-            assert config.getConfigPath() == temp_path
+            assert config.get_config_path() == temp_path
 
             # Test all path getters
-            assert config.getDataDir() == Path("./data/")
-            assert config.getDataDownloadsDir() == Path("./data/downloads")
-            assert config.getDataDownloadsVideosDir() == Path("./data/downloads/videos/")
-            assert config.getDataDownloadsTranscriptsDir() == Path("./data/downloads/transcripts")
-            assert config.getDataDownloadsTranscriptsHallucinationsDir() == Path("./data/downloads/transcripts-hallucinations")
-            assert config.getDataDownloadsTranscriptsCleanedDir() == Path("./data/downloads/transcripts_cleaned")
-            assert config.getDataDownloadsAudioDir() == Path("./data/downloads/audio")
-            assert config.getDataDownloadsMetadataDir() == Path("./data/downloads/metadata")
-            assert config.getDataOutputDir() == Path("./data/output/")
-            assert config.getDataInputDir() == Path("./data/input/")
-            assert config.getDataTempDir() == Path("./data/temp")
-            assert config.getDataArchiveDir() == Path("./data/archive")
-            assert config.getDataArchiveVideosDir() == Path("./data/archive/videos")
+            assert config.get_data_dir() == Path("./data/")
+            assert config.get_data_downloads_dir() == Path("./data/downloads")
+            assert config.get_data_downloads_videos_dir() == Path("./data/downloads/videos/")
+            assert config.get_data_downloads_transcripts_dir() == Path("./data/downloads/transcripts")
+            assert config.get_data_downloads_transcripts_hallucinations_dir() == Path("./data/downloads/transcripts-hallucinations")
+            assert config.get_data_downloads_transcripts_cleaned_dir() == Path("./data/downloads/transcripts_cleaned")
+            assert config.get_data_downloads_audio_dir() == Path("./data/downloads/audio")
+            assert config.get_data_downloads_metadata_dir() == Path("./data/downloads/metadata")
+            assert config.get_data_output_dir() == Path("./data/output/")
+            assert config.get_data_input_dir() == Path("./data/input/")
+            assert config.get_data_temp_dir() == Path("./data/temp")
+            assert config.get_data_archive_dir() == Path("./data/archive")
+            assert config.get_data_archive_videos_dir() == Path("./data/archive/videos")
         finally:
             temp_path.unlink()
 

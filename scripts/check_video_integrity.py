@@ -188,10 +188,10 @@ def main() -> int:
 
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     config = Config(config_path)
-    configure_root_logger(config.getDataLogsDir())
+    configure_root_logger(config.get_data_logs_dir())
 
-    data_dir = config.getDataDir()
-    videos_dir = config.getDataDownloadsVideosDir()
+    data_dir = config.get_data_dir()
+    videos_dir = config.get_data_downloads_videos_dir()
     cache_file = data_dir / "video_integrity_cache.json"
     cache = _load_cache(cache_file)
     logger.info(f"Loaded {len(cache)} entries from integrity cache")

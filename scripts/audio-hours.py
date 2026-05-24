@@ -29,7 +29,7 @@ def main() -> int:
     project_root = Path(__file__).parent.parent
     config = Config(project_root / "config" / "config.yaml")
 
-    transcripts_dir = config.getDataDownloadsTranscriptsDir()
+    transcripts_dir = config.get_data_downloads_transcripts_dir()
     if not transcripts_dir.exists():
         print(f"Error: Transcripts directory not found: {transcripts_dir}")
         return 1

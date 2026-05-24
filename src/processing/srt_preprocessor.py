@@ -130,8 +130,8 @@ def main() -> None:
     config = Config(config_path)
 
     # Get paths from Config
-    transcripts_dir = config.getDataDownloadsTranscriptsDir()
-    output_dir = config.getDataDownloadsTranscriptsDir().parent / "transcripts-preprocessed"
+    transcripts_dir = config.get_data_downloads_transcripts_dir()
+    output_dir = config.get_data_downloads_transcripts_dir().parent / "transcripts-preprocessed"
 
     if not transcripts_dir.exists():
         print(f"Transcripts directory not found: {transcripts_dir}")

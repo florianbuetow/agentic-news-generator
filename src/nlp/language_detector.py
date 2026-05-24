@@ -30,7 +30,7 @@ class LanguageDetector:
         >>> from pathlib import Path
         >>> from src.config import Config
         >>> config = Config(Path("config/config.yaml"))
-        >>> model_path = config.getDataModelsDir() / "fasttext" / "lid.176.ftz"
+        >>> model_path = config.get_data_models_dir() / "fasttext" / "lid.176.ftz"
         >>> detector = LanguageDetector(model_path=model_path)
         >>> detector.detect_language("Hello, how are you?")
         'en'

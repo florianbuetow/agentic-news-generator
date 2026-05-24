@@ -22,7 +22,7 @@ class FileProcessingFilter:
         """Initialize the filter from config paths and the filter file."""
         config_paths = self.extract_config_paths(config)
         self._path_to_key_lookup = self.build_path_to_key_lookup(config_paths)
-        filter_path = config.getConfigPath().parent / "filefilter.json"
+        filter_path = config.get_config_path().parent / "filefilter.json"
         self._filter = self.load_filter_file(filter_path)
 
         invalid_keys = sorted(set(self._filter.keys()) - set(config_paths.keys()))

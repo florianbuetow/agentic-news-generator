@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+from src.topic_detection.hierarchy.schemas import MethodKeyphrasesData, TaxonomyLabelData, TopicTreeNodeData, TopicTreeOutput
 
 from src.config import Config
-from src.topic_detection.hierarchy.schemas import MethodKeyphrasesData, TaxonomyLabelData, TopicTreeNodeData, TopicTreeOutput
 from src.util.srt_util import SRTEntry, SRTUtil
 
 
@@ -349,9 +349,9 @@ def main() -> int:
     config = Config(config_path)
 
     td_config = config.get_topic_detection_config()
-    topics_dir = config.getDataDir() / td_config.output_dir
-    metadata_dir = config.getDataDownloadsMetadataDir()
-    metadata_video_subdir = config.getTranscriptionMetadataVideoSubdir()
+    topics_dir = config.get_data_dir() / td_config.output_dir
+    metadata_dir = config.get_data_downloads_metadata_dir()
+    metadata_video_subdir = config.get_transcription_metadata_video_subdir()
     export_dir = args.export_dir
     export_dir.mkdir(parents=True, exist_ok=True)
 
@@ -406,7 +406,7 @@ def main() -> int:
             exported, total_leaves = export_video(
                 topic_tree_path=tree_path,
                 topics_base_dir=topics_base_dir,
-                data_dir=config.getDataDir(),
+                data_dir=config.get_data_dir(),
                 metadata_dir=metadata_dir,
                 metadata_video_subdir=metadata_video_subdir,
                 export_dir=export_dir,

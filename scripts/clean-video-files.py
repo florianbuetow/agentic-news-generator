@@ -374,7 +374,7 @@ def main() -> int:
         print(f"Error loading config: {e}", file=sys.stderr)
         return 1
 
-    data_dir = config.getDataDir().resolve()
+    data_dir = config.get_data_dir().resolve()
     if not data_dir.exists():
         print(f"Error: Data directory not found: {data_dir}", file=sys.stderr)
         return 1
