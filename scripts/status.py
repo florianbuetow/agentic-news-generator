@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
 from collections import defaultdict, deque
@@ -284,7 +283,7 @@ def _print_stat_row(
 def main() -> int:  # noqa: C901
     """Main entry point."""
     update_cache = "--no-update-cache" not in sys.argv
-    show_time = _parse_bool_flag(os.environ.get("SHOW_TIME"))
+    show_time = "--show-time" in sys.argv
 
     # Load configuration
     project_root = Path(__file__).parent.parent

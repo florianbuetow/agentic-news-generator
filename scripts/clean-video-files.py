@@ -93,6 +93,28 @@ def find_archives_with_video(data_dir: Path, video_id: str) -> list[Path]:
     return sorted(matches)
 
 
+def _parse_selection_token(token: str, count: int) -> set[int] | None:
+    """Parse one comma-separated selection token into 0-based indices."""
+    if "-" in token:
+        parts = token.split("-", 1)
+        try:
+            start = int(parts[0])
+            end = int(parts[1])
+        except ValueError:
+            return None
+        if start < 1 or end < 1 or start > count or end > count or start > end:
+            return None
+        return set(range(start - 1, end))
+
+    try:
+        index = int(token)
+    except ValueError:
+        return None
+    if index < 1 or index > count:
+        return None
+    return {index - 1}
+
+
 def parse_selection(selection: str, count: int) -> list[int] | None:
     """Parse a user selection string into a list of 0-based indices.
 
@@ -117,28 +139,18 @@ def parse_selection(selection: str, count: int) -> list[int] | None:
         return list(range(count))
 
     indices: set[int] = set()
+    invalid_selection = False
     for token in text.split(","):
         token = token.strip()
         if not token:
             continue
-        if "-" in token:
-            parts = token.split("-", 1)
-            try:
-                start = int(parts[0])
-                end = int(parts[1])
-            except ValueError:
-                return None
-            if start < 1 or end < 1 or start > count or end > count or start > end:
-                return None
-            indices.update(range(start - 1, end))
-        else:
-            try:
-                i = int(token)
-            except ValueError:
-                return None
-            if i < 1 or i > count:
-                return None
-            indices.add(i - 1)
+        parsed_token = _parse_selection_token(token, count)
+        if parsed_token is None:
+            invalid_selection = True
+            break
+        indices.update(parsed_token)
+    if invalid_selection:
+        return None
     return sorted(indices)
 
 

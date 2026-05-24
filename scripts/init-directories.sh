@@ -4,11 +4,11 @@
 # This script is the single source of truth for directory creation
 
 # Get the absolute path to the project root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd "$script_dir/.." && pwd)"
 
 # Read all directory paths from config.yaml using Python
-cd "$PROJECT_ROOT"
+cd "$project_root"
 uv run python -c "
 import yaml
 import os

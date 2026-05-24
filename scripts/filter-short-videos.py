@@ -54,10 +54,7 @@ def find_info_json(info_sub: Path, video_id: str) -> Path | None:
     if not info_sub.is_dir():
         return None
     token = f"[{video_id}]"
-    for p in info_sub.iterdir():
-        if p.is_file() and token in p.name and p.name.endswith(".info.json"):
-            return p
-    return None
+    return next((p for p in info_sub.iterdir() if p.is_file() and token in p.name and p.name.endswith(".info.json")), None)
 
 
 def _read_info_duration(info_path: Path) -> int | None:
@@ -294,23 +291,29 @@ def _print_report(
     print(f"  already in filter: {len(already)}")
     print(f"  new entries:       {len(to_add)}")
 
-    if not to_add:
-        return
+    if to_add:
+        per_key = {f"{ch}/{vid}": (dur, reason) for ch, vid, dur, reason in matches}
+        grouped: dict[str, list[tuple[str, int | None, str]]] = {}
+        for key in to_add:
+            ch, vid = key.split("/", 1)
+            dur, reason = per_key[key]
+            grouped.setdefault(ch, []).append((vid, dur, reason))
 
-    per_key = {f"{ch}/{vid}": (dur, reason) for ch, vid, dur, reason in matches}
-    grouped: dict[str, list[tuple[str, int | None, str]]] = {}
-    for key in to_add:
-        ch, vid = key.split("/", 1)
-        dur, reason = per_key[key]
-        grouped.setdefault(ch, []).append((vid, dur, reason))
-
-    print()
-    print("new entries to add:")
-    for ch in sorted(grouped):
-        print(f"  {ch}")
-        for vid, dur, reason in sorted(grouped[ch], key=lambda t: (t[1] is None, t[1] or 0)):
-            dur_s = f"{dur:>5}s" if dur is not None else "   ? s"
-            print(f"    {dur_s}  {reason:<18}  {vid}")
+        print()
+        print("new entries to add:")
+        sorted_channels = sorted(grouped)
+        channel_index = 0
+        while channel_index < len(sorted_channels):
+            ch = sorted_channels[channel_index]
+            print(f"  {ch}")
+            sorted_entries = sorted(grouped[ch], key=lambda t: (t[1] is None, t[1] or 0))
+            entry_index = 0
+            while entry_index < len(sorted_entries):
+                vid, dur, reason = sorted_entries[entry_index]
+                dur_s = f"{dur:>5}s" if dur is not None else "   ? s"
+                print(f"    {dur_s}  {reason:<18}  {vid}")
+                entry_index += 1
+            channel_index += 1
 
 
 def main() -> int:

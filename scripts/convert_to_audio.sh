@@ -21,7 +21,7 @@ if ! command -v jq &> /dev/null; then
 fi
 
 # Detect number of CPU cores for optimal threading
-NUM_THREADS=$(detect_cpu_cores)
+num_threads=$(detect_cpu_cores)
 
 # ============================================================================
 # HELPER FUNCTIONS FOR SILENCE DETECTION
@@ -150,7 +150,7 @@ while read -r channel_dir; do
     channel_name=$(basename "$channel_dir")
 
     # Create output directory for this channel
-    mkdir -p "$AUDIO_DIR/$channel_name"
+    mkdir -p "$audio_dir/$channel_name"
 
     # Count total files and files needing processing in this channel
     total_files=0
@@ -168,7 +168,7 @@ while read -r channel_dir; do
 
         # Validate extension
         prescan_valid=false
-        for allowed_ext in "${ALLOWED_EXTENSIONS[@]}"; do
+        for allowed_ext in "${allowed_extensions[@]}"; do
             if [[ "$prescan_ext_lower" == "$allowed_ext" ]]; then
                 prescan_valid=true
                 break
@@ -179,9 +179,9 @@ while read -r channel_dir; do
         total_files=$((total_files + 1))
 
         # Check if output already exists
-        prescan_wav="$AUDIO_DIR/$channel_name/$prescan_base.wav"
-        prescan_json="$METADATA_DIR/$channel_name/$METADATA_AUDIO_SUBDIR/$prescan_base.silence_map.json"
-        if [ -f "$prescan_wav" ] && { [ "$ENABLE_SILENCE_REMOVAL" = "false" ] || [ -f "$prescan_json" ]; }; then
+        prescan_wav="$audio_dir/$channel_name/$prescan_base.wav"
+        prescan_json="$metadata_dir/$channel_name/$metadata_audio_subdir/$prescan_base.silence_map.json"
+        if [ -f "$prescan_wav" ] && { [ "$enable_silence_removal" = "false" ] || [ -f "$prescan_json" ]; }; then
             continue
         fi
 
@@ -213,7 +213,7 @@ while read -r channel_dir; do
         # Validate file extension against whitelist
         extension_lower=$(echo "$extension" | tr '[:upper:]' '[:lower:]')
         is_valid=false
-        for allowed_ext in "${ALLOWED_EXTENSIONS[@]}"; do
+        for allowed_ext in "${allowed_extensions[@]}"; do
             if [[ "$extension_lower" == "$allowed_ext" ]]; then
                 is_valid=true
                 break
@@ -230,25 +230,25 @@ while read -r channel_dir; do
         time_since_modification=$((current_time - file_modified_time))
 
         if [ $time_since_modification -lt 60 ]; then
-            if [ "$VERBOSE" = "true" ]; then
+            if [ "$verbose" = "true" ]; then
                 echo "  ⏸️  Skipping: $filename (modified ${time_since_modification}s ago, waiting for download to complete)"
             fi
             continue
         fi
 
         # Define output file paths
-        output_wav="$AUDIO_DIR/$channel_name/$base_name.wav"
-        output_json="$METADATA_DIR/$channel_name/$METADATA_AUDIO_SUBDIR/$base_name.silence_map.json"
-        temp_wav="$AUDIO_DIR/$channel_name/.$base_name.temp.wav"
-        silence_log="$AUDIO_DIR/$channel_name/.$base_name.silence.log"
+        output_wav="$audio_dir/$channel_name/$base_name.wav"
+        output_json="$metadata_dir/$channel_name/$metadata_audio_subdir/$base_name.silence_map.json"
+        temp_wav="$audio_dir/$channel_name/.$base_name.temp.wav"
+        silence_log="$audio_dir/$channel_name/.$base_name.silence.log"
 
         # Create metadata audio subdirectory if it doesn't exist
-        mkdir -p "$METADATA_DIR/$channel_name/$METADATA_AUDIO_SUBDIR"
+        mkdir -p "$metadata_dir/$channel_name/$metadata_audio_subdir"
 
         # Check if both output files already exist (idempotent)
-        if [ -f "$output_wav" ] && { [ "$ENABLE_SILENCE_REMOVAL" = "false" ] || [ -f "$output_json" ]; }; then
+        if [ -f "$output_wav" ] && { [ "$enable_silence_removal" = "false" ] || [ -f "$output_json" ]; }; then
             skipped_count=$((skipped_count + 1))
-            if [ "$VERBOSE" = "true" ]; then
+            if [ "$verbose" = "true" ]; then
                 echo "  ⏭️  Skipping: $filename"
                 echo "  ---"
             fi
@@ -257,7 +257,7 @@ while read -r channel_dir; do
             echo "  [$process_index/$to_process] Processing: $filename"
 
             # Check available disk space on target device (require >= 2 GB)
-            available_kb=$(df -k "$AUDIO_DIR" | awk 'NR==2 {print $4}')
+            available_kb=$(df -k "$audio_dir" | awk 'NR==2 {print $4}')
             required_kb=$((2 * 1024 * 1024))
             if [ "$available_kb" -lt "$required_kb" ]; then
                 available_mb=$((available_kb / 1024))
@@ -276,15 +276,15 @@ while read -r channel_dir; do
                 continue
             fi
 
-            if [ "$ENABLE_SILENCE_REMOVAL" = "true" ]; then
+            if [ "$enable_silence_removal" = "true" ]; then
                 # === TWO-PASS PROCESSING WITH SILENCE REMOVAL ===
 
                 # === PASS 1: Convert + Detect Silence ===
                 echo "    [Pass 1/2] Converting and detecting silence..."
 
-                ffmpeg -threads "$NUM_THREADS" -y -i "$input_file" \
+                ffmpeg -threads "$num_threads" -y -i "$input_file" \
                     -vn -ar 16000 -ac 1 -c:a pcm_s16le \
-                    -af "silencedetect=noise=${SILENCE_THRESHOLD_DB}dB:d=${SILENCE_MIN_DURATION}" \
+                    -af "silencedetect=noise=${silence_threshold_db}dB:d=${silence_min_duration}" \
                     -f wav "$temp_wav" \
                     -loglevel info -stats \
                     2> "$silence_log" </dev/null
@@ -323,7 +323,7 @@ while read -r channel_dir; do
                     # Extract each speech segment individually, then concatenate.
                     # This avoids the "Cannot allocate memory" error that occurs
                     # when aselect expressions have too many segments.
-                    segments_dir="$AUDIO_DIR/$channel_name/.$base_name.segments"
+                    segments_dir="$audio_dir/$channel_name/.$base_name.segments"
                     concat_list="$segments_dir/concat.txt"
                     mkdir -p "$segments_dir"
                     > "$concat_list"
@@ -394,8 +394,8 @@ while read -r channel_dir; do
                     --arg source "$filename" \
                     --arg orig_dur "$original_duration" \
                     --arg trim_dur "$trimmed_duration" \
-                    --arg threshold "$SILENCE_THRESHOLD_DB" \
-                    --arg min_dur "$SILENCE_MIN_DURATION" \
+                    --arg threshold "$silence_threshold_db" \
+                    --arg min_dur "$silence_min_duration" \
                     --argjson intervals "$silence_intervals" \
                     --argjson segments "$kept_segments" \
                     --arg total_silence "$total_silence" \
@@ -424,9 +424,9 @@ while read -r channel_dir; do
                 echo "    ✅ Done: $base_name.wav (removed $(format_duration "$total_silence") of silence)"
             else
                 # === SIMPLE CONVERSION (Silence removal disabled) ===
-                echo "    Converting to audio/$channel_name/$base_name.wav (using $NUM_THREADS threads)..."
+                echo "    Converting to audio/$channel_name/$base_name.wav (using $num_threads threads)..."
 
-                ffmpeg -threads "$NUM_THREADS" -y -i "$input_file" \
+                ffmpeg -threads "$num_threads" -y -i "$input_file" \
                     -vn -ar 16000 -ac 1 -c:a pcm_s16le \
                     -loglevel error -stats \
                     "$output_wav" </dev/null
@@ -455,7 +455,7 @@ while read -r channel_dir; do
     fi
 
     echo ""
-done < <(find "$VIDEOS_DIR" -mindepth 1 -maxdepth 1 -type d)
+done < <(find "$videos_dir" -mindepth 1 -maxdepth 1 -type d)
 
 if [ $total_fail_count -gt 0 ]; then
     echo "Audio conversion finished with $total_fail_count failure(s)."

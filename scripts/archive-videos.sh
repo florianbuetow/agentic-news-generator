@@ -8,21 +8,21 @@ echo "=========================================="
 echo ""
 
 # Create archive directory
-mkdir -p "$ARCHIVE_VIDEOS_DIR"
+mkdir -p "$archive_videos_dir"
 
 # Counters
 total_archived=0
 total_audio_deleted=0
 
 # Iterate over all channel folders in transcripts directory
-find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
+find "$transcripts_dir" -mindepth 1 -maxdepth 1 -type d | while read -r channel_dir; do
     channel_name=$(basename "$channel_dir")
 
     echo "Processing channel: $channel_name"
     echo "---"
 
     # Create archive directory for this channel
-    mkdir -p "$ARCHIVE_VIDEOS_DIR/$channel_name"
+    mkdir -p "$archive_videos_dir/$channel_name"
 
     # Counters for this channel
     archived_count=0
@@ -33,12 +33,12 @@ find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_
         base_name=$(basename "$transcript_file" .srt)
 
         # Define paths for audio and video files
-        audio_file="$AUDIO_DIR/$channel_name/$base_name.wav"
+        audio_file="$audio_dir/$channel_name/$base_name.wav"
 
         # Find the video file with any extension
         video_file=""
         for ext in mp4 webm m4a mov m4v avi mkv flv; do
-            candidate="$VIDEOS_DIR/$channel_name/$base_name.$ext"
+            candidate="$videos_dir/$channel_name/$base_name.$ext"
             if [ -f "$candidate" ]; then
                 video_file="$candidate"
                 break
@@ -49,7 +49,7 @@ find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_
         if [ -f "$audio_file" ]; then
             rm "$audio_file"
             audio_deleted_count=$((audio_deleted_count + 1))
-            if [ "$VERBOSE" = "true" ]; then
+            if [ "$verbose" = "true" ]; then
                 echo "  🗑️  Deleted audio: $base_name.wav"
             fi
         fi
@@ -57,9 +57,9 @@ find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d | while read -r channel_
         # Move video file to archive if it exists
         if [ -n "$video_file" ] && [ -f "$video_file" ]; then
             video_filename=$(basename "$video_file")
-            mv "$video_file" "$ARCHIVE_VIDEOS_DIR/$channel_name/$video_filename"
+            mv "$video_file" "$archive_videos_dir/$channel_name/$video_filename"
             archived_count=$((archived_count + 1))
-            if [ "$VERBOSE" = "true" ]; then
+            if [ "$verbose" = "true" ]; then
                 echo "  📦 Archived video: $video_filename"
             fi
         fi

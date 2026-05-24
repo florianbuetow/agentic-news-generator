@@ -50,13 +50,28 @@ ARCHIVE_VIDEOS_DIR="$ARCHIVE_DIR/videos"
 TEMP_DIR="$DATA_DIR/temp"
 OUTPUT_DIR="$DATA_DIR/output"
 
+data_dir="$DATA_DIR"
+downloads_dir="$DOWNLOADS_DIR"
+videos_dir="$VIDEOS_DIR"
+audio_dir="$AUDIO_DIR"
+transcripts_dir="$TRANSCRIPTS_DIR"
+metadata_dir="$METADATA_DIR"
+metadata_video_subdir="$METADATA_VIDEO_SUBDIR"
+metadata_audio_subdir="$METADATA_AUDIO_SUBDIR"
+archive_dir="$ARCHIVE_DIR"
+archive_videos_dir="$ARCHIVE_VIDEOS_DIR"
+temp_dir="$TEMP_DIR"
+output_dir="$OUTPUT_DIR"
+
 # --- Video/Audio Processing Settings ---
 # Whitelist of allowed video file extensions
 ALLOWED_EXTENSIONS=("mp4" "mkv" "webm" "m4a" "mov" "m4v" "avi" "flv")
+allowed_extensions=("${ALLOWED_EXTENSIONS[@]}")
 
 # VERBOSE: Set to "true" to show individual operations/messages
 # Can be overridden via environment: VERBOSE=true ./script.sh
 VERBOSE="${VERBOSE:-false}"
+verbose="$VERBOSE"
 
 # --- Silence Detection Settings (convert_to_audio.sh) ---
 # Silence threshold in decibels (dB)
@@ -64,41 +79,52 @@ VERBOSE="${VERBOSE:-false}"
 # Less negative = louder sounds also treated as silence
 # Common values: -50 (aggressive), -40 (moderate), -30 (conservative)
 SILENCE_THRESHOLD_DB="${SILENCE_THRESHOLD_DB:--40}"
+silence_threshold_db="$SILENCE_THRESHOLD_DB"
 
 # Minimum silence duration in seconds
 # Only silence longer than this duration will be removed
 # Common values: 0.5 (aggressive), 1.0-2.0 (moderate), 3.0+ (conservative)
 SILENCE_MIN_DURATION="${SILENCE_MIN_DURATION:-2}"
+silence_min_duration="$SILENCE_MIN_DURATION"
 
 # Enable or disable silence removal entirely
 # Set to "false" to only convert audio without silence processing
 # Can be overridden via environment: ENABLE_SILENCE_REMOVAL=false ./convert_to_audio.sh
 ENABLE_SILENCE_REMOVAL="${ENABLE_SILENCE_REMOVAL:-true}"
+enable_silence_removal="$ENABLE_SILENCE_REMOVAL"
 
 # --- Transcription Settings (transcribe_audio.sh) ---
 # Whisper models
 # English-only model (optimized for English content)
 MODEL_EN_NAME="${MODEL_EN_NAME:-medium.en}"
 MODEL_EN_REPO="${MODEL_EN_REPO:-mlx-community/whisper-medium.en-mlx}"
+model_en_name="$MODEL_EN_NAME"
+model_en_repo="$MODEL_EN_REPO"
 
 # Multilingual model (supports all languages, used for translation)
 MODEL_MULTI_NAME="${MODEL_MULTI_NAME:-medium}"
 MODEL_MULTI_REPO="${MODEL_MULTI_REPO:-mlx-community/whisper-medium-mlx}"
+model_multi_name="$MODEL_MULTI_NAME"
+model_multi_repo="$MODEL_MULTI_REPO"
 
 # Anti-hallucination settings
 # If hallucination detected after N seconds of silence, seek past silence and retry
 HALLUCINATION_SILENCE_THRESHOLD="${HALLUCINATION_SILENCE_THRESHOLD:-2.0}"
+hallucination_silence_threshold="$HALLUCINATION_SILENCE_THRESHOLD"
 
 # If gzip compression ratio > this value, treat as hallucination
 # Lower = stricter (default is 2.4, we use 2.0 for better quality)
 COMPRESSION_RATIO_THRESHOLD="${COMPRESSION_RATIO_THRESHOLD:-2.0}"
+compression_ratio_threshold="$COMPRESSION_RATIO_THRESHOLD"
 
 # Whether to use YouTube metadata (title, description) in the initial prompt
 USE_YOUTUBE_METADATA="${USE_YOUTUBE_METADATA:-true}"
+use_youtube_metadata="$USE_YOUTUBE_METADATA"
 
 # --- YouTube Download Settings (yt-downloader.sh) ---
 # Browser to extract cookies from
 BROWSER="${BROWSER:-chrome}"
+browser="$BROWSER"
 
 # ============================================================================
 # Helper Functions

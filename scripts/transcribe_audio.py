@@ -129,12 +129,14 @@ def find_metadata_file(metadata_video_dir: Path, base_name: str) -> Path:
     if video_id is None or not metadata_video_dir.exists():
         return exact_path
 
-    for candidate in sorted(metadata_video_dir.glob("*.info.json")):
-        candidate_stem = candidate.name.removesuffix(".info.json")
-        if extract_video_id_from_stem(candidate_stem) == video_id:
-            return candidate
-
-    return exact_path
+    return next(
+        (
+            candidate
+            for candidate in sorted(metadata_video_dir.glob("*.info.json"))
+            if extract_video_id_from_stem(candidate.name.removesuffix(".info.json")) == video_id
+        ),
+        exact_path,
+    )
 
 
 def transcribe_single_file(
@@ -431,6 +433,7 @@ def main() -> int:  # noqa: C901
     progress.start()
 
     total_processed = 0
+    failures: list[tuple[str, str]] = []
 
     # Process channels in order of fewest pending files first
     for channel_info in all_channels:
@@ -515,8 +518,10 @@ def main() -> int:  # noqa: C901
                 total_processed += 1
                 transcribed_for_channel += 1
             else:
-                logger.error(f"Aborting: transcription failed for {wav_file.name}")
-                return 1
+                rel_path = f"{channel_name}/{wav_file.name}"
+                logger.error(f"Transcription failed for {rel_path}")
+                failures.append((rel_path, "transcription command failed or produced no transcript"))
+                continue
 
         if skipped_count > 0:
             logger.info(f"Skipped {skipped_count} file(s) (transcript already exists)")
@@ -529,10 +534,18 @@ def main() -> int:  # noqa: C901
     logger.info("  Transcription Complete")
     logger.info("=" * 56)
     logger.info(f"  Processed: {total_processed}")
+    logger.info(f"  Failed: {len(failures)}")
     logger.info(f"  Elapsed: {progress.format_duration(total_elapsed)}")
     logger.info("")
 
-    return 0
+    if failures:
+        logger.error("")
+        logger.error("--- Failure Summary ---")
+        for path, reason in failures:
+            logger.error(f"❌ {path}: {reason}")
+        raise SystemExit(1)
+
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":

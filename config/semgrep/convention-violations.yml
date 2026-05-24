@@ -3,7 +3,8 @@ rules:
     languages: [python]
     severity: ERROR
     message: >
-      Convention Violation: Environment variables are forbidden for configuration.
+      Convention Violation: Never use environment variables for configuration.
+      Always use the 'Config' class in 'src/config.py'.
       Please read CONVENTIONS.md to learn how to do it correctly.
     pattern-either:
       - pattern: os.environ.get(...)
@@ -39,6 +40,7 @@ rules:
     severity: ERROR
     message: >
       Convention Violation: Scripts must continue processing remaining items even if individual items fail.
+      Do not abort loops with 'return' or 'exit'.
       Please read CONVENTIONS.md to learn how to do it correctly.
     pattern-either:
       - pattern: |
@@ -54,3 +56,4 @@ rules:
         - "scripts/**"
       exclude:
         - "**/tests/**"
+

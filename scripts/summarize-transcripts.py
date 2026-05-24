@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import sys
 import time
@@ -139,7 +138,8 @@ def process_single_file(
 
     prompt = prompt_template.replace("{transcript}", transcript)
 
-    for attempt in range(1, llm.max_retries + 1):
+    attempt = 1
+    while attempt <= llm.max_retries:
         try:
             summary = call_llm(prompt, llm)
             FSUtil.write_text_file(output_file, summary, create_parents=True)
@@ -149,6 +149,7 @@ def process_single_file(
             if attempt == llm.max_retries:
                 raise
             time.sleep(llm.retry_delay)
+        attempt += 1
 
     raise RuntimeError("unreachable")
 
@@ -164,11 +165,11 @@ def format_eta(seconds_remaining: float) -> str:
 def collect_pending_files(
     cleaned_dir: Path,
     summaries_dir: Path,
+    channel_filter: str,
 ) -> tuple[list[tuple[Path, Path]], int, int, int]:
     """Scan for transcript files and partition into pending/done/empty."""
     txt_files = FSUtil.find_files_by_extension(cleaned_dir, ".txt", recursive=True)
     txt_files = [f for f in txt_files if not f.name.startswith("._")]
-    channel_filter = os.environ.get("CHANNEL_FILTER", "").strip()
     if channel_filter:
         txt_files = [f for f in txt_files if f.parent.name == channel_filter]
 
@@ -206,11 +207,12 @@ def process_pending(
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
     skip_threshold_pct: int,
-) -> None:
-    """Process all pending files. Raises on persistent LLM failure."""
+) -> int:
+    """Process all pending files. Return 1 if any file fails after retries."""
     success_count = 0
     skipped_count = 0
     oversized_files: list[tuple[str, str]] = []
+    failures: list[tuple[str, str]] = []
     start_time = time.monotonic()
 
     for idx, (txt_file, output_file) in enumerate(pending, start=1):
@@ -222,7 +224,12 @@ def process_pending(
         rel_path = f"{txt_file.parent.name}/{txt_file.name}"
         logger.info(f"[{idx}/{len(pending)}] {idx / len(pending) * 100:5.1f}% ETA {format_eta(eta_seconds)}  {rel_path}")
 
-        status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder, skip_threshold_pct)
+        try:
+            status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder, skip_threshold_pct)
+        except Exception as exc:
+            failures.append((rel_path, str(exc)))
+            logger.error(f"  -> failed: {exc}")
+            continue
         if status != "ok":
             skipped_count += 1
             if status == "skip (oversized)":
@@ -243,6 +250,7 @@ def process_pending(
     logger.info(f"Total pending: {len(pending)}")
     logger.info(f"Summarized: {success_count}")
     logger.info(f"Skipped: {skipped_count}")
+    logger.info(f"Failed: {len(failures)}")
 
     if oversized_files:
         logger.warning("=" * 50)
@@ -253,9 +261,26 @@ def process_pending(
             logger.warning(f"  - {path}: {detail}")
         logger.warning("=" * 50)
 
+    if failures:
+        logger.error("=" * 50)
+        logger.error("Failure Summary")
+        logger.error("=" * 50)
+        for path, reason in failures:
+            logger.error(f"❌ {path}: {reason}")
+        return 1
+
+    return 0
+
 
 def main() -> int:
     """Main entry point."""
+    channel_filter = ""
+    if len(sys.argv) == 3 and sys.argv[1] == "--channel":
+        channel_filter = sys.argv[2].strip()
+    elif len(sys.argv) != 1:
+        logger.error("Usage: summarize-transcripts.py [--channel CHANNEL]")
+        return 1
+
     setup_result = setup_environment()
     if isinstance(setup_result, int):
         return setup_result
@@ -264,7 +289,7 @@ def main() -> int:
     encoder = tiktoken.get_encoding(encoding_name)
     llm = summarize_cfg.llm
 
-    pending, total, already_done, empty_files = collect_pending_files(cleaned_dir, summaries_dir)
+    pending, total, already_done, empty_files = collect_pending_files(cleaned_dir, summaries_dir, channel_filter)
 
     if total == 0:
         logger.error(f"No .txt files found in: {cleaned_dir}")
@@ -277,8 +302,7 @@ def main() -> int:
         logger.info("Nothing to do — all files already processed.")
         return 0
 
-    process_pending(pending, prompt_template, llm, encoder, summarize_cfg.skip_transcripts_above_context_window_pct)
-    return 0
+    return process_pending(pending, prompt_template, llm, encoder, summarize_cfg.skip_transcripts_above_context_window_pct)
 
 
 if __name__ == "__main__":

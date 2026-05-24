@@ -868,17 +868,17 @@ def main() -> None:
     )
     _ = parser.add_argument(
         "--model",
-        default=os.getenv("LM_STUDIO_MODEL", "qwen2.5-7b-instruct-mlx"),
+        default="qwen2.5-7b-instruct-mlx",
         help="Model name (default: qwen2.5-7b-instruct-mlx)",
     )
     _ = parser.add_argument(
         "--base-url",
-        default=os.getenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1"),
+        default="http://localhost:1234/v1",
         help="LM Studio base URL (default: http://localhost:1234/v1)",
     )
     _ = parser.add_argument(
         "--api-key",
-        default=os.getenv("LM_STUDIO_API_KEY", "local"),
+        default="local",
         help="API key (default: local)",
     )
     _ = parser.add_argument(

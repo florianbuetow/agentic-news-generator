@@ -2,7 +2,6 @@
 """Remove hallucinations from SRT transcripts using deterministic string replacement."""
 
 import json
-import os
 import re
 import sys
 import unicodedata
@@ -258,11 +257,11 @@ def main() -> int:
         logger.error(f"No SRT files found in transcripts directory: {transcripts_dir}")
         return 1
 
-    skip_existing = os.environ.get("SKIP_EXISTING", "").lower() in ("1", "true", "yes")
+    skip_existing = "--skip-existing" in sys.argv
 
     logger.info(f"Phase 2: Processing {len(srt_files)} transcript file(s)")
     if skip_existing:
-        logger.info("SKIP_EXISTING=true: skipping files with existing output")
+        logger.info("--skip-existing: skipping files with existing output")
     logger.info("")
 
     cleaned_files, copied_files, skipped_files, failed_files = process_all_files(

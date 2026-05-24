@@ -12,8 +12,8 @@ total_moved=0
 total_skipped=0
 
 # Iterate over all channel folders in transcripts directory
-if [ ! -d "$TRANSCRIPTS_DIR" ]; then
-    echo "⚠️  Transcripts directory does not exist: $TRANSCRIPTS_DIR"
+if [ ! -d "$transcripts_dir" ]; then
+    echo "⚠️  Transcripts directory does not exist: $transcripts_dir"
     exit 0
 fi
 
@@ -26,14 +26,14 @@ while IFS= read -r channel_dir; do
     fi
 
     # Create metadata/transcript directory for this channel
-    metadata_transcript_dir="$METADATA_DIR/$channel_name/transcript"
+    metadata_transcript_dir="$metadata_dir/$channel_name/transcript"
     mkdir -p "$metadata_transcript_dir"
 
     # Count JSON files in this channel
     json_count=$(find "$channel_dir" -maxdepth 1 -type f -name "*.json" ! -name "._*" | wc -l | tr -d ' ')
 
     if [ "$json_count" -eq 0 ]; then
-        if [ "$VERBOSE" = "true" ]; then
+        if [ "$verbose" = "true" ]; then
             echo "  ⏭️  Skipping channel: $channel_name (no JSON files)"
         fi
         continue
@@ -59,7 +59,7 @@ while IFS= read -r channel_dir; do
         # Check if file already exists in destination
         if [ -f "$dest_file" ]; then
             skipped_count=$((skipped_count + 1))
-            if [ "$VERBOSE" = "true" ]; then
+            if [ "$verbose" = "true" ]; then
                 echo "    ⏭️  Skipping: $base_name (already exists)"
             fi
             continue
@@ -70,7 +70,7 @@ while IFS= read -r channel_dir; do
 
         if [ $? -eq 0 ]; then
             moved_count=$((moved_count + 1))
-            if [ "$VERBOSE" = "true" ]; then
+            if [ "$verbose" = "true" ]; then
                 echo "    ✅ Moved: $base_name"
             fi
         else
@@ -92,7 +92,7 @@ while IFS= read -r channel_dir; do
     fi
 
     echo ""
-done < <(find "$TRANSCRIPTS_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+done < <(find "$transcripts_dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 
 # Print final summary
 echo "=========================================="

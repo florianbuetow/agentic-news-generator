@@ -17,47 +17,47 @@ if [ $# -ne 8 ]; then
 fi
 
 # Assign parameters
-WAV_FILE="$1"
-MODEL_REPO="$2"
-OUTPUT_DIR="$3"
-TASK="$4"
-LANGUAGE="$5"
-HALLUCINATION_SILENCE_THRESHOLD="$6"
-COMPRESSION_RATIO_THRESHOLD="$7"
-INITIAL_PROMPT="$8"
+wav_file="$1"
+model_repo="$2"
+output_dir="$3"
+task="$4"
+language="$5"
+hallucination_silence_threshold="$6"
+compression_ratio_threshold="$7"
+initial_prompt="$8"
 
 # Validate required parameters are non-empty
-if [ -z "$WAV_FILE" ]; then
+if [ -z "$wav_file" ]; then
     echo "❌ ERROR: wav_file parameter is empty" >&2
     exit 1
 fi
 
-if [ -z "$MODEL_REPO" ]; then
+if [ -z "$model_repo" ]; then
     echo "❌ ERROR: model_repo parameter is empty" >&2
     exit 1
 fi
 
-if [ -z "$OUTPUT_DIR" ]; then
+if [ -z "$output_dir" ]; then
     echo "❌ ERROR: output_dir parameter is empty" >&2
     exit 1
 fi
 
-if [ -z "$TASK" ]; then
+if [ -z "$task" ]; then
     echo "❌ ERROR: task parameter is empty" >&2
     exit 1
 fi
 
-if [ -z "$LANGUAGE" ]; then
+if [ -z "$language" ]; then
     echo "❌ ERROR: language parameter is empty" >&2
     exit 1
 fi
 
-if [ -z "$HALLUCINATION_SILENCE_THRESHOLD" ]; then
+if [ -z "$hallucination_silence_threshold" ]; then
     echo "❌ ERROR: hallucination_silence_threshold parameter is empty" >&2
     exit 1
 fi
 
-if [ -z "$COMPRESSION_RATIO_THRESHOLD" ]; then
+if [ -z "$compression_ratio_threshold" ]; then
     echo "❌ ERROR: compression_ratio_threshold parameter is empty" >&2
     exit 1
 fi
@@ -65,37 +65,37 @@ fi
 # initial_prompt can be empty (fallback handled by Python)
 
 # Validate file exists
-if [ ! -f "$WAV_FILE" ]; then
-    echo "❌ ERROR: WAV file not found: $WAV_FILE" >&2
+if [ ! -f "$wav_file" ]; then
+    echo "❌ ERROR: WAV file not found: $wav_file" >&2
     exit 1
 fi
 
 # Create output directory if it doesn't exist
-mkdir -p "$OUTPUT_DIR"
+mkdir -p "$output_dir"
 
 # Call mlx_whisper
 # Note: When task=translate, we omit --language to avoid confusing Whisper
 # (translate task always outputs English, and --language would be misinterpreted as output language)
-if [ "$TASK" = "translate" ]; then
-    uv run mlx_whisper "$WAV_FILE" \
-        --model "$MODEL_REPO" \
-        --output-dir "$OUTPUT_DIR" \
+if [ "$task" = "translate" ]; then
+    uv run mlx_whisper "$wav_file" \
+        --model "$model_repo" \
+        --output-dir "$output_dir" \
         --output-format all \
-        --task "$TASK" \
-        --hallucination-silence-threshold "$HALLUCINATION_SILENCE_THRESHOLD" \
-        --compression-ratio-threshold "$COMPRESSION_RATIO_THRESHOLD" \
-        --initial-prompt "$INITIAL_PROMPT" \
+        --task "$task" \
+        --hallucination-silence-threshold "$hallucination_silence_threshold" \
+        --compression-ratio-threshold "$compression_ratio_threshold" \
+        --initial-prompt "$initial_prompt" \
         --word-timestamps True
 else
-    uv run mlx_whisper "$WAV_FILE" \
-        --model "$MODEL_REPO" \
-        --output-dir "$OUTPUT_DIR" \
+    uv run mlx_whisper "$wav_file" \
+        --model "$model_repo" \
+        --output-dir "$output_dir" \
         --output-format all \
-        --task "$TASK" \
-        --language "$LANGUAGE" \
-        --hallucination-silence-threshold "$HALLUCINATION_SILENCE_THRESHOLD" \
-        --compression-ratio-threshold "$COMPRESSION_RATIO_THRESHOLD" \
-        --initial-prompt "$INITIAL_PROMPT" \
+        --task "$task" \
+        --language "$language" \
+        --hallucination-silence-threshold "$hallucination_silence_threshold" \
+        --compression-ratio-threshold "$compression_ratio_threshold" \
+        --initial-prompt "$initial_prompt" \
         --word-timestamps True
 fi
 

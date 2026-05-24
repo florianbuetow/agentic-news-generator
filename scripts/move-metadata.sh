@@ -7,7 +7,7 @@
 source "$(dirname "$0")/config.sh"
 
 # Create metadata directory if it doesn't exist
-mkdir -p "$METADATA_DIR"
+mkdir -p "$metadata_dir"
 
 echo "Moving metadata files from videos to metadata folders..."
 echo ""
@@ -17,7 +17,7 @@ total_moved=0
 total_errors=0
 
 # Iterate through all channel directories
-for channel_dir in "$VIDEOS_DIR"/*; do
+for channel_dir in "$videos_dir"/*; do
     # Skip if not a directory
     if [ ! -d "$channel_dir" ]; then
         continue
@@ -27,7 +27,7 @@ for channel_dir in "$VIDEOS_DIR"/*; do
     channel_name=$(basename "$channel_dir")
 
     # Create corresponding metadata video subdirectory
-    metadata_video_dir="$METADATA_DIR/$channel_name/$METADATA_VIDEO_SUBDIR"
+    metadata_video_dir="$metadata_dir/$channel_name/$metadata_video_subdir"
     mkdir -p "$metadata_video_dir"
 
     # Count JSON files in this channel
@@ -67,7 +67,7 @@ for channel_dir in "$VIDEOS_DIR"/*; do
             fi
         elif [ "$json_type" = "playlist" ]; then
             # Channel/playlist metadata - move to channel root directory
-            if mv -f "$json_file" "$METADATA_DIR/$channel_name/$filename"; then
+            if mv -f "$json_file" "$metadata_dir/$channel_name/$filename"; then
                 ((channel_metadata_count++))
             else
                 echo "   ✗ Failed to move channel metadata: $filename"

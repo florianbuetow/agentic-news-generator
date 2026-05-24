@@ -55,10 +55,12 @@ def _check_duration(input_file: Path, timeout_cmd: str | None) -> str | None:
 
 def _detect_timeout_cmd() -> str | None:
     """Find an available timeout command (GNU coreutils)."""
+    timeout_cmd = None
     for cmd in ("timeout", "gtimeout"):
         if shutil.which(cmd):
-            return cmd
-    return None
+            timeout_cmd = cmd
+            break
+    return timeout_cmd
 
 
 def _check_file(input_file: Path, timeout_cmd: str | None, channel_name: str, file_size: int) -> str | None:

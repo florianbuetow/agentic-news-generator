@@ -11,11 +11,11 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-VIDEO_ID="$1"
-CONFIG="config/config.yaml"
+video_id="$1"
+config="config/config.yaml"
 
-if [ ! -f "$CONFIG" ]; then
-    echo "Error: $CONFIG not found" >&2
+if [ ! -f "$config" ]; then
+    echo "Error: $config not found" >&2
     exit 1
 fi
 
@@ -28,7 +28,7 @@ while IFS=': ' read -r key path; do
     [ -z "$path" ] && continue
     keys+=("$key")
     paths+=("${path%/}")
-done < <(awk '/^paths:/{found=1; next} found && /^[^ ]/{exit} found && /^ /{sub(/^ +/,""); print}' "$CONFIG")
+done < <(awk '/^paths:/{found=1; next} found && /^[^ ]/{exit} found && /^ /{sub(/^ +/,""); print}' "$config")
 
 # Keep only shortest unique prefixes: skip a path if a shorter path already covers it
 declare -a use_keys=()
@@ -62,7 +62,7 @@ for i in "${!use_keys[@]}"; do
     # Derive category name: data_downloads_videos_dir -> Downloads / Videos
     category=$(echo "$key" | sed 's/_dir$//; s/^data_//' | tr '_' ' ' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)}1' | sed 's/ / \/ /')
 
-    matches=$(find "$path" -type f -name "*${VIDEO_ID}*" 2>/dev/null | sort)
+    matches=$(find "$path" -type f -name "*${video_id}*" 2>/dev/null | sort)
     [ -z "$matches" ] && continue
 
     found=1
@@ -75,5 +75,5 @@ for i in "${!use_keys[@]}"; do
 done
 
 if [ "$found" -eq 0 ]; then
-    echo "No files found containing '${VIDEO_ID}'."
+    echo "No files found containing '${video_id}'."
 fi

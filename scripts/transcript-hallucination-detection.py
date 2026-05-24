@@ -2,7 +2,6 @@
 """Detect hallucinations in SRT transcripts using repetition detection."""
 
 import argparse
-import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -279,6 +278,11 @@ Examples:
         default=None,
         help=f"Overlap percentage between windows (default: {config_overlap_percent} from config)",
     )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip files that already have hallucination detection output",
+    )
     args = parser.parse_args()
 
     # Use CLI args if provided, otherwise use config
@@ -311,11 +315,11 @@ Examples:
         logger.error(f"No SRT files found in transcripts directory: {transcripts_dir}")
         return 1
 
-    skip_existing = os.environ.get("SKIP_EXISTING", "").lower() in ("1", "true", "yes")
+    skip_existing = args.skip_existing
 
     logger.info(f"Found {len(srt_files)} SRT file(s) to process")
     if skip_existing:
-        logger.info("SKIP_EXISTING=true: skipping files with existing output")
+        logger.info("--skip-existing: skipping files with existing output")
     logger.info("")
 
     # Initialize detector (SVM classifier decides what's a hallucination)

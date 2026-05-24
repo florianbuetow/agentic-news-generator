@@ -334,7 +334,7 @@ clean-video-files VIDEO_ID:
 analyze-transcripts-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Analyzing Transcripts for Hallucinations ===\033[0m\n"
-    @SKIP_EXISTING=true uv run scripts/transcript-hallucination-detection.py
+    @uv run scripts/transcript-hallucination-detection.py --skip-existing
     @echo ""
     @printf "\033[0;34m=== Creating Transcript Hallucination Digest ===\033[0m\n"
     @uv run scripts/create-hallucination-digest.py
@@ -344,7 +344,7 @@ analyze-transcripts-hallucinations:
 transcripts-remove-hallucinations:
     @echo ""
     @printf "\033[0;34m=== Removing Hallucinations from Transcripts ===\033[0m\n"
-    @SKIP_EXISTING=true uv run python scripts/transcript-hallucination-removal.py
+    @uv run python scripts/transcript-hallucination-removal.py --skip-existing
     @echo ""
 
 # Analyze transcript languages (run after hallucination removal for accurate detection)
@@ -358,7 +358,7 @@ analyze-transcript-languages:
 summarize-transcripts channel="":
     @echo ""
     @printf "\033[0;34m=== Summarizing Cleaned Transcripts ===\033[0m\n"
-    @CHANNEL_FILTER="{{ channel }}" uv run python scripts/summarize-transcripts.py
+    @uv run python scripts/summarize-transcripts.py {{ if channel == "" { "" } else { "--channel " + channel } }}
     @echo ""
 
 # Extract topics from hallucination-freed SRT transcripts
@@ -490,7 +490,7 @@ totals period="":
     fi
     clear
     echo ""
-    SHOW_TIME=True uv run scripts/status.py $cache_flag
+    uv run scripts/status.py --show-time $cache_flag
     echo ""
     if [[ -n "$stats_from" ]]; then
         printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
