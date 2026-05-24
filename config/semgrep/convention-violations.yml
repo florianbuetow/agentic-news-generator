@@ -1,0 +1,56 @@
+rules:
+  - id: xrag.no-env-vars-python
+    languages: [python]
+    severity: ERROR
+    message: >
+      Convention Violation: Environment variables are forbidden for configuration.
+      Please read CONVENTIONS.md to learn how to do it correctly.
+    pattern-either:
+      - pattern: os.environ.get(...)
+      - pattern: os.environ[...]
+      - pattern: os.getenv(...)
+    paths:
+      exclude:
+        - "**/src/config.py"
+        - "**/tests/**"
+        - "**/tools/**"
+
+  - id: xrag.no-env-vars-shell
+    languages: [bash]
+    severity: ERROR
+    message: >
+      Convention Violation: Shell scripts must not rely on environment variables for configuration.
+      Please read CONVENTIONS.md to learn how to do it correctly.
+    patterns:
+      - pattern-either:
+          - pattern: ${$VAR:-...}
+          - pattern: ${$VAR}
+          - pattern: $($VAR)
+      # Focus on uppercase variables which are the primary convention for env vars
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: "^[A-Z][A-Z0-9_]*$"
+    paths:
+      exclude:
+        - "**/scripts/config.sh"
+
+  - id: xrag.continue-on-failure
+    languages: [python]
+    severity: ERROR
+    message: >
+      Convention Violation: Scripts must continue processing remaining items even if individual items fail.
+      Please read CONVENTIONS.md to learn how to do it correctly.
+    pattern-either:
+      - pattern: |
+          for ... in $ITEMS:
+              ...
+              sys.exit(...)
+      - pattern: |
+          for ... in $ITEMS:
+              ...
+              return $VAL
+    paths:
+      include:
+        - "scripts/**"
+      exclude:
+        - "**/tests/**"

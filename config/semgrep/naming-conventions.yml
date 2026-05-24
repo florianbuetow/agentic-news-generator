@@ -1,0 +1,21 @@
+rules:
+  - id: xrag.enforce-snake-case
+    languages: [python]
+    message: >
+      Python function and method names must use snake_case.
+      Inconsistent naming (camelCase) was detected in '$FUNC'.
+      Please rename it to use underscores (e.g., 'get_data_dir' instead of 'getDataDir').
+    severity: ERROR
+    patterns:
+      - pattern-either:
+          - pattern: "def $FUNC(...): ..."
+          - pattern: "async def $FUNC(...): ..."
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: "^(?P<name>(?:_|[a-z])[a-z0-9]*[A-Z][a-zA-Z0-9]*)$"
+    paths:
+      include:
+        - src/
+        - scripts/
+      exclude:
+        - tests/
