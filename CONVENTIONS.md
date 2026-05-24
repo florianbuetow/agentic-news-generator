@@ -28,7 +28,8 @@
 
 ## Testing
 - After **every change** to the code, the tests must be executed
-- Always verify the program runs correctly with `just run` after modifications
+- Always verify changes with `just ci-quiet` after modifications
+- **NEVER** run `just run` as a routine verification step; it executes the full pipeline and may perform long-running or side-effectful work
 
 ## Python Execution Rules
 - Python code must be executed **only** via `uv run ...`

@@ -56,4 +56,3 @@ rules:
         - "scripts/**"
       exclude:
         - "**/tests/**"
-
