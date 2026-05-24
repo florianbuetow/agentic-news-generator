@@ -109,6 +109,10 @@ max-complexity = 10
 # Ban relative imports for cleaner, more explicit code
 ban-relative-imports = "all"
 
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.environ".msg = "Never use environment variables for configuration. Use 'src.config.Config' to access settings defined in 'config/config.yaml'. Refer to CONVENTIONS.md #Configuration Management."
+"os.getenv".msg = "Never use environment variables for configuration. Use 'src.config.Config' to access settings defined in 'config/config.yaml'. Refer to CONVENTIONS.md #Configuration Management."
+
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 

@@ -67,10 +67,27 @@
   - Source information (if applicable)
 
 ## Error Handling
-- Scripts should continue processing other items even if one fails
-- Failed/invalid outputs must be logged appropriately
-- Scripts should track and report success/failure counts
-- Exit with code 1 if any items failed, 0 if all succeeded
+- Resilient Processing: Scripts must continue processing remaining items even if individual items fail. A single failure should never halt an entire batch or pipeline.
+- Failure Visibility: All failures must be logged appropriately.
+- Reporting Requirement: At the end of execution (and thus at the end of a just target), a summary of all failures must be printed to the screen. This summary should include the specific items that failed and the reasons, allowing for immediate inspection.
+- Exit Codes: Scripts must track success/failure counts. Exit with code 1 if any items failed (even if others succeeded), and 0 only if all items succeeded.
+- **Implementation Pattern**:
+  ```python
+  failures = []
+  for item in items:
+      try:
+          process(item)
+      except Exception as e:
+          logger.error(f"Failed to process {item}: {e}")
+          failures.append((item, str(e)))
+  
+  if failures:
+      print("\n--- Failure Summary ---")
+      for item, error in failures:
+          print(f"❌ {item}: {error}")
+      sys.exit(1)
+  ```
+- Goal: This ensures processing runs through completely while ensuring all errors are visibly flagged for remediation. Both are required.
 
 ## Configuration Management
 - **Never use environment variables** for configuration
@@ -79,6 +96,19 @@
 - **Never mention specific config values in code comments or docstrings** - they will get out of sync with actual config and cause confusion
 - Use `config/config.yaml` for all settings (add sensitive values to `.gitignore` or use `config.yaml.local`)
 - Document configuration options in `config/config.yaml.template`
+
+### How to extend Configuration
+1. Add the new setting to `config/config.yaml` and `config/config.yaml.template`.
+2. Add the corresponding field to the appropriate `BaseModel` in `src/config.py`.
+3. Add a getter method to the `Config` class in `src/config.py`.
+4. **NEVER** access `os.environ` or the YAML file directly in your script.
+
+### How to use Configuration in Shell Scripts
+Extract values from `config/config.yaml` using a one-liner:
+```bash
+# Example extraction in shell
+DATA_DIR=$(uv run python -c "import yaml; print(yaml.safe_load(open('config/config.yaml'))['paths']['data_dir'])")
+```
 
 ## Output Organization
 - Organize output files by date or topic as appropriate
