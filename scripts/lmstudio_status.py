@@ -59,6 +59,17 @@ def collect_required_models(config: _Cfg) -> list[RequiredModel]:
                 )
             )
 
+    for top_key in ("summarize_transcripts", "topic_boundaries"):
+        llm = _sub(_sub(config, top_key), "llm")
+        if llm.get("api_base"):
+            models.append(
+                RequiredModel(
+                    section=f"{top_key}.llm",
+                    model=str(llm["model"]),
+                    api_base=str(llm["api_base"]),
+                )
+            )
+
     return models
 
 
