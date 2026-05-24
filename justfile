@@ -77,7 +77,7 @@ help:
     @printf "  %-38s %s\n" "analyze-transcripts-hallucinations" "Analyze transcripts for hallucinations"
     @printf "  %-38s %s\n" "transcripts-remove-hallucinations" "Remove hallucinations from transcripts using LLM"
     @printf "  %-38s %s\n" "analyze-transcript-languages" "Analyze transcript languages"
-    @printf "  %-38s %s\n" "summarize-transcripts" "Summarize cleaned transcripts using LLM"
+    @printf "  %-38s %s\n" "summarize-transcripts [<channel>]" "Summarize cleaned transcripts using LLM"
     @echo ""
     @printf "\033[0;33mTopic Detection:\033[0m\n"
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
@@ -354,11 +354,11 @@ analyze-transcript-languages:
     @uv run scripts/transcript-language-analysis.py
     @echo ""
 
-# Summarize cleaned transcripts using LLM
-summarize-transcripts:
+# Summarize cleaned transcripts using LLM (optional: just summarize-transcripts <channel>)
+summarize-transcripts channel="":
     @echo ""
     @printf "\033[0;34m=== Summarizing Cleaned Transcripts ===\033[0m\n"
-    @uv run python scripts/summarize-transcripts.py
+    @CHANNEL_FILTER="{{ channel }}" uv run python scripts/summarize-transcripts.py
     @echo ""
 
 # Extract topics from hallucination-freed SRT transcripts

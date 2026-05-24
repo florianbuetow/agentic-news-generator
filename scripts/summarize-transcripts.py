@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sys
 import time
@@ -167,6 +168,9 @@ def collect_pending_files(
     """Scan for transcript files and partition into pending/done/empty."""
     txt_files = FSUtil.find_files_by_extension(cleaned_dir, ".txt", recursive=True)
     txt_files = [f for f in txt_files if not f.name.startswith("._")]
+    channel_filter = os.environ.get("CHANNEL_FILTER", "").strip()
+    if channel_filter:
+        txt_files = [f for f in txt_files if f.parent.name == channel_filter]
 
     pending: list[tuple[Path, Path]] = []
     already_done = 0
