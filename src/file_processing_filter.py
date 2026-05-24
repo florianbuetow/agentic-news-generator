@@ -15,6 +15,28 @@ from src.config import Config
 VIDEO_ID_PATTERN = re.compile(r"\[([^\]]+)\]\.[^.]+$")
 
 
+def add_no_speech_to_filefilter(filefilter_path: Path, channel_name: str, base_name: str) -> bool:
+    """Add a no-speech video to filefilter.json under data_downloads_audio_dir.
+
+    Returns True if a new entry was written, False otherwise.
+    """
+    if not filefilter_path.is_file():
+        return False
+    vid_match = re.search(r"\[([A-Za-z0-9_-]+)\]$", base_name)
+    if not vid_match:
+        return False
+    entry = f"{channel_name}/{vid_match.group(1)}"
+    filter_data: dict[str, list[str]] = json.loads(filefilter_path.read_text())
+    if "data_downloads_audio_dir" not in filter_data:
+        return False
+    existing = filter_data["data_downloads_audio_dir"]
+    if entry in existing:
+        return False
+    filter_data["data_downloads_audio_dir"] = sorted(existing + [entry])
+    filefilter_path.write_text(json.dumps(filter_data, indent=4) + "\n")
+    return True
+
+
 class FileProcessingFilter:
     """Skip files listed in the file filter configuration."""
 

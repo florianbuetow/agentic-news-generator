@@ -28,13 +28,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config  # noqa: E402
-from src.file_processing_filter import FileProcessingFilter  # noqa: E402
+from src.file_processing_filter import FileProcessingFilter, add_no_speech_to_filefilter  # noqa: E402
 from src.transcription.argument_helper import TranscriptionArgumentHelper  # noqa: E402
 from src.util.fs_util import FSUtil  # noqa: E402
 from src.util.log_util import configure_root_logger, get_logger  # noqa: E402
 from src.util.whisper_languages import WhisperLanguages  # noqa: E402
 
 logger = get_logger(__name__)
+
+REQUIRED_TRANSCRIPT_EXTENSIONS = ("txt", "srt")
+VIDEO_ID_STEM_PATTERN = re.compile(r"\[([A-Za-z0-9_-]+)\](?:\.[^.]+)?$")
 
 
 @dataclass
@@ -105,6 +108,35 @@ def sanitize_channel_name(name: str) -> str:
     return sanitized
 
 
+def transcript_outputs_complete(channel_transcripts_dir: Path, base_name: str) -> bool:
+    """Return whether the downstream-required transcript outputs exist."""
+    return all((channel_transcripts_dir / f"{base_name}.{ext}").exists() for ext in REQUIRED_TRANSCRIPT_EXTENSIONS)
+
+
+def extract_video_id_from_stem(stem: str) -> str | None:
+    """Extract a YouTube video ID from a filename stem."""
+    match = VIDEO_ID_STEM_PATTERN.search(stem)
+    return match.group(1) if match else None
+
+
+def find_metadata_file(metadata_video_dir: Path, base_name: str) -> Path:
+    """Find metadata by exact stem, then by video ID for format-suffixed files."""
+    exact_path = metadata_video_dir / f"{base_name}.info.json"
+    if exact_path.exists():
+        return exact_path
+
+    video_id = extract_video_id_from_stem(base_name)
+    if video_id is None or not metadata_video_dir.exists():
+        return exact_path
+
+    for candidate in sorted(metadata_video_dir.glob("*.info.json")):
+        candidate_stem = candidate.name.removesuffix(".info.json")
+        if extract_video_id_from_stem(candidate_stem) == video_id:
+            return candidate
+
+    return exact_path
+
+
 def transcribe_single_file(
     wav_file: Path,
     model_repo: str,
@@ -172,6 +204,7 @@ def process_single_wav_file(  # noqa: C901
     verbose: bool,
     progress: ProgressTracker | None = None,
     empty_transcript_log: Path | None = None,
+    filefilter_path: Path | None = None,
 ) -> tuple[bool, int]:
     """Process a single WAV file for transcription.
 
@@ -185,10 +218,10 @@ def process_single_wav_file(  # noqa: C901
         logger.error(f"Empty wav file: {wav_file}")
         return (False, 0)
 
-    # Skip if transcript already exists (idempotent)
-    if (channel_transcripts_dir / f"{base_name}.txt").exists():
+    # Skip if transcript outputs already exist (idempotent)
+    if transcript_outputs_complete(channel_transcripts_dir, base_name):
         if verbose:
-            logger.debug(f"Skipping: {base_name}.wav (transcript already exists)")
+            logger.debug(f"Skipping: {base_name}.wav (transcript outputs already exist)")
         return (True, 0)
 
     # Build progress prefix if tracker provided
@@ -198,7 +231,8 @@ def process_single_wav_file(  # noqa: C901
     # Build initial prompt from metadata
     initial_prompt = ""
     if use_youtube_metadata:
-        metadata_file = metadata_dir / channel_name / metadata_video_subdir / f"{base_name}.info.json"
+        metadata_video_dir = metadata_dir / channel_name / metadata_video_subdir
+        metadata_file = find_metadata_file(metadata_video_dir, base_name)
 
         if verbose:
             logger.debug(f"Looking for metadata: {metadata_file}")
@@ -257,6 +291,8 @@ def process_single_wav_file(  # noqa: C901
                 if empty_transcript_log:
                     with open(empty_transcript_log, "a", encoding="utf-8") as log:
                         log.write(f"{channel_name}/{base_name}.wav\n")
+                if filefilter_path:
+                    add_no_speech_to_filefilter(filefilter_path, channel_name, base_name)
                 return (True, 0)
 
             # Move generated files from temp to transcripts directory
@@ -312,6 +348,7 @@ def main() -> int:  # noqa: C901
     FSUtil.ensure_directory_exists(logs_dir)
     configure_root_logger(logs_dir)
     empty_transcript_log = logs_dir / "empty_transcripts.log"
+    filefilter_path = project_root / "config" / "filefilter.json"
 
     # Get transcription settings from config
     model_en_repo = config.get_transcription_model_en_repo()
@@ -357,17 +394,17 @@ def main() -> int:  # noqa: C901
             wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
             wav_files = [f for f in wav_files if not f.name.startswith(".")]
 
-            # Add files that need transcription (no existing transcript, not filtered)
+            # Add files that need transcription (missing required outputs, not filtered)
             files_to_transcribe.extend(
                 (wav_file, channel_name, channel_transcripts_dir)
                 for wav_file in wav_files
-                if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+                if not transcript_outputs_complete(channel_transcripts_dir, wav_file.stem)
                 and not file_filter.should_skip_file(str(wav_file), str(audio_dir))
             )
             pending_count_by_channel[channel_name] = sum(
                 1
                 for wav_file in wav_files
-                if not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+                if not transcript_outputs_complete(channel_transcripts_dir, wav_file.stem)
                 and not file_filter.should_skip_file(str(wav_file), str(audio_dir))
             )
 
@@ -435,7 +472,7 @@ def main() -> int:  # noqa: C901
 
         for i, wav_file in enumerate(wav_files):
             if transcribed_for_channel >= channel_limiter:
-                remaining = sum(1 for w in wav_files[i:] if not (channel_transcripts_dir / f"{w.stem}.txt").exists())
+                remaining = sum(1 for w in wav_files[i:] if not transcript_outputs_complete(channel_transcripts_dir, w.stem))
                 logger.info(f"Transcription limited to {transcribed_for_channel}/{channel_limiter} files. Skipping {remaining} files.")
                 break
 
@@ -444,7 +481,7 @@ def main() -> int:  # noqa: C901
                 continue
 
             # Check if this file needs transcription (for progress tracking)
-            needs_transcription = not (channel_transcripts_dir / f"{wav_file.stem}.txt").exists()
+            needs_transcription = not transcript_outputs_complete(channel_transcripts_dir, wav_file.stem)
             if needs_transcription:
                 progress.next_file()
 
@@ -467,6 +504,7 @@ def main() -> int:  # noqa: C901
                 verbose,
                 progress=progress if needs_transcription else None,
                 empty_transcript_log=empty_transcript_log,
+                filefilter_path=filefilter_path,
             )
 
             if moved_count == 0 and success:
