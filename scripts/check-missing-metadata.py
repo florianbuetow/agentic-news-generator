@@ -87,7 +87,7 @@ def main() -> int:
         video_ids = [video_id for video_id, _ in items]
         print(f"  {channel_name} ({len(items)} file(s))...", end=" ", flush=True)
         result = subprocess.run(
-            [sys.executable, str(fetch_script), channel_name, *video_ids],
+            [sys.executable, str(fetch_script), channel_name, "--", *video_ids],
             capture_output=True,
         )
         if result.returncode != 0:
