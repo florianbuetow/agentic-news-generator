@@ -121,6 +121,7 @@ help:
     @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-38s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
     @printf "  %-38s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
+    @printf "  %-38s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
@@ -833,6 +834,14 @@ check-missing-metadata:
     @printf "\033[0;34m=== Checking for Missing Metadata ===\033[0m\n"
     @echo ""
     @uv run python scripts/check-missing-metadata.py
+    @echo ""
+
+# Fetch missing video thumbnails. With no args, scans all .info.json files. With args: CHANNEL VIDEO_ID [...]
+fetch-video-thumbnails *ARGS:
+    @echo ""
+    @printf "\033[0;34m=== Fetching Video Thumbnails ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/fetch-video-thumbnails.py {{ ARGS }}
     @echo ""
 
 # Interactively search cleaned transcripts with fzf and open selected file in Sublime Text

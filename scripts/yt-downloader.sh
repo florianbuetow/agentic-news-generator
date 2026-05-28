@@ -55,6 +55,7 @@ yt-dlp --cookies-from-browser $browser \
        --min-sleep-interval 1 \
        --max-sleep-interval 5 \
        --write-info-json \
+       --write-thumbnail \
        --merge-output-format mp4 \
        -o "$output_dir/%(title)s [%(id)s].%(ext)s" \
        "$url" >"$output_fifo" 2>&1 &
