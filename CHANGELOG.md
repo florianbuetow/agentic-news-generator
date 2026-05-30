@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added between-channel disk-space guard that aborts downloads when free space drops below 20 GB.
 - Added YouTube video thumbnail download and backfill.
 - Added optional single-channel filter to transcript summarization.
 - Added skip-threshold gating that skips over-context transcripts during summarization instead of failing.
