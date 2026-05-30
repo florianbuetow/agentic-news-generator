@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added YouTube video thumbnail download and backfill.
+- Added optional single-channel filter to transcript summarization.
+- Added skip-threshold gating that skips over-context transcripts during summarization instead of failing.
+- Added LM Studio model validation for transcript summarization to the status check.
 - Added interactive transcript summary search with fzf preview and colorized query highlights.
 - Added configurable context window threshold and fewest-pending channel ordering to transcript summarization.
 - Added script to scan and auto-fetch missing video metadata (.info.json) files.
@@ -52,6 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Consolidated missing-metadata scan and auto-fetch into fetch-video-metadata's no-argument mode.
 - Updated transcript summarization default model to qwen3.6-35b-a3b.
 - Rewrote FileProcessingFilter to use video ID matching and made transcription fail fast on missing metadata
 - Ordered channels globally by pending count instead of per-language group during transcription
@@ -72,6 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed video IDs starting with a dash being parsed as command options.
+- Fixed transcription leaving partial reruns by requiring both text and subtitle outputs.
 - Fixed transcript summarization to exit non-zero after exceeding max retries.
 - Skip empty transcripts produced by speechless videos
 - `yt-downloader` now uses `--merge-output-format mp4` to avoid format selection issues
