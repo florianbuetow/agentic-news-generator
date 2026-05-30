@@ -76,6 +76,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Legacy bash transcription implementation
 - Topic detection (topic extraction agent and hierarchical topic modeling pipeline)
 - Topic boundary detection (LLM boundary detector, reference-evaluation harness, indexing-guardrail simulation, and boundary metrics)
+- Removed stale topic detection sections from the config template.
 
 ### Fixed
 
