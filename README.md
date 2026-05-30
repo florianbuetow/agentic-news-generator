@@ -26,6 +26,8 @@ agentic-news-generator/
 ├── AGENTS.md               # AI agent development rules
 ├── CLAUDE.md               # Redirect to AGENTS.md
 ├── README.md               # This file
+├── ARCHIVE-GUIDE.md         # Procedure for archiving stale code and data
+├── TROUBLESHOOTING-GUIDE.md # Diagnostic scripts and failure playbooks
 ├── config/                 # Configuration files
 │   ├── config.yaml        # YouTube channel configuration
 │   ├── config.yaml.template  # Template for config.yaml

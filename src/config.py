@@ -172,17 +172,6 @@ class SummarizeTranscriptsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class TopicBoundariesConfig(BaseModel):
-    """Configuration for topic-boundary detection from cleaned TXT transcripts."""
-
-    input_dir: str = Field(..., min_length=1, description="Input directory of cleaned TXT files (relative to data_dir)")
-    output_dir: str = Field(..., min_length=1, description="Output directory for topic boundary files (relative to data_dir)")
-    prompt_template: str = Field(..., min_length=1, description="Prompt template path (relative to project root)")
-    llm: LLMConfig = Field(..., description="LLM config for topic-boundary detection")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
 class TopicsConfig(BaseModel):
     """Configuration for topic extraction from hallucination-freed SRT transcripts."""
 
@@ -306,10 +295,6 @@ class Config:
         # Validate summarize_transcripts section if present
         if "summarize_transcripts" in self._data:
             self._summarize_transcripts = self._validate_summarize_transcripts()
-
-        # Validate topic_boundaries section if present
-        if "topic_boundaries" in self._data:
-            self._topic_boundaries = self._validate_topic_boundaries()
 
         # Validate topics section if present
         if "topics" in self._data:
@@ -480,14 +465,6 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Topics configuration validation failed: {error_messages}") from e
 
-    def _validate_topic_boundaries(self) -> TopicBoundariesConfig:
-        """Validate topic_boundaries configuration."""
-        try:
-            return TopicBoundariesConfig.model_validate(self._data["topic_boundaries"])
-        except ValidationError as e:
-            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
-            raise ValueError(f"Topic boundaries configuration validation failed: {error_messages}") from e
-
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -545,12 +522,6 @@ class Config:
         if not hasattr(self, "_topics"):
             raise KeyError("Missing required key 'topics' in config file")
         return self._topics
-
-    def get_topic_boundaries_config(self) -> TopicBoundariesConfig:
-        """Get topic boundaries configuration."""
-        if not hasattr(self, "_topic_boundaries"):
-            raise KeyError("Missing required key 'topic_boundaries' in config file")
-        return self._topic_boundaries
 
     def get_encoding_name(self) -> str:
         """Get default tiktoken encoding for token counting."""
@@ -648,11 +619,6 @@ class Config:
     def get_data_downloads_transcripts_summaries_dir(self) -> Path:
         """Get the transcript summaries directory path."""
         return Path(self._paths.data_downloads_transcripts_summaries_dir)
-
-    def get_data_downloads_transcripts_topic_boundaries_dir(self) -> Path:
-        """Get the transcript topic boundaries directory path from topic_boundaries config."""
-        topic_boundaries = self.get_topic_boundaries_config()
-        return self.get_data_dir() / Path(topic_boundaries.output_dir)
 
     def get_data_downloads_audio_dir(self) -> Path:
         """Get the data downloads audio directory path.

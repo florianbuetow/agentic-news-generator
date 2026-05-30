@@ -188,26 +188,6 @@ summarize_transcripts:
     max_retries: 3
     retry_delay: 2.0
 
-# Topic Boundary Detection Configuration
-topic_boundaries:
-  # Input directory of cleaned TXT transcripts (relative to data_dir)
-  input_dir: downloads/transcripts_cleaned
-  # Output directory for topic boundary files (relative to data_dir)
-  output_dir: downloads/transcripts_topic_boundaries
-  # Prompt template (relative to project root)
-  prompt_template: prompts/detect-topic-boundaries-from-txt.md
-  llm:
-    model: openai/qwen/qwen3.6-35b-a3b
-    api_base: http://127.0.0.1:1234/v1
-    api_key: lm-studio
-    context_window: 262144
-    max_tokens: 32768
-    temperature: 0.3
-    context_window_threshold: 90
-    max_retries: 3
-    retry_delay: 2.0
-
-
 # Language Analysis Configuration
 language_analysis:
   # Minimum FastText confidence (0.0-1.0) for a non-English detection to count as non-English.

@@ -24,6 +24,7 @@ For coding conventions, git rules, and project standards, see [`CONVENTIONS.md`]
 
 ### Operations
 - For diagnostic scripts and failure playbooks, see [`TROUBLESHOOTING-GUIDE.md`](TROUBLESHOOTING-GUIDE.md)
+- For the procedure to archive stale code and its data artifacts, see [`ARCHIVE-GUIDE.md`](ARCHIVE-GUIDE.md)
 
 ### Appendix
 - For the project changelog, see [`CHANGELOG.md`](CHANGELOG.md)

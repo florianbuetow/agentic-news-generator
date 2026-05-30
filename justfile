@@ -82,8 +82,6 @@ help:
     @printf "\033[0;33mTopic Detection:\033[0m\n"
     @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
     @printf "  %-38s %s\n" "extract-topics" "Extract topics from hallucination-freed SRT transcripts"
-    @printf "  %-38s %s\n" "detect-topic-boundaries" "Detect topic boundaries in cleaned TXT transcripts"
-    @printf "  %-38s %s\n" "evaluate-indexing-chunks" "Evaluate topic-boundary chunking guardrails from saved predictions"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
     @echo ""
     @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
@@ -369,31 +367,6 @@ extract-topics:
     @uv run python scripts/extract-topics.py
     @echo ""
 
-# Detect topic boundaries in cleaned TXT transcripts
-detect-topic-boundaries:
-    @echo ""
-    @printf "\033[0;34m=== Detecting Topic Boundaries from Cleaned Transcripts ===\033[0m\n"
-    @uv run python scripts/detect-topic-boundaries.py
-    @echo ""
-
-# Evaluate chunking guardrails from saved topic-boundary predictions
-evaluate-indexing-chunks:
-    @echo ""
-    @printf "\033[0;34m=== Evaluating Topic Boundary Chunking Guardrails ===\033[0m\n"
-    @mkdir -p data/tmp/indexing-guardrail-report-all-docs-min50
-    @UV_CACHE_DIR=/private/tmp/uv-cache uv run python scripts/simulate-boundary-indexing.py \
-        --predictions data/tmp/remote-boundary-eval-full-v2/per_example_results.jsonl \
-        --raw-output-jsonl /Users/flo/Developer/github/llm-funted-topicboundaries/reports/eval/qwen3-0.6b-exp03-raw-outputs.jsonl \
-        --raw-output-jsonl /Users/flo/Developer/github/llm-funted-topicboundaries/reports/eval/mlx-community-llama-3-2-3b-instruct-4bit-exp01-raw-outputs.jsonl \
-        --labeled-examples /Users/flo/Developer/github/llm-funted-topicboundaries/data/input/labeled_examples.json \
-        --output-json data/tmp/indexing-guardrail-report-all-docs-min50/indexing_guardrail_simulation.json \
-        --report-md data/tmp/indexing-guardrail-report-all-docs-min50/indexing_guardrail_report.md \
-        --manual-review data/tmp/indexing-guardrail-report-all-docs-min50/indexing_guardrail_manual_review.txt \
-        --padding-lines 30 \
-        --min-segment-lines 50 \
-        --max-segment-lines 300
-    @echo ""
-
 # Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
 topics-experiment:
     #!/usr/bin/env bash
@@ -419,7 +392,6 @@ topics-all:
     @echo ""
     @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
     @just extract-topics
-    @just detect-topic-boundaries
     @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 
