@@ -327,6 +327,14 @@ def main() -> int:  # noqa: C901
     Returns:
         0 if all files succeeded, 1 if any failed
     """
+    # Optional limit on number of files to transcribe before exiting (default: all)
+    transcribe_limit: int | None = None
+    if len(sys.argv) == 3 and sys.argv[1] == "--limit":
+        transcribe_limit = int(sys.argv[2])
+    elif len(sys.argv) != 1:
+        logger.error("Usage: transcribe_audio.py [--limit N]")
+        return 1
+
     # Load configuration
     project_root = Path(__file__).parent.parent
     config_path = project_root / "config" / "config.yaml"
@@ -434,6 +442,7 @@ def main() -> int:  # noqa: C901
 
     total_processed = 0
     failures: list[tuple[str, str]] = []
+    limit_reached = False
 
     # Process channels in order of fewest pending files first
     for channel_info in all_channels:
@@ -474,6 +483,11 @@ def main() -> int:  # noqa: C901
         wav_files = [f for f in wav_files if not f.name.startswith(".")]
 
         for i, wav_file in enumerate(wav_files):
+            if transcribe_limit is not None and total_processed >= transcribe_limit:
+                logger.info(f"Reached transcription limit ({transcribe_limit} file(s)). Stopping.")
+                limit_reached = True
+                break
+
             if transcribed_for_channel >= channel_limiter:
                 remaining = sum(1 for w in wav_files[i:] if not transcript_outputs_complete(channel_transcripts_dir, w.stem))
                 logger.info(f"Transcription limited to {transcribed_for_channel}/{channel_limiter} files. Skipping {remaining} files.")
@@ -527,6 +541,9 @@ def main() -> int:  # noqa: C901
             logger.info(f"Skipped {skipped_count} file(s) (transcript already exists)")
 
         logger.info("")
+
+        if limit_reached:
+            break
 
     total_elapsed = time.time() - progress.start_time
     logger.info("")

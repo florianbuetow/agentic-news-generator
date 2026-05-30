@@ -295,13 +295,13 @@ filter-videos:
     printf "\033[0;32m✓ filter-videos completed successfully\033[0m\n"
     echo ""
 
-# Transcribe audio files to text
-transcribe:
+# Transcribe audio files to text (optional n: stop after transcribing n files; default all)
+transcribe n="":
     #!/usr/bin/env bash
     set -e
     echo ""
     printf "\033[0;34m=== Transcribing Audio Files ===\033[0m\n"
-    uv run python scripts/transcribe_audio.py
+    uv run python scripts/transcribe_audio.py {{ if n == "" { "" } else { "--limit " + n } }}
     echo ""
     printf "\033[0;34m=== Cleaning Up Empty Transcripts ===\033[0m\n"
     transcripts_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(Path('.') / c.get_data_downloads_transcripts_dir())")
