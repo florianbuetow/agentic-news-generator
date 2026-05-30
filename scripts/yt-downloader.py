@@ -2,6 +2,7 @@
 """Python wrapper for yt-downloader.sh that reads channels from config.yaml."""
 
 import random
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +12,22 @@ from src.util.channel_name import sanitize_channel_name
 from src.util.log_util import configure_root_logger, get_logger
 
 logger = get_logger(__name__)
+
+# Stop before downloading the next channel once free space drops below this floor.
+# Downloads are batched per channel, so this is checked between channels - mirroring
+# the per-file disk guard in convert_to_audio.sh.
+MIN_FREE_DISK_GB = 20
+MIN_FREE_DISK_BYTES = MIN_FREE_DISK_GB * 1024**3
+
+
+def stop_if_disk_low(videos_dir: Path) -> None:
+    """Exit if free space on the videos volume has dropped below the floor."""
+    free_bytes = shutil.disk_usage(videos_dir).free
+    if free_bytes < MIN_FREE_DISK_BYTES:
+        free_mb = free_bytes // (1024 * 1024)
+        logger.error(f"🚨 Less than {MIN_FREE_DISK_GB} GB disk space remaining ({free_mb} MB available) - stopping")
+        sys.exit(1)
+
 
 EXIT_CODE_REASONS: dict[int, str] = {
     10: (
@@ -46,6 +63,9 @@ def main() -> None:
 
     random.shuffle(channels)
 
+    videos_dir = config.get_data_downloads_videos_dir()
+    videos_dir.mkdir(parents=True, exist_ok=True)
+
     success_count = 0
     failure_count = 0
     failed_channels: list[tuple[str, str]] = []
@@ -54,6 +74,8 @@ def main() -> None:
         logger.info("")
         logger.info(f"=== [{channel.name}] ===")
         logger.info("")
+
+        stop_if_disk_low(videos_dir)
 
         if channel.download_limiter == 0:
             logger.info(f"Skipping {channel.name} (download-limiter: 0)")
