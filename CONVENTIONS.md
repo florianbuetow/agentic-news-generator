@@ -51,7 +51,7 @@
 - Prompt templates go in `prompts/`
 - **Input data**: `data/input/`
 - **Output data**: `data/output/`
-- **Temporary debug scripts**: `debug/` (see `TROUBLESHOOTING.md` for usage guidelines)
+- **Temporary debug scripts**: `debug/` (see `TROUBLESHOOTING-GUIDE.md` for usage guidelines)
 - **Never create Python files in the project root directory**
   - Wrong: `./test.py`, `./helper.py`
   - Correct: `./src/helper.py`, `./scripts/test.py`, `./debug/test_something.py`
@@ -118,7 +118,7 @@ DATA_DIR=$(uv run python -c "import yaml; print(yaml.safe_load(open('config/conf
 - Keep raw outputs separate from processed/refined outputs
 
 ## Troubleshooting & Debugging
-- See `TROUBLESHOOTING.md` at project root for catalogue of diagnostic helper scripts in `scripts/` and `tools/`
+- See `TROUBLESHOOTING-GUIDE.md` at project root for catalogue of diagnostic helper scripts in `scripts/` and `tools/`
 - Covers: finding files by video ID, detecting corrupt videos, empty transcripts, hallucination analysis, LM Studio status checks, AI-powered test/shell reviewers, and code quality diagnostics
 - Contains playbooks for common failure modes (empty transcripts, corrupt videos, LLM pipeline stalls)
 - Check there first before writing new debug scripts

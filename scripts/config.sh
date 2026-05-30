@@ -123,7 +123,7 @@ use_youtube_metadata="$USE_YOUTUBE_METADATA"
 
 # --- YouTube Download Settings (yt-downloader.sh) ---
 # Browser to extract cookies from
-BROWSER="${BROWSER:-chrome}"
+BROWSER="${BROWSER:-firefox}"
 browser="$BROWSER"
 
 # ============================================================================

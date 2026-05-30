@@ -243,11 +243,69 @@ The root cause is yt-dlp intermediate files left behind from a failed format mer
 
 ## Playbook: YouTube Cookies Expired During Download
 
-When `just download-videos` fails with `ERROR: YouTube cookies are expired or invalid. Aborting.`, Chrome's YouTube cookies have rotated mid-session. Channels processed before the rotation succeed; those after fail.
+When `just download-videos` fails with `ERROR: YouTube cookies are expired or invalid. Aborting.`, the browser cookies that yt-dlp extracted are no longer accepted by YouTube.
 
-1. Open Chrome, visit youtube.com, ensure you're logged in.
-2. Re-run `just download-videos` — yt-dlp re-extracts fresh cookies from Chrome on each channel.
-3. If it keeps failing, see yt-dlp wiki: https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies
+**Which browser is currently configured?**
+
+Check `scripts/config.sh`:
+```bash
+grep 'BROWSER=' scripts/config.sh
+```
+The `BROWSER` variable sets the default (currently `firefox`). Override per-run with `BROWSER=chrome just download-videos`.
+
+---
+
+**Fix for Firefox (current default):**
+
+Firefox stores cookies in plain SQLite (Chrome 127+ encrypts them), making extraction reliable.
+
+1. Open Firefox and log into YouTube:
+   ```bash
+   # macOS
+   open -a Firefox "https://www.youtube.com/watch?v=OQSNhk5ICTI"
+
+   # Linux
+   firefox "https://www.youtube.com/watch?v=OQSNhk5ICTI"
+   ```
+2. **Close Firefox completely** (Cmd+Q on macOS) — yt-dlp needs the SQLite WAL flushed before it can copy the file.
+3. Run `just download-videos`.
+
+---
+
+**Fix for Chrome:**
+
+Chrome 127+ encrypts its cookie store, so yt-dlp's `--cookies-from-browser chrome` is unreliable — Chrome also rotates session cookies when it detects external access. If you're on Chrome:
+
+1. Open Chrome and visit youtube.com. Ensure you're logged in.
+2. Close Chrome completely before running, for the same WAL-flush reason as Firefox.
+3. Run `BROWSER=chrome just download-videos` immediately after closing.
+
+If Chrome keeps rotating cookies and the download keeps failing, switch the default to Firefox in `scripts/config.sh` and follow the Firefox steps above.
+
+---
+
+**Last resort — switch browsers back and forth:**
+
+YouTube's cookie rotation is sometimes session-specific. If both Firefox and Chrome fail independently, try switching browsers once:
+
+1. Try Chrome: `BROWSER=chrome just download-videos`
+2. If that fails, try Firefox: `BROWSER=firefox just download-videos`
+3. If that also fails, go back to Chrome: `BROWSER=chrome just download-videos`
+
+The act of switching forces yt-dlp to read a completely different cookie store, which can bypass a rotation that was triggered by the previous extraction attempt.
+
+---
+
+**Last resort — export cookies to a file:**
+
+If all browser extraction methods fail:
+
+1. Install the "Get cookies.txt LOCALLY" extension in Firefox or Chrome.
+2. Visit youtube.com while logged in.
+3. Click the extension → export `youtube.com` cookies → save as e.g. `~/.youtube-cookies.txt`.
+4. Pass it directly to yt-dlp: set `--cookies ~/.youtube-cookies.txt` in `yt-downloader.sh` (remove `--cookies-from-browser`).
+
+Reference: https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies
 
 ---
 

@@ -20,7 +20,7 @@ For coding conventions, git rules, and project standards, see [`CONVENTIONS.md`]
 - For the shell script parameter detector tool, see [`tools/shellscript_analyzer/README.md`](tools/shellscript_analyzer/README.md)
 
 ### Operations
-- For diagnostic scripts and failure playbooks, see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md)
+- For diagnostic scripts and failure playbooks, see [`TROUBLESHOOTING-GUIDE.md`](TROUBLESHOOTING-GUIDE.md)
 
 ### Appendix
 - For the project changelog, see [`CHANGELOG.md`](CHANGELOG.md)
