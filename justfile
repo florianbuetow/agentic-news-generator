@@ -248,13 +248,19 @@ download-videos:
     uv run scripts/yt-downloader.py 2>&1 | tee reports/video-download.log
     download_exit_code=${PIPESTATUS[0]}
     echo ""
+    if [ $download_exit_code -ne 0 ]; then
+        printf "\033[0;31m✗ download-videos failed: see the error above and reports/video-download.log\033[0m\n"
+        echo ""
+        exit $download_exit_code
+    fi
     printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
     bash scripts/move-metadata.sh
     echo ""
     printf "\033[0;34m=== Adding Members-Only Videos to Skip List ===\033[0m\n"
     uv run scripts/parse-and-archive-membersonly.py
     echo ""
-    exit $download_exit_code
+    printf "\033[0;32m✓ download-videos completed successfully\033[0m\n"
+    echo ""
 
 # Convert downloaded videos to WAV audio files
 extract-audio:
