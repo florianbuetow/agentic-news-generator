@@ -89,61 +89,6 @@ transcription:
   # Output verbosity
   verbose: false  # Set to true for detailed output
 
-# Experimental LLM topic segmentation (scripts/topics-experiment.py)
-topics_experiment:
-  api_base: http://127.0.0.1:1234/v1
-  models_endpoint: http://127.0.0.1:1234/api/v0/models
-  api_key: lm-studio
-  models_http_timeout: 10.0
-  output_subdir: topics-experiment
-  temperature: 0.3
-  max_output_tokens: 32768
-  token_safety_factor: 1.1
-  prompt_overhead_tokens: 500
-  prefer_loaded: true
-  max_retries: 3
-  retry_delay: 2.0
-
-# Topic Segmentation Agent Configuration
-topic_segmentation:
-  # Segmentation Agent LLM - using LM Studio
-  agent_llm:
-    model: your-model-name
-    api_base: http://127.0.0.1:1234/v1
-    api_key: lm-studio
-    context_window: 262144
-    max_tokens: 32000
-    temperature: 0.7
-    context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
-    max_retries: 3
-    retry_delay: 2.0
-
-  # Critic Agent LLM - using same LM Studio instance
-  critic_llm:
-    model: your-model-name
-    api_base: http://127.0.0.1:1234/v1
-    api_key: lm-studio
-    context_window: 262144
-    max_tokens: 32000
-    temperature: 0.3
-    context_window_threshold: 90  # Raise error if token usage exceeds 90% of context window
-    max_retries: 3
-    retry_delay: 2.0
-
-  # Retry configuration
-  retry_limit: 1
-
-# Topic Extraction Configuration
-topics:
-  # Input directory of hallucination-freed SRT files (relative to data_dir)
-  input_dir: downloads/transcripts_cleaned
-  # Output directory for topic extraction results (relative to data_dir)
-  output_dir: output/topics
-  # Codex model passed to `codex exec -m` (mini variant for speed/cost)
-  codex_model: gpt-5.4-mini
-  # Prompt template (relative to project root)
-  prompt_template: prompts/extract-topic-boundaries.md
-
 # Default parameter values
 defaults:
   # Token validation defaults
