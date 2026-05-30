@@ -21,64 +21,63 @@ This system automatically:
 
 ```
 agentic-news-generator/
-├── pyproject.toml          # Project dependencies and metadata
+├── pyproject.toml          # Dependencies and metadata
 ├── justfile                # Build and run commands
 ├── AGENTS.md               # AI agent development rules
 ├── CLAUDE.md               # Redirect to AGENTS.md
 ├── README.md               # This file
-├── ARCHIVE-GUIDE.md         # Procedure for archiving stale code and data
+├── ARCHIVE-GUIDE.md        # Archiving stale code and data
 ├── TROUBLESHOOTING-GUIDE.md # Diagnostic scripts and failure playbooks
-├── config/                 # Configuration files
-│   ├── config.yaml        # YouTube channel configuration
-│   ├── config.yaml.template  # Template for config.yaml
-│   └── semgrep/           # Semgrep rule configurations
+├── config/
+│   ├── config.yaml        # YouTube channel config
+│   ├── config.yaml.template
+│   └── semgrep/           # Semgrep rules
 ├── src/                    # Source code
-│   ├── main.py           # Main entry point
-│   ├── config.py         # Configuration loading
-│   ├── processing/       # Processing modules
-│   │   └── repetition_detector.py  # Hallucination detection algorithm
-│   └── util/             # Utility modules
-│       └── fs_util.py    # File system utilities
-├── scripts/                # Utility scripts
-│   ├── yt-downloader.sh   # YouTube video downloader (filters out <120s)
-│   ├── convert_to_audio.sh  # Video to audio converter
-│   ├── transcribe_audio.sh  # Audio transcription (MLX Whisper)
-│   ├── transcript-hallucination-detection.py  # Hallucination detection
-│   ├── create-hallucination-digest.py  # Digest report generator
+│   ├── config.py          # Config loading
+│   ├── processing/
+│   │   └── repetition_detector.py  # Hallucination detection
+│   └── util/
+│       └── fs_util.py     # Filesystem utilities
+├── scripts/
+│   ├── yt-downloader.sh   # Download videos (skips <120s)
+│   ├── convert_to_audio.sh  # Video → audio
+│   ├── transcribe_audio.sh  # Transcribe (MLX Whisper)
+│   ├── transcript-hallucination-detection.py
+│   ├── create-hallucination-digest.py  # Digest report
 │   ├── archive-videos.sh  # Archive processed videos
-│   ├── find-files.sh     # Locate every file for a video ID
-│   ├── check-audio-track.sh  # Probe a video for audio stream + volume
-│   ├── filter-short-videos.py  # Add short / no-audio files to filefilter.json
-│   ├── remove-filtered-files.py  # Delete filtered files and upstream copies
-│   ├── fetch-video-metadata.py  # Backfill missing info.json for an ID
-│   └── find-empty-transcripts.py  # List transcripts that failed silently
+│   ├── find-files.sh     # Locate all files for a video ID
+│   ├── check-audio-track.sh  # Probe audio stream + volume
+│   ├── filter-short-videos.py  # Flag short / no-audio files
+│   ├── remove-filtered-files.py  # Delete flagged + upstream copies
+│   ├── fetch-video-metadata.py  # Backfill missing info.json
+│   └── find-empty-transcripts.py  # List silently-failed transcripts
 ├── tests/                  # Test suite
 ├── prompts/                # LLM prompt templates
-├── frontend/               # Frontend applications
-│   └── newspaper/         # Nuxt-based newspaper generator
-│       ├── nuxt.config.ts # Nuxt configuration
-│       ├── package.json   # Node.js dependencies
-│       ├── components/    # Vue components (Masthead, ArticleCard, etc.)
-│       ├── data/          # Content data (articles.js)
-│       ├── pages/         # Nuxt pages
+├── frontend/
+│   └── newspaper/         # Nuxt newspaper generator
+│       ├── nuxt.config.ts
+│       ├── package.json
+│       ├── components/    # Vue components
+│       ├── data/          # Content (articles.js)
+│       ├── pages/
 │       └── assets/        # Styles and static assets
-└── data/                   # Data files
-    ├── downloads/         # Downloaded and processed content
-    │   ├── videos/       # Downloaded videos (by channel)
-    │   ├── audio/        # Extracted WAV files (by channel)
-    │   ├── transcripts/  # Transcripts in multiple formats (by channel)
-    │   │   └── {channel}/transcript-analysis/  # Hallucination analysis JSON
-    │   └── metadata/     # Video metadata and silence maps (by channel)
-    ├── archive/           # Archived content
-    │   └── videos/       # Processed videos moved here
-    ├── input/             # Input data files
-    │   └── newspaper/     # Newspaper input data
-    │       └── articles.js # Generated articles data for Nuxt
+└── data/
+    ├── downloads/         # Downloaded + processed content (by channel)
+    │   ├── videos/
+    │   ├── audio/        # Extracted WAV
+    │   ├── transcripts/  # Multiple formats
+    │   │   └── {channel}/transcript-analysis/  # Hallucination JSON
+    │   └── metadata/     # Metadata + silence maps
+    ├── archive/
+    │   └── videos/       # Processed videos
+    ├── input/
+    │   └── newspaper/
+    │       └── articles.js  # Generated articles for Nuxt
     ├── temp/              # Temporary processing files
-    └── output/            # Generated output files
-        ├── hallucination_digest.md  # Hallucination analysis report
-        ├── topics/        # Per-topic aggregated JSON files
-        └── newspaper/     # Generated HTML newspaper (static site output)
+    └── output/
+        ├── hallucination_digest.md  # Hallucination report
+        ├── topics/        # Per-topic aggregated JSON
+        └── newspaper/     # Generated static site
 ```
 
 ## Prerequisites
