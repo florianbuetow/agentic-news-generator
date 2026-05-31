@@ -4,6 +4,7 @@ from pathlib import Path
 
 import tiktoken
 
+from src.config import LLMConfig
 from src.url_ingestion.clean_content_pipeline import UrlCleanContentPipeline
 from src.url_ingestion.download_pipeline import InboxArchive, UrlDownloadPipeline
 from src.url_ingestion.downloader import DownloaderFactory
@@ -24,7 +25,7 @@ from tests.test_url_formatting import make_llm_config
 class FixtureFormattingClient:
     """Deterministic formatter for expected-file comparisons."""
 
-    def complete(self, prompt: str, *_: object) -> str:
+    def complete(self, prompt: str, llm: LLMConfig) -> str:
         """Return the extracted source text unchanged."""
         return prompt
 
@@ -76,7 +77,10 @@ def write_http_fixture(server_root: Path) -> None:
         """,
         encoding="utf-8",
     )
-    (server_root / "notes.md").write_text("# Markdown fixture\n\nThis is served but unsupported for download right now.\n", encoding="utf-8")
+    (server_root / "notes.md").write_text(
+        "# Markdown fixture\n\nThis is served but unsupported for download right now.\n",
+        encoding="utf-8",
+    )
 
 
 def write_expected_cleaned_outputs(expected_root: Path, base_url: str) -> dict[str, Path]:
@@ -128,7 +132,11 @@ def test_url_pipeline_downloads_from_local_http_server_and_matches_expected_clea
             encoding="utf-8",
         )
 
-        download_summary = UrlDownloadPipeline(config, DownloaderFactory.default(config), InboxArchive(config, fixed_today)).run(read_queue(config))
+        download_summary = UrlDownloadPipeline(
+            config,
+            DownloaderFactory.default(config),
+            InboxArchive(config, fixed_today),
+        ).run(read_queue(config))
 
         assert download_summary.successful_download_count == 2
         assert download_summary.failure_count == 1
