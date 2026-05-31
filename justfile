@@ -79,9 +79,11 @@ help:
     @printf "  %-38s %s\n" "analyze-transcript-languages" "Analyze transcript languages"
     @printf "  %-38s %s\n" "summarize-transcripts [<channel>]" "Summarize cleaned transcripts using LLM"
     @echo ""
-    @printf "\033[0;33mTopic Detection:\033[0m\n"
-    @printf "  %-38s %s\n" "topics-all" "Run complete topic detection pipeline"
-    @printf "  %-38s %s\n" "extract-topics" "Extract topics from hallucination-freed SRT transcripts"
+    @printf "\033[0;33mData-Import:\033[0m\n"
+    @printf "  %-38s %s\n" "urls-download" "Download raw content from inbox URLs (normalize, classify, fetch)"
+    @printf "  %-38s %s\n" "urls-cleancontent" "Convert downloaded raw URL content into cleaned Markdown"
+    @echo ""
+    @printf "\033[0;33mData-Export:\033[0m\n"
     @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
     @echo ""
     @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
@@ -121,9 +123,11 @@ help:
     @printf "  %-38s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-38s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
+    @printf "  %-38s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
+    @printf "  %-38s %s\n" "test-url-ingestion" "Run URL ingestion integration/e2e tests"
     @printf "  %-38s %s\n" "test-coverage" "Run unit tests with coverage report"
     @printf "  %-38s %s\n" "ci" "Run ALL validation checks (verbose)"
     @printf "  %-38s %s\n" "ci-quiet" "Run ALL validation checks silently"
@@ -210,7 +214,6 @@ all:
     @just transcripts-remove-hallucinations
     @just analyze-transcript-languages
     @just summarize-transcripts
-    @just topics-all
 
 # Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
 ingestion-all:
@@ -366,12 +369,31 @@ summarize-transcripts channel="":
     @uv run python scripts/summarize-transcripts.py {{ if channel == "" { "" } else { "--channel " + channel } }}
     @echo ""
 
-# Extract topics from hallucination-freed SRT transcripts
-extract-topics:
-    @echo ""
-    @printf "\033[0;34m=== Extracting Topics from Transcripts ===\033[0m\n"
-    @uv run python scripts/extract-topics.py
-    @echo ""
+# Download raw content from inbox URLs (normalize, deduplicate, classify, fetch, write metadata, archive inbox)
+urls-download:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Downloading Raw Content from Inbox URLs ===\033[0m\n"
+    if ! uv run python scripts/urls-download.py; then
+        printf "\033[0;31m✗ urls-download failed\033[0m\n"
+        exit 1
+    fi
+    printf "\033[0;32m✓ urls-download completed successfully\033[0m\n"
+    echo ""
+
+# Convert downloaded raw URL content into cleaned Markdown documents
+urls-cleancontent:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Cleaning Raw URL Content into Markdown ===\033[0m\n"
+    if ! uv run python scripts/urls-cleancontent.py; then
+        printf "\033[0;31m✗ urls-cleancontent failed\033[0m\n"
+        exit 1
+    fi
+    printf "\033[0;32m✓ urls-cleancontent completed successfully\033[0m\n"
+    echo ""
 
 # Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
 topics-experiment:
@@ -391,14 +413,6 @@ export-to-minirag *ARGS:
     @echo ""
     @printf "\033[0;34m=== Exporting Topics to Mini-RAG Format ===\033[0m\n"
     @uv run python scripts/export-to-minirag.py {{ ARGS }}
-    @echo ""
-
-# Run complete topic detection pipeline
-topics-all:
-    @echo ""
-    @printf "\033[0;34m=== Running Complete Topic Detection Pipeline ===\033[0m\n"
-    @just extract-topics
-    @printf "\033[0;32m✓ Topic detection pipeline complete\033[0m\n"
     @echo ""
 
 # Check if LM Studio is running and required models are loaded
@@ -783,6 +797,29 @@ test:
     echo ""
     exit $EXIT_CODE
 
+# Run URL ingestion integration and e2e tests
+test-url-ingestion:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Running URL Ingestion Integration Tests ===\033[0m\n"
+    uv run pytest -v \
+        tests/test_config_data_dir.py \
+        tests/test_url_queue_reader.py \
+        tests/test_url_normalizer.py \
+        tests/test_url_classifier.py \
+        tests/test_url_identity.py \
+        tests/test_url_metadata.py \
+        tests/test_url_downloader.py \
+        tests/test_url_download_pipeline.py \
+        tests/test_url_formatting.py \
+        tests/test_url_raw_processing.py \
+        tests/test_url_clean_content_pipeline.py \
+        tests/test_url_pipeline_e2e.py
+    echo ""
+    printf "\033[0;32m✓ URL ingestion integration tests passed\033[0m\n"
+    echo ""
+
 # Run unit tests with coverage report and threshold check
 test-coverage: init
     @echo ""
@@ -893,6 +930,14 @@ check-audio-track CHANNEL VIDEO_ID:
     @bash scripts/check-audio-track.sh {{ CHANNEL }} {{ VIDEO_ID }}
     @echo ""
 
+# Move plain-named duplicate files (no YouTube ID) to backup location
+cleanup-plain-filename-duplicates:
+    @echo ""
+    @printf "\033[0;34m=== Cleanup Plain Filename Duplicates ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/cleanup-plain-filename-duplicates.py
+    @echo ""
+
 # List transcript files that are 100 bytes or smaller
 find-empty-transcripts:
     @echo ""
@@ -919,6 +964,7 @@ ci:
     just check-config-syntax
     just code-semgrep
     just code-audit
+    just test-url-ingestion
     just test
     just code-lspchecks
     echo ""
@@ -966,6 +1012,9 @@ ci-quiet:
 
     just code-audit > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Code-audit failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "\033[0;32m✓ Code-audit passed\033[0m\n"
+
+    just test-url-ingestion > $TMPFILE 2>&1 || { printf "\033[0;31m✗ URL ingestion integration tests failed\033[0m\n"; cat $TMPFILE; exit 1; }
+    printf "\033[0;32m✓ URL ingestion integration tests passed\033[0m\n"
 
     just test > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Test failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "\033[0;32m✓ Test passed\033[0m\n"
@@ -1035,10 +1084,6 @@ all-quiet:
     printf "🚀 Starting summarize-transcripts...\n"
     just summarize-transcripts > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Summarize-transcripts failed\033[0m\n"; cat $TMPFILE; exit 1; }
     printf "✅ Completed summarize-transcripts\n"
-
-    printf "🚀 Starting topics-all...\n"
-    just topics-all > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Topics-all failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed topics-all\n"
 
     echo ""
     printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"
