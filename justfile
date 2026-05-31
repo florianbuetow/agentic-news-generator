@@ -47,27 +47,23 @@ help:
     @echo ""
     @printf "\033[0;34m=== agentic-news-generator ===\033[0m\n"
     @echo ""
-    @printf "\033[0;33mSetup & Lifecycle:\033[0m\n"
+    @printf "\033[0;33mProject:\033[0m\n"
     @printf "  %-38s %s\n" "init" "Initialize the development environment"
     @printf "  %-38s %s\n" "destroy" "Destroy the virtual environment and frontend artifacts"
-    @printf "  %-38s %s\n" "newspaper-destroy" "Clean up generated newspaper files"
-    @printf "  %-38s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
-    @printf "  %-38s %s\n" "clean-video-files" "Delete all files for a YouTube video ID (interactive). Requires: VIDEO_ID"
     @printf "  %-38s %s\n" "check" "Check if all required tools and prerequisites are available"
     @printf "  %-38s %s\n" "help" "Show this help information"
     @echo ""
-    @printf "\033[0;33mRun & Pipeline:\033[0m\n"
-    @printf "  %-38s %s\n" "run" "Run the main application"
-    @printf "  %-38s %s\n" "all" "Run the complete pipeline"
-    @printf "  %-38s %s\n" "ingestion-all" "Run pipeline without topic detection"
+    @printf "\033[0;33mPipelines:\033[0m\n"
+    @printf "  %-38s %s\n" "video-all" "Run the complete video pipeline"
+    @printf "  %-38s %s\n" "url-all" "Run the full URL pipeline (fetch, download, clean)"
     @printf "  %-38s %s\n" "maintenance" "Run all read-only data pipeline health checks"
     @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
-    @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @printf "  %-38s %s\n" "stats [hour|day]" "Show processing status (throttle: once per hour/day)"
     @printf "  %-38s %s\n" "totals [hour|day]" "Show processing status with transcript time totals"
     @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
+    @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @echo ""
-    @printf "\033[0;33mData Pipeline:\033[0m\n"
+    @printf "\033[0;33mVideo-Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
     @printf "  %-38s %s\n" "check-video-integrity" "Check video files for corruption"
     @printf "  %-38s %s\n" "filter-videos" "Filter and delete videos shorter than transcription.min_duration"
@@ -79,21 +75,17 @@ help:
     @printf "  %-38s %s\n" "analyze-transcript-languages" "Analyze transcript languages"
     @printf "  %-38s %s\n" "summarize-transcripts [<channel>]" "Summarize cleaned transcripts using LLM"
     @echo ""
-    @printf "\033[0;33mData-Import:\033[0m\n"
+    @printf "\033[0;33mURL-Pipeline:\033[0m\n"
+    @printf "  %-38s %s\n" "urls-fetch-raindrop" "Fetch Raindrop.io bookmarks into the URL inbox (categorized)"
     @printf "  %-38s %s\n" "urls-download" "Download raw content from inbox URLs (normalize, classify, fetch)"
     @printf "  %-38s %s\n" "urls-cleancontent" "Convert downloaded raw URL content into cleaned Markdown"
     @echo ""
-    @printf "\033[0;33mData-Export:\033[0m\n"
-    @printf "  %-38s %s\n" "export-to-minirag" "Export topic segments to mini-rag format"
-    @echo ""
-    @printf "\033[0;33mExperiments (standalone, not part of any pipeline):\033[0m\n"
-    @printf "  %-38s %s\n" "topics-experiment" "Experimental topic extraction from de-hallucinated SRTs"
-    @echo ""
-    @printf "\033[0;33mNewspaper & Frontend:\033[0m\n"
+    @printf "\033[0;33mNewspaper-Pipeline:\033[0m\n"
     @printf "  %-38s %s\n" "notebooks" "Launch Jupyter notebook server"
     @printf "  %-38s %s\n" "compile-articles" "Compile markdown articles into articles.js"
     @printf "  %-38s %s\n" "newspaper-generate" "Generate static newspaper website"
     @printf "  %-38s %s\n" "newspaper-serve" "Run newspaper development server"
+    @printf "  %-38s %s\n" "newspaper-destroy" "Clean up generated newspaper files"
     @echo ""
     @printf "\033[0;33mCode Quality:\033[0m\n"
     @printf "  %-38s %s\n" "code-format" "Auto-fix code style and formatting"
@@ -109,21 +101,23 @@ help:
     @printf "  %-38s %s\n" "code-audit" "Scan dependencies for known vulnerabilities"
     @printf "  %-38s %s\n" "code-stats" "Generate code statistics with pygount"
     @echo ""
-    @printf "\033[0;33mAI Reviews:\033[0m\n"
+    @printf "\033[0;33mAgentic Reviews:\033[0m\n"
     @printf "  %-38s %s\n" "ai-review-unit-tests" "Run AI-powered fake unit test detector"
     @printf "  %-38s %s\n" "ai-review-unit-tests-nocache" "Run AI-powered fake unit test detector (no cache)"
     @printf "  %-38s %s\n" "ai-review-shell-scripts" "Run AI-powered shell script reviewer"
     @printf "  %-38s %s\n" "ai-review-shell-scripts-nocache" "Run AI-powered shell script reviewer (no cache)"
     @echo ""
     @printf "\033[0;33mTools:\033[0m\n"
-    @printf "  %-38s %s\n" "find [query]" "Interactively search cleaned transcripts; with query, list matching files"
-    @printf "  %-38s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
-    @printf "  %-38s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
-    @printf "  %-38s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
-    @printf "  %-38s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
-    @printf "  %-38s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
-    @printf "  %-38s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
-    @printf "  %-38s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
+    @printf "  %-46s %s\n" "find [query]" "Interactively search cleaned transcripts; with query, list matching files"
+    @printf "  %-46s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
+    @printf "  %-46s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
+    @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
+    @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
+    @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
+    @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
+    @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
+    @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
+    @printf "  %-46s %s\n" "clean-video-files" "Delete all files for a YouTube video ID (interactive). Requires: VIDEO_ID"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
@@ -188,21 +182,8 @@ check:
     @printf "\033[0;32m✓ All required tools and prerequisites are available\033[0m\n"
     @echo ""
 
-# Run the main application
-run:
-    @just download-videos
-    @just check-video-integrity
-    @just filter-videos
-    @just extract-audio
-    @just transcribe
-    @just archive-videos
-    @just analyze-transcripts-hallucinations
-    @just transcripts-remove-hallucinations
-    @just analyze-transcript-languages
-    @just summarize-transcripts
-
-# Run the complete pipeline
-all:
+# Run the complete video pipeline
+video-all:
     @just ci-quiet
     -@just download-videos
     @just check-video-integrity
@@ -215,8 +196,8 @@ all:
     @just analyze-transcript-languages
     @just summarize-transcripts
 
-# Run pipeline without topic detection (download, transcribe, archive, hallucination processing)
-ingestion-all:
+# Run the full URL pipeline: fetch bookmarks from Raindrop, download raw content, clean into Markdown
+url-all:
     @just ci-quiet
     -@just download-videos
     @just fetch-video-metadata
@@ -369,6 +350,19 @@ summarize-transcripts channel="":
     @uv run python scripts/summarize-transcripts.py {{ if channel == "" { "" } else { "--channel " + channel } }}
     @echo ""
 
+# Fetch Raindrop.io bookmarks into the URL inbox as categorized Category->Subcategory:url lines
+urls-fetch-raindrop:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Fetching Raindrop.io Bookmarks into URL Inbox ===\033[0m\n"
+    if ! uv run python integrations/raindrop_io/fetchurls-raindrop.py; then
+        printf "\033[0;31m✗ urls-fetch-raindrop failed\033[0m\n"
+        exit 1
+    fi
+    printf "\033[0;32m✓ urls-fetch-raindrop completed successfully\033[0m\n"
+    echo ""
+
 # Download raw content from inbox URLs (normalize, deduplicate, classify, fetch, write metadata, archive inbox)
 urls-download:
     #!/usr/bin/env bash
@@ -395,25 +389,6 @@ urls-cleancontent:
     printf "\033[0;32m✓ urls-cleancontent completed successfully\033[0m\n"
     echo ""
 
-# Experimental topic extraction from de-hallucinated SRTs (standalone, not part of any pipeline)
-topics-experiment:
-    #!/usr/bin/env bash
-    set -e
-    echo ""
-    printf "\033[0;34m=== Running Topics Experiment (standalone) ===\033[0m\n"
-    if ! uv run python -u scripts/topics-experiment.py; then
-        printf "\033[0;31m✗ topics-experiment failed\033[0m\n"
-        exit 1
-    fi
-    printf "\033[0;32m✓ topics-experiment completed successfully\033[0m\n"
-    echo ""
-
-# Export topic segments to mini-rag format (.txt + .json pairs). Requires: --export-dir <path> [--file <path>] [--force]
-export-to-minirag *ARGS:
-    @echo ""
-    @printf "\033[0;34m=== Exporting Topics to Mini-RAG Format ===\033[0m\n"
-    @uv run python scripts/export-to-minirag.py {{ ARGS }}
-    @echo ""
 
 # Check if LM Studio is running and required models are loaded
 status:
