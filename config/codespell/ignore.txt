@@ -36,3 +36,6 @@ servicer
 uuid
 uuids
 
+# External API endpoint paths
+childrens
+

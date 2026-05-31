@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 import yaml
 
-from src.config import Config, PathsConfig
+from src.config import Config, PathsConfig, UrlProcessingConfig
 
 
 def get_valid_paths_config() -> dict[str, str]:
@@ -30,6 +30,32 @@ def get_valid_paths_config() -> dict[str, str]:
         "data_archive_videos_dir": "./data/archive/videos",
         "data_logs_dir": "./data/logs",
         "reports_dir": "reports",
+    }
+
+
+def get_valid_url_processing_config() -> dict[str, str]:
+    """Return a valid URL processing configuration dictionary."""
+    return {
+        "base_dir": "urls",
+        "inbox_dir": "inbox_urls",
+        "raw_dir": "data_raw",
+        "cleaned_dir": "data_cleaned",
+        "test_base_dir": ".test/urls",
+    }
+
+
+def get_valid_llm_config() -> dict[str, object]:
+    """Return a valid LLM config dictionary."""
+    return {
+        "model": "openai/test-model",
+        "api_base": "http://127.0.0.1:1234/v1",
+        "api_key": "test-key",
+        "context_window": 1000,
+        "max_tokens": 100,
+        "temperature": 0.0,
+        "context_window_threshold": 90,
+        "max_retries": 1,
+        "retry_delay": 1.0,
     }
 
 
@@ -69,6 +95,37 @@ class TestPathsConfig:
 
         with pytest.raises(Exception) as exc_info:
             PathsConfig.model_validate(paths_data)
+        assert "extra" in str(exc_info.value).lower()
+
+
+class TestUrlProcessingConfig:
+    """Test cases for the UrlProcessingConfig Pydantic model."""
+
+    def test_valid_url_processing_config(self) -> None:
+        """Test that a valid URL processing configuration passes validation."""
+        url_processing = UrlProcessingConfig.model_validate(get_valid_url_processing_config())
+        assert url_processing.base_dir == "urls"
+        assert url_processing.inbox_dir == "inbox_urls"
+        assert url_processing.raw_dir == "data_raw"
+        assert url_processing.cleaned_dir == "data_cleaned"
+        assert url_processing.test_base_dir == ".test/urls"
+
+    def test_absolute_url_processing_path_raises_error(self) -> None:
+        """Test that URL processing paths must be relative to data_dir."""
+        url_processing_data = get_valid_url_processing_config()
+        url_processing_data["base_dir"] = "/absolute/urls"
+
+        with pytest.raises(Exception) as exc_info:
+            UrlProcessingConfig.model_validate(url_processing_data)
+        assert "relative to data_dir" in str(exc_info.value)
+
+    def test_extra_fields_forbidden(self) -> None:
+        """Test that extra fields are forbidden."""
+        url_processing_data = get_valid_url_processing_config()
+        url_processing_data["extra_field"] = "should not be allowed"
+
+        with pytest.raises(Exception) as exc_info:
+            UrlProcessingConfig.model_validate(url_processing_data)
         assert "extra" in str(exc_info.value).lower()
 
 
@@ -220,5 +277,50 @@ class TestConfigPaths:
         try:
             config = Config(temp_path)
             assert str(config.get_data_dir()) == "/absolute/path/to/data"
+        finally:
+            temp_path.unlink()
+
+    def test_url_processing_getters_resolve_relative_to_data_dir(self) -> None:
+        """Test URL processing path getters resolve under data_dir and base_dir."""
+        config_data: dict[str, Any] = {
+            "paths": get_valid_paths_config(),
+            "channels": [],
+            "url_processing": get_valid_url_processing_config(),
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            assert config.get_url_base_dir() == Path("./data/") / "urls"
+            assert config.get_url_inbox_dir() == Path("./data/") / "urls" / "inbox_urls"
+            assert config.get_url_raw_dir() == Path("./data/") / "urls" / "data_raw"
+            assert config.get_url_cleaned_dir() == Path("./data/") / "urls" / "data_cleaned"
+            assert config.get_url_test_base_dir() == Path("./data/") / ".test" / "urls"
+        finally:
+            temp_path.unlink()
+
+    def test_url_clean_content_config_loads(self) -> None:
+        """Test URL clean-content config validation and getter."""
+        config_data: dict[str, Any] = {
+            "paths": get_valid_paths_config(),
+            "channels": [],
+            "url_clean_content": {
+                "prompt_template": "prompts/format-url-content.md",
+                "skip_documents_above_context_window_pct": 80,
+                "llm": get_valid_llm_config(),
+            },
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
+            yaml.dump(config_data, f)
+            temp_path = Path(f.name)
+
+        try:
+            config = Config(temp_path)
+            clean_config = config.get_url_clean_content_config()
+            assert clean_config.prompt_template == "prompts/format-url-content.md"
+            assert clean_config.skip_documents_above_context_window_pct == 80
+            assert clean_config.llm.model == "openai/test-model"
         finally:
             temp_path.unlink()

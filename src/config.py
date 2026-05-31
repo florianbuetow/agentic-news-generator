@@ -172,6 +172,21 @@ class SummarizeTranscriptsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class UrlCleanContentConfig(BaseModel):
+    """Configuration for URL raw-content Markdown formatting via LLM."""
+
+    llm: LLMConfig = Field(..., description="LLM config for URL content formatting")
+    prompt_template: str = Field(..., min_length=1, description="Prompt template path relative to project root")
+    skip_documents_above_context_window_pct: int = Field(
+        ...,
+        ge=0,
+        le=100,
+        description="Skip URL documents when prompt token count exceeds this percentage of the model context window",
+    )
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class TopicsConfig(BaseModel):
     """Configuration for topic extraction from hallucination-freed SRT transcripts."""
 
@@ -183,6 +198,26 @@ class TopicsConfig(BaseModel):
         min_length=1,
         description="Prompt template path (relative to project root) with {{INPUT_SRT_FILE}} and {{OUTPUT_JSON_FILE}} placeholders",
     )
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class UrlProcessingConfig(BaseModel):
+    """Configuration for URL ingestion pipeline folders relative to data_dir."""
+
+    base_dir: str = Field(..., min_length=1, description="Base URL ingestion directory relative to data_dir")
+    inbox_dir: str = Field(..., min_length=1, description="URL inbox directory relative to base_dir")
+    raw_dir: str = Field(..., min_length=1, description="Raw downloaded URL data directory relative to base_dir")
+    cleaned_dir: str = Field(..., min_length=1, description="Cleaned URL content directory relative to base_dir")
+    test_base_dir: str = Field(..., min_length=1, description="Test URL ingestion directory relative to data_dir")
+
+    @field_validator("base_dir", "inbox_dir", "raw_dir", "cleaned_dir", "test_base_dir")
+    @classmethod
+    def validate_relative_path(cls, path_value: str) -> str:
+        """Validate URL processing paths are relative folder fragments."""
+        if Path(path_value).is_absolute():
+            raise ValueError("URL processing paths must be relative to data_dir")
+        return path_value
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -229,6 +264,22 @@ class TranscriptionConfig(BaseModel):
         ge=0,
         description="Minimum video duration in seconds to transcribe (shorter videos are skipped)",
     )
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class RaindropIoConfig(BaseModel):
+    """Configuration for the Raindrop.io integration."""
+
+    token: str = Field(..., min_length=1, description="Raindrop.io API token")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class IntegrationsConfig(BaseModel):
+    """Configuration for external service integrations."""
+
+    raindrop_io: RaindropIoConfig = Field(..., description="Raindrop.io integration configuration")
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -296,9 +347,21 @@ class Config:
         if "summarize_transcripts" in self._data:
             self._summarize_transcripts = self._validate_summarize_transcripts()
 
+        # Validate url_clean_content section if present
+        if "url_clean_content" in self._data:
+            self._url_clean_content = self._validate_url_clean_content()
+
         # Validate topics section if present
         if "topics" in self._data:
             self._topics = self._validate_topics()
+
+        # Validate url_processing section if present
+        if "url_processing" in self._data:
+            self._url_processing = self._validate_url_processing()
+
+        # Validate integrations section if present
+        if "integrations" in self._data:
+            self._integrations = self._validate_integrations()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -457,6 +520,14 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Summarize transcripts configuration validation failed: {error_messages}") from e
 
+    def _validate_url_clean_content(self) -> UrlCleanContentConfig:
+        """Validate url_clean_content configuration."""
+        try:
+            return UrlCleanContentConfig.model_validate(self._data["url_clean_content"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"URL clean content configuration validation failed: {error_messages}") from e
+
     def _validate_topics(self) -> TopicsConfig:
         """Validate topics configuration."""
         try:
@@ -464,6 +535,22 @@ class Config:
         except ValidationError as e:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Topics configuration validation failed: {error_messages}") from e
+
+    def _validate_url_processing(self) -> UrlProcessingConfig:
+        """Validate URL processing configuration."""
+        try:
+            return UrlProcessingConfig.model_validate(self._data["url_processing"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"URL processing configuration validation failed: {error_messages}") from e
+
+    def _validate_integrations(self) -> IntegrationsConfig:
+        """Validate integrations configuration."""
+        try:
+            return IntegrationsConfig.model_validate(self._data["integrations"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Integrations configuration validation failed: {error_messages}") from e
 
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
@@ -517,11 +604,33 @@ class Config:
             raise KeyError("Missing required key 'summarize_transcripts' in config file")
         return self._summarize_transcripts
 
+    def get_url_clean_content_config(self) -> UrlCleanContentConfig:
+        """Get URL clean-content configuration."""
+        if not hasattr(self, "_url_clean_content"):
+            raise KeyError("Missing required key 'url_clean_content' in config file")
+        return self._url_clean_content
+
     def get_topics_config(self) -> TopicsConfig:
         """Get topics configuration."""
         if not hasattr(self, "_topics"):
             raise KeyError("Missing required key 'topics' in config file")
         return self._topics
+
+    def get_url_processing_config(self) -> UrlProcessingConfig:
+        """Get URL processing configuration."""
+        if not hasattr(self, "_url_processing"):
+            raise KeyError("Missing required key 'url_processing' in config file")
+        return self._url_processing
+
+    def get_integrations_config(self) -> IntegrationsConfig:
+        """Get integrations configuration."""
+        if not hasattr(self, "_integrations"):
+            raise KeyError("Missing required key 'integrations' in config file")
+        return self._integrations
+
+    def get_raindrop_token(self) -> str:
+        """Get the Raindrop.io API token."""
+        return self.get_integrations_config().raindrop_io.token
 
     def get_encoding_name(self) -> str:
         """Get default tiktoken encoding for token counting."""
@@ -691,6 +800,26 @@ class Config:
             Path object pointing to the reports directory.
         """
         return Path(self._paths.reports_dir)
+
+    def get_url_base_dir(self) -> Path:
+        """Get the URL ingestion base directory under data_dir."""
+        return self.get_data_dir() / self.get_url_processing_config().base_dir
+
+    def get_url_inbox_dir(self) -> Path:
+        """Get the URL inbox directory under the URL ingestion base directory."""
+        return self.get_url_base_dir() / self.get_url_processing_config().inbox_dir
+
+    def get_url_raw_dir(self) -> Path:
+        """Get the URL raw data directory under the URL ingestion base directory."""
+        return self.get_url_base_dir() / self.get_url_processing_config().raw_dir
+
+    def get_url_cleaned_dir(self) -> Path:
+        """Get the URL cleaned content directory under the URL ingestion base directory."""
+        return self.get_url_base_dir() / self.get_url_processing_config().cleaned_dir
+
+    def get_url_test_base_dir(self) -> Path:
+        """Get the URL ingestion test base directory under data_dir."""
+        return self.get_data_dir() / self.get_url_processing_config().test_base_dir
 
     def get_article_compiler_config(self) -> ArticleCompilerConfig:
         """Get article compiler configuration.

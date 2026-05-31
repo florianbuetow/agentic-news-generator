@@ -20,6 +20,13 @@ paths:
   # Model benchmark and visualization paths
   reports_dir: reports
 
+url_processing:
+  base_dir: urls
+  inbox_dir: inbox_urls
+  raw_dir: data_raw
+  cleaned_dir: data_cleaned
+  test_base_dir: .test/urls
+
 channels:
   # Example 1: English channel
   - url: https://www.youtube.com/@ExampleChannel1
@@ -133,8 +140,28 @@ summarize_transcripts:
     max_retries: 3
     retry_delay: 2.0
 
+# URL Clean Content Configuration
+url_clean_content:
+  prompt_template: prompts/format-url-content.md
+  skip_documents_above_context_window_pct: 80
+  llm:
+    model: openai/qwen/qwen3.6-35b-a3b
+    api_base: http://127.0.0.1:1234/v1
+    api_key: lm-studio
+    context_window: 262144
+    max_tokens: 32768
+    temperature: 0.3
+    context_window_threshold: 90
+    max_retries: 3
+    retry_delay: 2.0
+
 # Language Analysis Configuration
 language_analysis:
   # Minimum FastText confidence (0.0-1.0) for a non-English detection to count as non-English.
   # Low-confidence hits (e.g. German proper nouns in English text) are treated as English.
   min_detection_confidence: 0.7
+
+# Integrations Configuration
+integrations:
+  raindrop_io:
+    token: YOUR_RAINDROP_TOKEN_HERE
