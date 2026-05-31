@@ -54,10 +54,11 @@ help:
     @printf "  %-38s %s\n" "help" "Show this help information"
     @echo ""
     @printf "\033[0;33mPipelines:\033[0m\n"
+    @printf "  %-38s %s\n" "pipelines-all" "Run url-all then video-all"
     @printf "  %-38s %s\n" "video-all" "Run the complete video pipeline"
     @printf "  %-38s %s\n" "url-all" "Run the full URL pipeline (fetch, download, clean)"
+    @printf "  %-38s %s\n" "checks-all" "Run all checks and CI"
     @printf "  %-38s %s\n" "maintenance" "Run all read-only data pipeline health checks"
-    @printf "  %-38s %s\n" "all-quiet" "Run the complete pipeline quietly"
     @printf "  %-38s %s\n" "stats [hour|day]" "Show processing status (throttle: once per hour/day)"
     @printf "  %-38s %s\n" "totals [hour|day]" "Show processing status with transcript time totals"
     @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
@@ -117,7 +118,7 @@ help:
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
-    @printf "  %-46s %s\n" "clean-video-files" "Delete all files for a YouTube video ID (interactive). Requires: VIDEO_ID"
+    @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
@@ -195,6 +196,21 @@ video-all:
     @just transcripts-remove-hallucinations
     @just analyze-transcript-languages
     @just summarize-transcripts
+
+# Run all checks and CI
+checks-all:
+    @just clean-empty-files
+    @just check-video-integrity
+    @just filter-videos
+    @just analyze-transcripts-hallucinations
+    @just transcripts-remove-hallucinations
+    @just analyze-transcript-languages
+    @just ci-quiet
+
+# Run url-all then video-all
+pipelines-all:
+    @just url-all
+    @just video-all
 
 # Run the full URL pipeline: fetch bookmarks from Raindrop, download raw content, clean into Markdown
 url-all:
@@ -1002,68 +1018,6 @@ ci-quiet:
     echo ""
 
 # Run the complete pipeline quietly (only show errors and warnings)
-all-quiet:
-    #!/usr/bin/env bash
-    set +e  # Don't exit on error for download-videos
-    echo ""
-    printf "\033[0;34m=== Running Complete Pipeline (Quiet Mode) ===\033[0m\n"
-    TMPFILE=$(mktemp)
-    trap "rm -f $TMPFILE" EXIT
-
-    printf "🚀 Starting ci-quiet...\n"
-    just ci-quiet || exit 1
-    printf "✅ Completed ci-quiet\n"
-
-    printf "🚀 Starting download-videos...\n"
-    if just download-videos > $TMPFILE 2>&1; then
-        printf "✅ Completed download-videos\n"
-    else
-        printf "\033[0;33m⚠ Download-videos failed (continuing...)\033[0m\n"
-        cat $TMPFILE
-    fi
-
-    set -e  # Exit on error for remaining steps
-
-    printf "🚀 Starting check-video-integrity...\n"
-    just check-video-integrity > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Check-video-integrity failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed check-video-integrity\n"
-
-    printf "🚀 Starting filter-videos...\n"
-    just filter-videos > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Filter-videos failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed filter-videos\n"
-
-    printf "🚀 Starting extract-audio...\n"
-    just extract-audio > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Extract-audio failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed extract-audio\n"
-
-    printf "🚀 Starting transcribe...\n"
-    just transcribe > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcribe failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed transcribe\n"
-
-    printf "🚀 Starting archive-videos...\n"
-    just archive-videos > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Archive-videos failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed archive-videos\n"
-
-    printf "🚀 Starting analyze-transcripts-hallucinations...\n"
-    just analyze-transcripts-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Analyze-transcripts-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed analyze-transcripts-hallucinations\n"
-
-    printf "🚀 Starting transcripts-remove-hallucinations...\n"
-    just transcripts-remove-hallucinations > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Transcripts-remove-hallucinations failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed transcripts-remove-hallucinations\n"
-
-    printf "🚀 Starting analyze-transcript-languages...\n"
-    just analyze-transcript-languages > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Analyze-transcript-languages failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed analyze-transcript-languages\n"
-
-    printf "🚀 Starting summarize-transcripts...\n"
-    just summarize-transcripts > $TMPFILE 2>&1 || { printf "\033[0;31m✗ Summarize-transcripts failed\033[0m\n"; cat $TMPFILE; exit 1; }
-    printf "✅ Completed summarize-transcripts\n"
-
-    echo ""
-    printf "\033[0;32m✅ All pipeline steps completed\033[0m\n"
-    echo ""
-
 # Run AI-based CI checks (AI-powered test validation, will grow in the future)
 # This pipeline is separate from regular CI and includes AI-assisted code quality checks
 ci-ai:
