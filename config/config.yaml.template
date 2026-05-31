@@ -161,6 +161,20 @@ language_analysis:
   # Low-confidence hits (e.g. German proper nouns in English text) are treated as English.
   min_detection_confidence: 0.7
 
+# Agentic Unit Test Reviews Configuration
+agentic_unit_test_reviews:
+  llm:
+    model: qwen2.5-7b-instruct-mlx
+    base_url: http://localhost:1234/v1
+    api_key: local
+
+# Agentic Shell Script Reviews Configuration
+agentic_shell_script_reviews:
+  llm:
+    model: qwen2.5-7b-instruct-mlx
+    base_url: http://localhost:1234/v1
+    api_key: local
+
 # Integrations Configuration
 integrations:
   raindrop_io:

@@ -23,10 +23,13 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 import requests
 from autogen_core.models import UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+from src.config import Config
 
 # Configure logging
 logging.basicConfig(
@@ -867,21 +870,6 @@ def main() -> None:
         help="Run specific test phase (default: full)",
     )
     _ = parser.add_argument(
-        "--model",
-        default="qwen2.5-7b-instruct-mlx",
-        help="Model name (default: qwen2.5-7b-instruct-mlx)",
-    )
-    _ = parser.add_argument(
-        "--base-url",
-        default="http://localhost:1234/v1",
-        help="LM Studio base URL (default: http://localhost:1234/v1)",
-    )
-    _ = parser.add_argument(
-        "--api-key",
-        default="local",
-        help="API key (default: local)",
-    )
-    _ = parser.add_argument(
         "--no-cache",
         action="store_true",
         help="Disable hash-based caching (re-scan all files)",
@@ -889,13 +877,20 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    project_root = Path(__file__).resolve().parents[2]
+    config = Config(project_root / "config" / "config.yaml")
+    review_cfg = config.get_agentic_shell_script_reviews_config()
+    model = review_cfg.llm.model
+    base_url = review_cfg.llm.base_url
+    api_key = review_cfg.llm.api_key
+
     # Check API availability for tests that require the model
-    if args.test in ["analyze", "full"] and not check_api_available(args.base_url):
-        print(f"\n⚠️  WARNING: Cannot connect to LLM API at {args.base_url}")
+    if args.test in ["analyze", "full"] and not check_api_available(base_url):
+        print(f"\n⚠️  WARNING: Cannot connect to LLM API at {base_url}")
         print("Please ensure:")
         print("  1. LM Studio (or your LLM server) is running")
         print("  2. The server is accessible at the configured base URL")
-        print(f"  3. The API endpoint {args.base_url}/models is reachable")
+        print(f"  3. The API endpoint {base_url}/models is reachable")
         print("\nCannot run the script without an available model API.")
         sys.exit(2)
 
@@ -905,9 +900,9 @@ def main() -> None:
         elif args.test == "extract":
             test_extract(args.root_path)
         elif args.test == "analyze":
-            test_analyze(args.root_path, args.model, args.base_url, args.api_key)
+            test_analyze(args.root_path, model, base_url, api_key)
         else:
-            run_full_analysis(args.root_path, args.model, args.base_url, args.api_key, not args.no_cache, args.file)
+            run_full_analysis(args.root_path, model, base_url, api_key, not args.no_cache, args.file)
 
     except KeyboardInterrupt:
         print("\n\nInterrupted by user")

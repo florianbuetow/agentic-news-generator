@@ -23,10 +23,13 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 import requests
 from autogen_core.models import UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
+from src.config import Config
 
 # Configure logging
 logging.basicConfig(
@@ -810,21 +813,6 @@ def main():
         help="Run specific test phase (default: full)",
     )
     _ = parser.add_argument(
-        "--model",
-        default="qwen2.5-7b-instruct-mlx",
-        help="Model name (default: qwen2.5-7b-instruct-mlx)",
-    )
-    _ = parser.add_argument(
-        "--base-url",
-        default="http://localhost:1234/v1",
-        help="LM Studio base URL (default: http://localhost:1234/v1)",
-    )
-    _ = parser.add_argument(
-        "--api-key",
-        default="local",
-        help="API key (default: local)",
-    )
-    _ = parser.add_argument(
         "--no-cache",
         action="store_true",
         help="Disable hash-based caching (re-scan all files)",
@@ -832,14 +820,21 @@ def main():
 
     args = parser.parse_args()
 
+    project_root = Path(__file__).resolve().parents[2]
+    config = Config(project_root / "config" / "config.yaml")
+    review_cfg = config.get_agentic_unit_test_reviews_config()
+    model = review_cfg.llm.model
+    base_url = review_cfg.llm.base_url
+    api_key = review_cfg.llm.api_key
+
     # Check API availability for tests that require the model
     if args.test in ["analyze", "full"]:
-        if not check_api_available(args.base_url):
-            print(f"\n⚠️  WARNING: Cannot connect to LLM API at {args.base_url}")
+        if not check_api_available(base_url):
+            print(f"\n⚠️  WARNING: Cannot connect to LLM API at {base_url}")
             print("Please ensure:")
             print("  1. LM Studio (or your LLM server) is running")
             print("  2. The server is accessible at the configured base URL")
-            print(f"  3. The API endpoint {args.base_url}/models is reachable")
+            print(f"  3. The API endpoint {base_url}/models is reachable")
             print("\nCannot run the script without an available model API.")
             sys.exit(2)
 
@@ -893,9 +888,9 @@ def main():
 
             # Analyze first test case
             detector = FakeTestDetector(
-                model=args.model,
-                base_url=args.base_url,
-                api_key=args.api_key,
+                model=model,
+                base_url=base_url,
+                api_key=api_key,
             )
             result = asyncio.run(detector.analyze(test_cases[0]))
             print("\nAnalysis result:")
@@ -908,8 +903,8 @@ def main():
         else:
             # Full detection
             print("=== Fake Unit Test Detector ===")
-            print(f"Model: {args.model}")
-            print(f"Base URL: {args.base_url}")
+            print(f"Model: {model}")
+            print(f"Base URL: {base_url}")
 
             if args.file:
                 print(f"Testing single file: {args.file}")
@@ -920,9 +915,9 @@ def main():
                 # Test single file
                 extractor = TestCaseExtractor()
                 detector = FakeTestDetector(
-                    model=args.model,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
+                    model=model,
+                    base_url=base_url,
+                    api_key=api_key,
                 )
 
                 test_cases = extractor.extract(args.file)
@@ -934,16 +929,16 @@ def main():
                 fake_tests = [f"{r.file_path}:{r.line_number}" for r in fake]
             else:
                 orchestrator = FakeTestOrchestrator(
-                    model=args.model,
-                    base_url=args.base_url,
-                    api_key=args.api_key,
+                    model=model,
+                    base_url=base_url,
+                    api_key=api_key,
                     use_cache=not args.no_cache,
                 )
                 fake_tests, fake, results, test_cases = orchestrator.run(args.root_path)
 
             # Write markdown report
             report_writer = MarkdownReportWriter()
-            report_writer.write_report(fake, test_cases, args.model)
+            report_writer.write_report(fake, test_cases, model)
 
             # Output results summary
             print()

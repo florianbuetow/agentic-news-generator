@@ -172,6 +172,24 @@ class SummarizeTranscriptsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class AgenticReviewLLMConfig(BaseModel):
+    """LLM connection settings for agentic review tools."""
+
+    model: str = Field(..., min_length=1, description="Model name in LM Studio")
+    base_url: str = Field(..., min_length=1, description="LM Studio OpenAI-compatible base URL")
+    api_key: str = Field(..., min_length=1, description="API key (any non-empty string for local LLMs)")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class AgenticReviewConfig(BaseModel):
+    """Configuration for agentic code review tools using a local LLM via Autogen."""
+
+    llm: AgenticReviewLLMConfig = Field(..., description="LLM connection settings")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
 class UrlCleanContentConfig(BaseModel):
     """Configuration for URL raw-content Markdown formatting via LLM."""
 
@@ -327,39 +345,37 @@ class Config:
         """
         self.config_path = Path(config_path)
         self._load(config_path)
-
-        # Validate paths section (required)
         self._paths = self._validate_paths()
+        self._validate_optional_sections()
 
-        # Validate topic_segmentation section if present
+    def _validate_optional_sections(self) -> None:
+        """Validate all optional config sections that are present."""
+        self._validate_pipeline_sections()
+        self._validate_tool_sections()
+
+    def _validate_pipeline_sections(self) -> None:
+        """Validate optional pipeline-related config sections."""
         if "topic_segmentation" in self._data:
             self._topic_segmentation = self._validate_topic_segmentation()
-
-        # Validate transcription section if present
         if "transcription" in self._data:
             self._transcription = self._validate_transcription()
-
-        # Validate topics_experiment section if present
         if "topics_experiment" in self._data:
             self._topics_experiment = self._validate_topics_experiment()
-
-        # Validate summarize_transcripts section if present
         if "summarize_transcripts" in self._data:
             self._summarize_transcripts = self._validate_summarize_transcripts()
-
-        # Validate url_clean_content section if present
         if "url_clean_content" in self._data:
             self._url_clean_content = self._validate_url_clean_content()
-
-        # Validate topics section if present
         if "topics" in self._data:
             self._topics = self._validate_topics()
-
-        # Validate url_processing section if present
         if "url_processing" in self._data:
             self._url_processing = self._validate_url_processing()
 
-        # Validate integrations section if present
+    def _validate_tool_sections(self) -> None:
+        """Validate optional tool-related config sections."""
+        if "agentic_unit_test_reviews" in self._data:
+            self._agentic_unit_test_reviews = self._validate_agentic_review("agentic_unit_test_reviews")
+        if "agentic_shell_script_reviews" in self._data:
+            self._agentic_shell_script_reviews = self._validate_agentic_review("agentic_shell_script_reviews")
         if "integrations" in self._data:
             self._integrations = self._validate_integrations()
 
@@ -544,6 +560,14 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"URL processing configuration validation failed: {error_messages}") from e
 
+    def _validate_agentic_review(self, key: str) -> AgenticReviewConfig:
+        """Validate an agentic review configuration section."""
+        try:
+            return AgenticReviewConfig.model_validate(self._data[key])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"{key} configuration validation failed: {error_messages}") from e
+
     def _validate_integrations(self) -> IntegrationsConfig:
         """Validate integrations configuration."""
         try:
@@ -621,6 +645,18 @@ class Config:
         if not hasattr(self, "_url_processing"):
             raise KeyError("Missing required key 'url_processing' in config file")
         return self._url_processing
+
+    def get_agentic_unit_test_reviews_config(self) -> AgenticReviewConfig:
+        """Get agentic unit test reviews configuration."""
+        if not hasattr(self, "_agentic_unit_test_reviews"):
+            raise KeyError("Missing required key 'agentic_unit_test_reviews' in config file")
+        return self._agentic_unit_test_reviews
+
+    def get_agentic_shell_script_reviews_config(self) -> AgenticReviewConfig:
+        """Get agentic shell script reviews configuration."""
+        if not hasattr(self, "_agentic_shell_script_reviews"):
+            raise KeyError("Missing required key 'agentic_shell_script_reviews' in config file")
+        return self._agentic_shell_script_reviews
 
     def get_integrations_config(self) -> IntegrationsConfig:
         """Get integrations configuration."""

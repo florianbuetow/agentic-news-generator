@@ -59,7 +59,7 @@ def collect_required_models(config: _Cfg) -> list[RequiredModel]:
                 )
             )
 
-    for top_key in ("summarize_transcripts", "topic_boundaries"):
+    for top_key in ("summarize_transcripts", "topic_boundaries", "url_clean_content"):
         llm = _sub(_sub(config, top_key), "llm")
         if llm.get("api_base"):
             models.append(
@@ -67,6 +67,18 @@ def collect_required_models(config: _Cfg) -> list[RequiredModel]:
                     section=f"{top_key}.llm",
                     model=str(llm["model"]),
                     api_base=str(llm["api_base"]),
+                )
+            )
+
+    for top_key in ("agentic_unit_test_reviews", "agentic_shell_script_reviews"):
+        llm = _sub(_sub(config, top_key), "llm")
+        api_base = llm.get("base_url") or llm.get("api_base")
+        if api_base:
+            models.append(
+                RequiredModel(
+                    section=f"{top_key}.llm",
+                    model=str(llm["model"]),
+                    api_base=str(api_base),
                 )
             )
 
@@ -87,6 +99,11 @@ def _fetch_json(url: str) -> dict[str, Any] | None:
 def _strip_v1(api_base: str) -> str:
     base = api_base.rstrip("/")
     return base[:-3] if base.endswith("/v1") else base
+
+
+def _canonical_base(api_base: str) -> str:
+    """Normalize URL so localhost and 127.0.0.1 at the same port group together."""
+    return api_base.replace("localhost", "127.0.0.1")
 
 
 @dataclass(frozen=True)
@@ -135,58 +152,47 @@ def _yn(flag: bool) -> str:
     return f"{_GREEN}yes{_RESET}" if flag else f"{_RED}-{_RESET}"
 
 
-def _print_table(rows: list[tuple[str, bool, bool]], col_model_w: int) -> None:
-    """Print ASCII table. rows = (model, available, loaded)."""
-    c1 = col_model_w
+def _print_table(rows: list[tuple[str, str, bool, bool]]) -> None:
+    """Print ASCII table. rows = (section, model, available, loaded)."""
+    c0 = max((len(s) for s, _, _, _ in rows), default=10)
+    c0 = max(c0, 10)  # "Config Key"
+    c1 = max((len(m) for _, m, _, _ in rows), default=5)
+    c1 = max(c1, 5)  # "Model"
     c2 = 9  # "Available"
     c3 = 6  # "Loaded"
 
-    top = f"┌{'─' * (c1 + 2)}┬{'─' * (c2 + 2)}┬{'─' * (c3 + 2)}┐"
-    sep = f"├{'─' * (c1 + 2)}┼{'─' * (c2 + 2)}┼{'─' * (c3 + 2)}┤"
-    bottom = f"└{'─' * (c1 + 2)}┴{'─' * (c2 + 2)}┴{'─' * (c3 + 2)}┘"
+    top = f"┌{'─' * (c0 + 2)}┬{'─' * (c1 + 2)}┬{'─' * (c2 + 2)}┬{'─' * (c3 + 2)}┐"
+    sep = f"├{'─' * (c0 + 2)}┼{'─' * (c1 + 2)}┼{'─' * (c2 + 2)}┼{'─' * (c3 + 2)}┤"
+    bottom = f"└{'─' * (c0 + 2)}┴{'─' * (c1 + 2)}┴{'─' * (c2 + 2)}┴{'─' * (c3 + 2)}┘"
 
-    def row(m: str, a: str, ld: str) -> str:
-        return f"│ {_cell(m, c1)} │ {_cell(a, c2, '^')} │ {_cell(ld, c3, '^')} │"
-
-    header_model = f"{_BOLD}Model{_RESET}"
-    header_avail = f"{_BOLD}Available{_RESET}"
-    header_loaded = f"{_BOLD}Loaded{_RESET}"
+    def row(sec: str, m: str, a: str, ld: str) -> str:
+        return f"│ {_cell(sec, c0)} │ {_cell(m, c1)} │ {_cell(a, c2, '^')} │ {_cell(ld, c3, '^')} │"
 
     print(top)
-    print(row(header_model, header_avail, header_loaded))
+    print(row(f"{_BOLD}Config Key{_RESET}", f"{_BOLD}Model{_RESET}", f"{_BOLD}Available{_RESET}", f"{_BOLD}Loaded{_RESET}"))
     print(sep)
-    for model, avail, loaded in rows:
-        print(row(model, _yn(avail), _yn(loaded)))
+    for section, model, avail, loaded in rows:
+        print(row(section, model, _yn(avail), _yn(loaded)))
     print(bottom)
 
 
-def _check_base(api_base: str, entries: list[RequiredModel]) -> bool:
+def _check_base(api_base: str, entries: list[RequiredModel]) -> tuple[bool, list[tuple[str, str, bool, bool]]]:
     print(f"\n  LM Studio: {api_base}")
 
     index = get_model_index(api_base)
     if index is None:
         print(f"  {_RED}FAIL{_RESET}  Server not reachable at {api_base}")
-        return False
+        return False, []
 
     print(f"  {_GREEN}OK{_RESET}    Server is running")
 
-    required_models: dict[str, list[str]] = {}
-    for entry in entries:
-        required_models.setdefault(entry.model, []).append(entry.section)
+    rows: list[tuple[str, str, bool, bool]] = []
+    for entry in sorted(entries, key=lambda e: e.section):
+        avail = _model_matches(entry.model, index.available)
+        loaded = _model_matches(entry.model, index.loaded)
+        rows.append((entry.section, entry.model, avail, loaded))
 
-    rows: list[tuple[str, bool, bool]] = []
-    for model in sorted(required_models):
-        avail = _model_matches(model, index.available)
-        loaded = _model_matches(model, index.loaded)
-        rows.append((model, avail, loaded))
-
-    col_w = max(len(model) for model, _, _ in rows)
-    col_w = max(col_w, 5)
-
-    print()
-    _print_table(rows, col_w)
-
-    return all(avail for _, avail, _ in rows)
+    return all(avail for _, _, avail, _ in rows), rows
 
 
 def main() -> int:
@@ -205,9 +211,19 @@ def main() -> int:
 
     bases: dict[str, list[RequiredModel]] = {}
     for rm in required:
-        bases.setdefault(rm.api_base, []).append(rm)
+        bases.setdefault(_canonical_base(rm.api_base), []).append(rm)
 
-    all_ok = all(_check_base(api_base, entries) for api_base, entries in sorted(bases.items()))
+    all_ok = True
+    all_rows: list[tuple[str, str, bool, bool]] = []
+    for api_base, entries in sorted(bases.items()):
+        ok, rows = _check_base(api_base, entries)
+        if not ok:
+            all_ok = False
+        all_rows.extend(rows)
+
+    if all_rows:
+        print()
+        _print_table(all_rows)
 
     print()
     if not all_ok:
