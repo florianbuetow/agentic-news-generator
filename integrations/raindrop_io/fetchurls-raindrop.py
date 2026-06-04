@@ -32,9 +32,12 @@ def fetch_collection_map(token: str) -> dict[int, tuple[str, int | None]]:
     collection_map: dict[int, tuple[str, int | None]] = {}
 
     for endpoint in (f"{RAINDROP_API_BASE}/collections", f"{RAINDROP_API_BASE}/collections/childrens"):
+        print(f"Fetching collections endpoint: {endpoint}", flush=True)
         response = requests.get(endpoint, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
-        for item in response.json().get("items", []):
+        items = response.json().get("items", [])
+        print(f"  found {len(items)} collection(s)", flush=True)
+        for item in items:
             collection_id = item.get("_id")
             if collection_id is None:
                 continue
@@ -56,6 +59,7 @@ def fetch_all_raindrops(token: str) -> tuple[list[tuple[int, str]], list[str]]:
 
     for page in range(MAX_PAGES):
         try:
+            print(f"Fetching raindrops page {page + 1}...", flush=True)
             response = requests.get(
                 endpoint,
                 headers=headers,
@@ -70,8 +74,11 @@ def fetch_all_raindrops(token: str) -> tuple[list[tuple[int, str]], list[str]]:
 
         if expected_count is None:
             expected_count = payload.get("count")
+            if expected_count is not None:
+                print(f"Raindrop reported {expected_count} bookmark(s)", flush=True)
 
         items = payload.get("items", [])
+        print(f"  page {page + 1}: {len(items)} bookmark(s)", flush=True)
         if not items:
             break
 
@@ -135,6 +142,7 @@ def main() -> int:
     config_path = project_root / "config" / "config.yaml"
 
     try:
+        print(f"Loading config: {config_path}", flush=True)
         config = Config(config_path)
         token = config.get_raindrop_token()
         inbox_dir = config.get_url_inbox_dir()
@@ -146,13 +154,17 @@ def main() -> int:
     if not inbox_dir.is_dir():
         print(f"Error: configured URL inbox folder does not exist: {inbox_dir}", file=sys.stderr)
         return 1
+    print(f"URL inbox directory: {inbox_dir}", flush=True)
 
     try:
+        print("Fetching Raindrop collection map...", flush=True)
         collection_map = fetch_collection_map(token)
     except requests.RequestException as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
+    print(f"Mapped {len(collection_map)} collection(s)", flush=True)
 
+    print("Fetching Raindrop bookmarks...", flush=True)
     raindrops, failures = fetch_all_raindrops(token)
 
     # Do not publish a partial file into the ingestion inbox when any page failed.
@@ -166,8 +178,10 @@ def main() -> int:
     lines = sorted(f"{resolve_folder_path(collection_id, collection_map)}:{link}" for collection_id, link in raindrops)
 
     output_path = resolve_output_path(inbox_dir, date.today())
+    print(f"Writing inbox file: {output_path}", flush=True)
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
+    print("\nSummary:")
     print(f"raindrops_fetched: {len(raindrops)}")
     print(f"collections_mapped: {len(collection_map)}")
     print(f"lines_written: {len(lines)}")

@@ -69,6 +69,7 @@ def test_queue_reader_merges_deduplicates_sorts_and_counts_urls(tmp_path: Path) 
     inbox_dir = config.get_url_inbox_dir()
     inbox_dir.mkdir(parents=True)
     (inbox_dir / "done").mkdir()
+    (inbox_dir / "failures").mkdir()
     (inbox_dir / "unprocessed").mkdir()
 
     (inbox_dir / "list_b.txt").write_text(
@@ -88,38 +89,40 @@ def test_queue_reader_merges_deduplicates_sorts_and_counts_urls(tmp_path: Path) 
             [
                 "example.com/c.pdf",
                 " https://example.com/b.html ",
-                "https://example.com/search?q=ignored",
+                "https://example.com/image.png",
             ]
         ),
         encoding="utf-8",
     )
     (inbox_dir / "done" / "ignored.txt").write_text("https://example.com/done\n", encoding="utf-8")
+    (inbox_dir / "failures" / "ignored.txt").write_text("https://example.com/failure\n", encoding="utf-8")
     (inbox_dir / "unprocessed" / "ignored.txt").write_text("https://example.com/unprocessed\n", encoding="utf-8")
 
     summary = make_reader(config).read_queue()
 
     assert summary.total_url_lines_read == 6
-    assert summary.unique_normalized_url_count == 2
+    assert summary.unique_normalized_url_count == 4
     assert summary.duplicate_url_entry_count == 2
     assert summary.unique_urls == (
+        "http://example.com/c.pdf",
         "https://example.com/a",
         "https://example.com/b.html",
+        "https://example.com/image.png",
     )
     assert summary.type_counts == {
-        "pdf": 0,
-        "html": 1,
+        "pdf": 1,
+        "html": 2,
         "markdown": 0,
         "text": 0,
         "unknown": 1,
     }
     assert [queued_url.sanitized_url_stem for queued_url in summary.queued_urls] == [
+        "http_example_com_c_pdf",
         "https_example_com_a",
         "https_example_com_b_html",
+        "https_example_com_image_png",
     ]
-    assert [(unprocessable.original_url, unprocessable.reason) for unprocessable in summary.unprocessable_urls] == [
-        ("example.com/c.pdf", "line does not contain an http URL"),
-        ("https://example.com/search?q=ignored", "URL contains a query string"),
-    ]
+    assert summary.unprocessable_urls == ()
     assert not config.get_url_raw_dir().exists()
     assert not config.get_url_cleaned_dir().exists()
 
@@ -149,10 +152,15 @@ def test_queue_reader_extracts_url_from_category_prefixed_lines(tmp_path: Path) 
         "https://example.com/a.html",
         "https://example.com/c",
     )
+    assert [(queued_url.normalized_url, queued_url.source_line) for queued_url in summary.queued_urls] == [
+        ("http://example.com/b.pdf", "Unsorted:http://example.com/b.pdf"),
+        ("https://example.com/a.html", "AI Engineering->LLM Evals:https://example.com/a.html"),
+        ("https://example.com/c", "https://example.com/c"),
+    ]
 
 
-def test_queue_reader_rejects_lines_without_an_http_url(tmp_path: Path) -> None:
-    """Reject inbox lines that contain no http URL and record them as errors."""
+def test_queue_reader_accepts_bare_urls_and_rejects_invalid_lines(tmp_path: Path) -> None:
+    """Let the normalizer add a scheme for bare URLs and reject invalid lines."""
     data_dir = tmp_path / "data"
     config = write_config(tmp_path / "config.yaml", data_dir)
     inbox_dir = config.get_url_inbox_dir()
@@ -170,10 +178,9 @@ def test_queue_reader_rejects_lines_without_an_http_url(tmp_path: Path) -> None:
 
     summary = make_reader(config).read_queue()
 
-    assert summary.unique_urls == ("https://example.com/a.html",)
+    assert summary.unique_urls == ("http://example.com/no-scheme", "https://example.com/a.html")
     assert [(unprocessable.original_url, unprocessable.reason) for unprocessable in summary.unprocessable_urls] == [
-        ("example.com/no-scheme", "line does not contain an http URL"),
-        ("Some Category:not-a-url", "line does not contain an http URL"),
+        ("Some Category:not-a-url", "URL contains whitespace"),
     ]
 
 

@@ -40,12 +40,11 @@ class UrlNormalizer:
             return UnprocessableUrl(original_url=original_url, reason="URL is missing a host")
         if not self._is_valid_host(split_url.hostname):
             return UnprocessableUrl(original_url=original_url, reason="URL host is not valid")
-        if split_url.query:
-            return UnprocessableUrl(original_url=original_url, reason="URL contains a query string")
         if not self._has_valid_port(split_url):
             return UnprocessableUrl(original_url=original_url, reason="URL port is not valid")
 
         normalized_split = self._normalize_split_url(split_url)
+        normalized_split = self._normalize_arxiv_pdf_url(normalized_split)
         return NormalizedUrl(original_url=original_url, normalized_url=urlunsplit(normalized_split))
 
     def _ensure_scheme(self, raw_url: str) -> str:
@@ -66,13 +65,33 @@ class UrlNormalizer:
         if split_url.port is not None:
             normalized_netloc = f"{normalized_host}:{split_url.port}"
 
+        path = "" if split_url.path == "/" else split_url.path
         return SplitResult(
             scheme=split_url.scheme.lower(),
             netloc=normalized_netloc,
-            path=split_url.path,
+            path=path,
             query=split_url.query,
-            fragment=split_url.fragment,
+            fragment="",
         )
+
+    def _normalize_arxiv_pdf_url(self, split_url: SplitResult) -> SplitResult:
+        """Convert arXiv abstract URLs to direct PDF URLs."""
+        hostname = split_url.hostname
+        if hostname is None:
+            hostname = ""
+        normalized_hostname = hostname.lower().removeprefix("www.")
+        if normalized_hostname != "arxiv.org":
+            return split_url
+
+        split_url = split_url._replace(netloc="arxiv.org")
+        path = split_url.path
+        if path.startswith("/abs/"):
+            arxiv_id = path.removeprefix("/abs/").rstrip("/")
+            return split_url._replace(path=f"/pdf/{arxiv_id}.pdf")
+        if path.startswith("/pdf/") and not path.lower().endswith(".pdf"):
+            arxiv_id = path.removeprefix("/pdf/").rstrip("/")
+            return split_url._replace(path=f"/pdf/{arxiv_id}.pdf")
+        return split_url
 
     def _is_valid_host(self, hostname: str) -> bool:
         """Validate the minimal host shape needed to reject plain text inputs."""

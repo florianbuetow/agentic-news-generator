@@ -10,6 +10,7 @@ from src.url_ingestion.downloader import DownloaderFactory, UnsupportedUrlTypeEr
 from src.url_ingestion.metadata import Metadata, MetadataHelper
 from src.url_ingestion.normalizer import UnprocessableUrl
 from src.url_ingestion.queue_reader import InboxFileSnapshot, QueuedUrl, UrlQueueSummary
+from src.url_ingestion.reachability import ReachabilityProbe
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class UrlDownloadRunSummary:
     queue_summary: UrlQueueSummary
     successful_download_count: int
     skipped_download_count: int
+    unprocessed_count: int
     failure_count: int
     failures: tuple[UrlDownloadFailure, ...]
 
@@ -43,9 +45,9 @@ class InboxArchive:
         """Append a successful original URL to today's done archive."""
         self._append_line("done", original_url)
 
-    def append_unprocessed(self, original_url: str, reason: str) -> None:
-        """Append an unprocessed original URL and reason to today's archive."""
-        self._append_line("unprocessed", f"{original_url}\t{reason}")
+    def append_unprocessed(self, source_line: str, reason: str) -> None:
+        """Append an unprocessed source inbox line and reason to today's archive."""
+        self._append_line("unprocessed", f"{source_line}\t{reason}")
 
     def remove_unchanged_files(self, snapshots: tuple[InboxFileSnapshot, ...]) -> None:
         """Remove consumed inbox files only when their content hash is unchanged."""
@@ -82,23 +84,31 @@ class UrlDownloadPipeline:
         config: Config,
         downloader_factory: DownloaderFactory,
         archive: InboxArchive,
+        reachability_probe: ReachabilityProbe | None,
     ) -> None:
         """Initialize the URL download pipeline."""
         self._config = config
         self._downloader_factory = downloader_factory
         self._archive = archive
+        self._reachability_probe = reachability_probe
 
     def run(self, queue_summary: UrlQueueSummary) -> UrlDownloadRunSummary:
         """Run downloads for a prepared queue summary."""
         failures: list[UrlDownloadFailure] = []
         successful_download_count = 0
         skipped_download_count = 0
+        unprocessed_count = 0
 
         for unprocessable_url in queue_summary.unprocessable_urls:
-            failure = self._record_unprocessable(unprocessable_url)
-            failures.append(failure)
+            self._record_unprocessable(unprocessable_url)
+            unprocessed_count += 1
+            self._emit(f"unprocessable: {unprocessable_url.original_url} | {unprocessable_url.reason}")
 
-        for queued_url in queue_summary.queued_urls:
+        total_queued = len(queue_summary.queued_urls)
+        if total_queued == 0:
+            self._emit("No queued URLs to download.")
+        for index, queued_url in enumerate(queue_summary.queued_urls, start=1):
+            self._emit(f"[{index}/{total_queued}] {queued_url.classified_type}: {queued_url.normalized_url}")
             try:
                 downloader = self._downloader_factory.create(queued_url.classified_type)
                 download_result = downloader.download(queued_url)
@@ -110,29 +120,54 @@ class UrlDownloadPipeline:
                     skipped_download_count += 1
                 else:
                     successful_download_count += 1
+                if download_result.http_status is not None:
+                    self._emit(f"  http_status: {download_result.http_status}")
+                if download_result.final_url and download_result.final_url != queued_url.normalized_url:
+                    self._emit(f"  final_url: {download_result.final_url}")
+                self._emit(f"  raw_bytes: {download_result.raw_path.stat().st_size}")
+                self._emit(f"  {download_result.status}: {download_result.raw_path}")
             except UnsupportedUrlTypeError as exc:
-                failure = UrlDownloadFailure(original_url=queued_url.original_url, reason=str(exc))
-                failures.append(failure)
-                self._archive.append_unprocessed(queued_url.original_url, failure.reason)
+                unprocessed_count += 1
+                source_line = self._failure_source_line(queued_url)
+                self._archive.append_unprocessed(source_line, str(exc))
+                self._emit(f"  unprocessed: {exc}")
             except Exception as exc:
-                failure = UrlDownloadFailure(original_url=queued_url.original_url, reason=str(exc))
+                reason = self._failure_reason_with_reachability(queued_url, str(exc))
+                failure = UrlDownloadFailure(original_url=self._failure_source_line(queued_url), reason=reason)
                 failures.append(failure)
-                self._archive.append_unprocessed(queued_url.original_url, failure.reason)
+                self._archive.append_unprocessed(failure.original_url, failure.reason)
+                self._emit(f"  failed: {failure.reason}")
 
         self._archive.remove_unchanged_files(queue_summary.inbox_file_snapshots)
         return UrlDownloadRunSummary(
             queue_summary=queue_summary,
             successful_download_count=successful_download_count,
             skipped_download_count=skipped_download_count,
+            unprocessed_count=unprocessed_count,
             failure_count=len(failures),
             failures=tuple(failures),
         )
+
+    def _emit(self, message: str) -> None:
+        """Report URL download progress."""
+        print(message, flush=True)
 
     def _record_unprocessable(self, unprocessable_url: UnprocessableUrl) -> UrlDownloadFailure:
         """Record one normalization or collision failure."""
         failure = UrlDownloadFailure(original_url=unprocessable_url.original_url, reason=unprocessable_url.reason)
         self._archive.append_unprocessed(unprocessable_url.original_url, unprocessable_url.reason)
         return failure
+
+    def _failure_source_line(self, queued_url: QueuedUrl) -> str:
+        """Return the pre-normalization inbox line to archive for failures."""
+        return queued_url.source_line or queued_url.original_url
+
+    def _failure_reason_with_reachability(self, queued_url: QueuedUrl, reason: str) -> str:
+        """Append curl-style reachability context after a download failure."""
+        if self._reachability_probe is None:
+            return reason
+        diagnostic = self._reachability_probe.check(queued_url.normalized_url)
+        return f"{reason} | {diagnostic.summary()}"
 
     def _save_metadata(
         self,

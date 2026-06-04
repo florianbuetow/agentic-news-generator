@@ -154,6 +154,7 @@ url_clean_content:
     context_window_threshold: 90
     max_retries: 3
     retry_delay: 2.0
+    request_timeout_seconds: 600.0
 
 # Language Analysis Configuration
 language_analysis:

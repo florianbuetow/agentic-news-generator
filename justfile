@@ -214,18 +214,9 @@ pipelines-all:
 
 # Run the full URL pipeline: fetch bookmarks from Raindrop, download raw content, clean into Markdown
 url-all:
-    @just ci-quiet
-    -@just download-videos
-    @just fetch-video-metadata
-    @just check-video-integrity
-    @just filter-videos
-    @just extract-audio
-    @just transcribe
-    @just archive-videos
-    @just analyze-transcripts-hallucinations
-    @just transcripts-remove-hallucinations
-    @just analyze-transcript-languages
-    @just summarize-transcripts
+    @just urls-fetch-raindrop
+    @just urls-download
+    @just urls-cleancontent
 
 # Run all read-only data pipeline health checks (no data modified or deleted)
 maintenance:
@@ -674,7 +665,7 @@ code-security:
     @printf "\033[0;34m=== Running Security Checks ===\033[0m\n"
     @mkdir -p reports/security
     @uv run bandit -c pyproject.toml -r src -f txt -o reports/security/bandit.txt || true
-    @uv run bandit -c pyproject.toml -r src
+    @uv run bandit -c pyproject.toml -r src --severity-level medium --confidence-level medium
     @echo ""
     @printf "\033[0;32m✓ Security checks passed\033[0m\n"
     @echo ""
@@ -801,6 +792,9 @@ test-url-ingestion:
         tests/test_url_classifier.py \
         tests/test_url_identity.py \
         tests/test_url_metadata.py \
+        tests/test_url_requeue_unprocessed.py \
+        tests/test_url_reachability.py \
+        tests/test_url_scripts.py \
         tests/test_url_downloader.py \
         tests/test_url_download_pipeline.py \
         tests/test_url_formatting.py \

@@ -1,7 +1,7 @@
 """Configuration loader for the Agentic News Generator."""
 
 from pathlib import Path
-from typing import Any, cast
+from typing import Annotated, Any, cast
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -125,6 +125,10 @@ class LLMConfig(BaseModel):
     )
     max_retries: int = Field(..., gt=0, description="Number of retries on LLM parsing errors")
     retry_delay: float = Field(..., gt=0, description="Delay in seconds between retries")
+    request_timeout_seconds: Annotated[
+        float | None,
+        Field(gt=0, description="Optional LLM request timeout in seconds; None lets the client/provider decide"),
+    ] = None
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

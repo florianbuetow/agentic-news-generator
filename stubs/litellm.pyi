@@ -24,7 +24,7 @@ def completion(
     api_base: str | None,
     temperature: float,
     max_tokens: int,
-    timeout: int | None = None,
+    timeout: float | None = None,
     stream: bool | None = None,
     response_format: Mapping[str, object] | None = None,
 ) -> ModelResponse: ...

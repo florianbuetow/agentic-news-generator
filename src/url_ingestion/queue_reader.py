@@ -26,6 +26,7 @@ class QueuedUrl:
     normalized_url: str
     sanitized_url_stem: str
     classified_type: UrlContentType
+    source_line: str = ""
 
 
 @dataclass(frozen=True)
@@ -63,24 +64,24 @@ class UrlInboxQueueReader:
 
         normalized_urls: list[str] = []
         normalized_results_by_url: dict[str, NormalizedUrl] = {}
+        source_lines_by_url: dict[str, str] = {}
         unprocessable_urls: list[UnprocessableUrl] = []
         for url_line in url_lines:
-            if "http" not in url_line.lower():
-                unprocessable_urls.append(UnprocessableUrl(original_url=url_line, reason="line does not contain an http URL"))
-                continue
-            normalized_result = self._normalizer.normalize(url_line)
+            extracted_url = self._extract_url(url_line)
+            normalized_result = self._normalizer.normalize(extracted_url)
             if isinstance(normalized_result, NormalizedUrl):
                 normalized_urls.append(normalized_result.normalized_url)
                 if normalized_result.normalized_url not in normalized_results_by_url:
                     normalized_results_by_url[normalized_result.normalized_url] = normalized_result
+                    source_lines_by_url[normalized_result.normalized_url] = url_line
             else:
-                unprocessable_urls.append(normalized_result)
+                unprocessable_urls.append(UnprocessableUrl(original_url=url_line, reason=normalized_result.reason))
 
         unique_urls = tuple(sorted(set(normalized_urls)))
         total_url_lines_read = len(url_lines)
         unique_normalized_url_count = len(unique_urls)
         duplicate_url_entry_count = len(normalized_urls) - unique_normalized_url_count
-        queued_urls, collision_failures = self._build_queued_urls(unique_urls, normalized_results_by_url)
+        queued_urls, collision_failures = self._build_queued_urls(unique_urls, normalized_results_by_url, source_lines_by_url)
         unprocessable_urls.extend(collision_failures)
         type_counts = self._count_url_types(queued_urls)
 
@@ -125,7 +126,7 @@ class UrlInboxQueueReader:
             for line in handle:
                 stripped_line = line.strip()
                 if stripped_line:
-                    url_lines.append(self._extract_url(stripped_line))
+                    url_lines.append(stripped_line)
         return tuple(url_lines)
 
     def _extract_url(self, line: str) -> str:
@@ -147,6 +148,7 @@ class UrlInboxQueueReader:
         self,
         unique_urls: tuple[str, ...],
         normalized_results_by_url: dict[str, NormalizedUrl],
+        source_lines_by_url: dict[str, str],
     ) -> tuple[tuple[QueuedUrl, ...], tuple[UnprocessableUrl, ...]]:
         """Build queued URL records and detect sanitized-stem collisions."""
         stem_to_urls: dict[str, list[str]] = {}
@@ -162,7 +164,7 @@ class UrlInboxQueueReader:
             if len(stem_to_urls[sanitized_stem]) > 1:
                 collision_failures.append(
                     UnprocessableUrl(
-                        original_url=normalized_result.original_url,
+                        original_url=source_lines_by_url[unique_url],
                         reason=f"sanitized URL stem collision: {sanitized_stem}",
                     )
                 )
@@ -173,6 +175,7 @@ class UrlInboxQueueReader:
                     normalized_url=unique_url,
                     sanitized_url_stem=sanitized_stem,
                     classified_type=self._classifier.classify(unique_url),
+                    source_line=source_lines_by_url[unique_url],
                 )
             )
         return tuple(queued_urls), tuple(collision_failures)

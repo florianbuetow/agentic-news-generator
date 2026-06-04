@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 import requests
 from playwright.sync_api import sync_playwright
@@ -10,6 +10,10 @@ from playwright.sync_api import sync_playwright
 from src.config import Config
 from src.url_ingestion.classifier import UrlContentType
 from src.url_ingestion.queue_reader import QueuedUrl
+
+CONTENT_FETCH_TIMEOUT_SECONDS: int = 10
+HtmlRenderWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
+HTML_RENDER_WAIT_UNTIL: HtmlRenderWaitUntil = "load"
 
 
 class UnsupportedUrlTypeError(ValueError):
@@ -96,6 +100,10 @@ class HtmlRenderer(Protocol):
 class PlaywrightHtmlRenderer:
     """Playwright-backed HTML renderer."""
 
+    def __init__(self) -> None:
+        """Initialize the renderer with a hard content-fetch timeout."""
+        self._timeout_ms = CONTENT_FETCH_TIMEOUT_SECONDS * 1000
+
     def render(self, url: str) -> RenderedHtml:
         """Render HTML in headless browser mode and return the document element HTML."""
         user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -111,7 +119,7 @@ class PlaywrightHtmlRenderer:
                     },
                 )
                 page = context.new_page()
-                response = page.goto(url, wait_until="networkidle")
+                response = page.goto(url, wait_until=HTML_RENDER_WAIT_UNTIL, timeout=self._timeout_ms)
                 html = page.evaluate("document.documentElement.outerHTML")
                 final_url = page.url
                 http_status = response.status if response is not None else None
@@ -139,7 +147,7 @@ class PdfDownloader:
             response = self._http_client.get(
                 queued_url.normalized_url,
                 headers=self._browser_headers(),
-                timeout=60,
+                timeout=CONTENT_FETCH_TIMEOUT_SECONDS,
                 allow_redirects=True,
             )
             response.raise_for_status()
@@ -179,6 +187,67 @@ class PdfDownloader:
         return raw_path.is_file() and raw_path.stat().st_size > 0
 
 
+class TextDocumentDownloader:
+    """Download text-like document URLs to the configured raw folders."""
+
+    def __init__(self, config: Config, http_client: HttpClient, classified_type: Literal["markdown", "text"]) -> None:
+        """Initialize the text document downloader."""
+        self._config = config
+        self._http_client = http_client
+        self._classified_type = classified_type
+
+    def download(self, queued_url: QueuedUrl) -> DownloadResult:
+        """Download one text-like URL or skip an existing non-empty raw file."""
+        raw_path = self.expected_raw_path(queued_url)
+        if self._is_non_empty_file(raw_path):
+            return DownloadResult(raw_path=raw_path, final_url=queued_url.normalized_url, http_status=None, status="skipped_existing")
+
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            response = self._http_client.get(
+                queued_url.normalized_url,
+                headers=self._browser_headers(),
+                timeout=CONTENT_FETCH_TIMEOUT_SECONDS,
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise UrlDownloadError(f"{self._classified_type} download failed for {queued_url.normalized_url}: {exc}") from exc
+
+        raw_path.write_bytes(response.content)
+        self._validate_raw_file(raw_path)
+        return DownloadResult(
+            raw_path=raw_path,
+            final_url=response.url,
+            http_status=response.status_code,
+            status="downloaded",
+        )
+
+    def expected_raw_path(self, queued_url: QueuedUrl) -> Path:
+        """Return the expected raw text document output path."""
+        suffix = ".md" if self._classified_type == "markdown" else ".txt"
+        return self._config.get_url_raw_dir() / self._classified_type / f"{queued_url.sanitized_url_stem}{suffix}"
+
+    def _browser_headers(self) -> dict[str, str]:
+        """Return browser-like headers for text downloads."""
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/markdown,text/plain,text/*,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+
+    def _validate_raw_file(self, raw_path: Path) -> None:
+        """Validate the raw text output exists and is non-empty."""
+        if not self._is_non_empty_file(raw_path):
+            raise UrlDownloadError(f"{self._classified_type} download produced an empty or missing file: {raw_path}")
+
+    def _is_non_empty_file(self, raw_path: Path) -> bool:
+        """Return whether a raw output file already exists and is non-empty."""
+        return raw_path.is_file() and raw_path.stat().st_size > 0
+
+
 class HtmlDownloader:
     """Download rendered HTML URLs to the configured raw HTML folder."""
 
@@ -194,6 +263,8 @@ class HtmlDownloader:
             return DownloadResult(raw_path=raw_path, final_url=queued_url.normalized_url, http_status=None, status="skipped_existing")
 
         rendered_html = self._renderer.render(queued_url.normalized_url)
+        if rendered_html.http_status is not None and rendered_html.http_status >= 400:
+            raise UrlDownloadError(f"HTML download returned HTTP {rendered_html.http_status} for {queued_url.normalized_url}")
         if not rendered_html.html.strip():
             raise UrlDownloadError(f"HTML renderer returned empty content for {queued_url.normalized_url}")
 
@@ -241,6 +312,10 @@ class DownloaderFactory:
             if self._http_client is None:
                 raise UrlDownloadError("PDF downloader requires an HTTP client")
             return PdfDownloader(self._config, self._http_client)
+        if classified_type == "markdown" or classified_type == "text":
+            if self._http_client is None:
+                raise UrlDownloadError(f"{classified_type} downloader requires an HTTP client")
+            return TextDocumentDownloader(self._config, self._http_client, classified_type)
         if classified_type == "html":
             if self._html_renderer is None:
                 raise UrlDownloadError("HTML downloader requires a renderer")

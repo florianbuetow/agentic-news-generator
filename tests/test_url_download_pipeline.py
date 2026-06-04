@@ -18,6 +18,7 @@ from src.url_ingestion.downloader import DownloaderFactory, RenderedHtml
 from src.url_ingestion.metadata import MetadataHelper
 from src.url_ingestion.normalizer import UrlNormalizer
 from src.url_ingestion.queue_reader import UrlInboxQueueReader
+from src.url_ingestion.reachability import ReachabilityResult
 from tests.test_url_downloader import FakeHtmlRenderer, FakeHttpClient, FakeResponse
 
 
@@ -71,7 +72,7 @@ def make_pipeline(config: Config, http_client: FakeHttpClient, html_renderer: Fa
     """Create a URL download pipeline with fake download dependencies."""
     factory = DownloaderFactory(config=config, http_client=http_client, html_renderer=html_renderer)
     archive = InboxArchive(config, fixed_today)
-    return UrlDownloadPipeline(config, factory, archive)
+    return UrlDownloadPipeline(config, factory, archive, reachability_probe=None)
 
 
 class QuietSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
@@ -79,6 +80,27 @@ class QuietSimpleHTTPRequestHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format: str, *args: object) -> None:
         """Suppress request logs."""
+
+
+class FailingHtmlRenderer:
+    """HTML renderer that always fails."""
+
+    def render(self, url: str) -> RenderedHtml:
+        """Raise a deterministic failure."""
+        raise RuntimeError("renderer blocked")
+
+
+class FakeReachabilityProbe:
+    """Reachability probe with deterministic diagnostics."""
+
+    def __init__(self) -> None:
+        """Initialize captured URLs."""
+        self.urls: list[str] = []
+
+    def check(self, url: str) -> ReachabilityResult:
+        """Record and return a fake diagnostic."""
+        self.urls.append(url)
+        return ReachabilityResult(http_status="403", final_url=url, content_type="text/html")
 
 
 @contextmanager
@@ -125,7 +147,12 @@ def test_download_pipeline_downloads_real_local_http_pdf_and_rendered_html(tmp_p
         inbox_file = inbox_dir / "links.txt"
         inbox_file.write_text(f"{base_url}/report.pdf\n{base_url}/article.html\n", encoding="utf-8")
 
-        summary = UrlDownloadPipeline(config, DownloaderFactory.default(config), InboxArchive(config, fixed_today)).run(read_queue(config))
+        summary = UrlDownloadPipeline(
+            config,
+            DownloaderFactory.default(config),
+            InboxArchive(config, fixed_today),
+            reachability_probe=None,
+        ).run(read_queue(config))
 
         host_stem = f"http_127_0_0_1_{base_url.rsplit(':', maxsplit=1)[1]}"
         pdf_path = config.get_url_raw_dir() / "pdf" / f"{host_stem}_report_pdf.pdf"
@@ -203,16 +230,20 @@ def test_download_pipeline_second_run_skips_existing_raw_files(tmp_path: Path) -
     assert second_html_renderer.calls == []
 
 
-def test_download_pipeline_archives_unprocessed_urls_and_keeps_changed_inbox_file(tmp_path: Path) -> None:
-    """Archive unprocessed URLs and avoid removing inbox files changed during processing."""
+def test_download_pipeline_archives_unprocessed_source_lines_and_keeps_changed_inbox_file(tmp_path: Path) -> None:
+    """Archive unprocessed pre-normalization source lines and avoid removing changed inbox files."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
     inbox_dir = config.get_url_inbox_dir()
     inbox_dir.mkdir(parents=True)
     inbox_file = inbox_dir / "links.txt"
-    inbox_file.write_text("https://example.com/readme.md\nhttps://example.com/search?q=bad\n", encoding="utf-8")
+    inbox_file.write_text(
+        "Docs->Markdown:https://example.com/readme.md\nAsset->Image:https://example.com/image.png\n",
+        encoding="utf-8",
+    )
     queue_summary = read_queue(config)
     inbox_file.write_text(
-        "https://example.com/readme.md\nhttps://example.com/search?q=bad\nhttps://example.com/new.pdf\n", encoding="utf-8"
+        "Docs->Markdown:https://example.com/readme.md\nAsset->Image:https://example.com/image.png\nhttps://example.com/new.pdf\n",
+        encoding="utf-8",
     )
     http_client = FakeHttpClient(FakeResponse(content=b"%PDF fake", status_code=200, url="https://cdn.example.com/report.pdf"))
     html_renderer = FakeHtmlRenderer(RenderedHtml(html="<html></html>", final_url="https://example.com/article.html", http_status=200))
@@ -221,8 +252,40 @@ def test_download_pipeline_archives_unprocessed_urls_and_keeps_changed_inbox_fil
 
     unprocessed_path = inbox_dir / "unprocessed" / "2026-05-31.txt"
     assert unprocessed_path.read_text(encoding="utf-8").splitlines() == [
-        "https://example.com/search?q=bad\tURL contains a query string",
-        "https://example.com/readme.md\tUnsupported URL type for download: markdown",
+        "Asset->Image:https://example.com/image.png\tUnsupported URL type for download: unknown",
     ]
+    markdown_path = config.get_url_raw_dir() / "markdown" / "https_example_com_readme_md.md"
+    assert markdown_path.read_bytes() == b"%PDF fake"
     assert inbox_file.exists()
-    assert summary.failure_count == 2
+    assert summary.successful_download_count == 1
+    assert summary.unprocessed_count == 1
+    assert summary.failure_count == 0
+
+
+def test_download_pipeline_adds_reachability_diagnostic_to_download_failures(tmp_path: Path) -> None:
+    """Append curl-style reachability context when a downloader fails."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    inbox_dir = config.get_url_inbox_dir()
+    inbox_dir.mkdir(parents=True)
+    inbox_file = inbox_dir / "links.txt"
+    inbox_file.write_text("https://example.com/article.html\n", encoding="utf-8")
+    probe = FakeReachabilityProbe()
+    pipeline = UrlDownloadPipeline(
+        config,
+        DownloaderFactory(config=config, http_client=None, html_renderer=FailingHtmlRenderer()),
+        InboxArchive(config, fixed_today),
+        probe,
+    )
+
+    summary = pipeline.run(read_queue(config))
+
+    assert probe.urls == ["https://example.com/article.html"]
+    assert summary.failure_count == 1
+    assert summary.failures[0].reason == (
+        "renderer blocked | curl_http_status=403, curl_content_type=text/html, curl_final_url=https://example.com/article.html"
+    )
+    assert (inbox_dir / "unprocessed" / "2026-05-31.txt").read_text(encoding="utf-8").splitlines() == [
+        "https://example.com/article.html\trenderer blocked | curl_http_status=403, curl_content_type=text/html, "
+        "curl_final_url=https://example.com/article.html"
+    ]
+    assert not inbox_file.exists()

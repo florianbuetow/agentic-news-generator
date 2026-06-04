@@ -14,6 +14,7 @@ from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
     HtmlTextExtractor,
     PdfRawProcessor,
+    PlainTextRawProcessor,
     PypdfTextExtractor,
     RawContentScanner,
     RawProcessorFactory,
@@ -78,7 +79,7 @@ def write_http_fixture(server_root: Path) -> None:
         encoding="utf-8",
     )
     (server_root / "notes.md").write_text(
-        "# Markdown fixture\n\nThis is served but unsupported for download right now.\n",
+        "# Markdown fixture\n\nThis is served and cleaned.\n",
         encoding="utf-8",
     )
 
@@ -87,13 +88,20 @@ def write_expected_cleaned_outputs(expected_root: Path, base_url: str) -> dict[s
     """Write expected cleaned Markdown files for downloaded local-server fixtures."""
     pdf_stem = sanitize_normalized_url_to_stem(f"{base_url}/report.pdf")
     html_stem = sanitize_normalized_url_to_stem(f"{base_url}/article.html")
+    query_html_stem = sanitize_normalized_url_to_stem(f"{base_url}/article.html?utm_source=test")
+    markdown_stem = sanitize_normalized_url_to_stem(f"{base_url}/notes.md")
     pdf_expected = expected_root / "pdf" / f"{pdf_stem}.md"
     html_expected = expected_root / "html" / f"{html_stem}.md"
+    query_html_expected = expected_root / "html" / f"{query_html_stem}.md"
+    markdown_expected = expected_root / "markdown" / f"{markdown_stem}.md"
     pdf_expected.parent.mkdir(parents=True)
     html_expected.parent.mkdir(parents=True)
+    markdown_expected.parent.mkdir(parents=True)
     pdf_expected.write_text("Fixture PDF Clean Text", encoding="utf-8")
     html_expected.write_text("Initial article text.\n\nRendered by JavaScript.", encoding="utf-8")
-    return {"pdf": pdf_expected, "html": html_expected}
+    query_html_expected.write_text("Initial article text.\n\nRendered by JavaScript.", encoding="utf-8")
+    markdown_expected.write_text("# Markdown fixture\n\nThis is served and cleaned.", encoding="utf-8")
+    return {"pdf": pdf_expected, "html": html_expected, "query_html": query_html_expected, "markdown": markdown_expected}
 
 
 def make_clean_pipeline(config_path: Path, data_dir: Path) -> UrlCleanContentPipeline:
@@ -109,6 +117,7 @@ def make_clean_pipeline(config_path: Path, data_dir: Path) -> UrlCleanContentPip
     processor_factory = RawProcessorFactory(
         HtmlRawProcessor(HtmlTextExtractor(), formatting_agent),
         PdfRawProcessor(PypdfTextExtractor(), formatting_agent),
+        PlainTextRawProcessor(formatting_agent),
     )
     return UrlCleanContentPipeline(RawContentScanner(config), processor_factory)
 
@@ -128,7 +137,7 @@ def test_url_pipeline_downloads_from_local_http_server_and_matches_expected_clea
         expected_outputs = write_expected_cleaned_outputs(expected_root, base_url)
         inbox_file = inbox_dir / "links.txt"
         inbox_file.write_text(
-            f"{base_url}/report.pdf\n{base_url}/article.html\n{base_url}/notes.md\n",
+            f"{base_url}/report.pdf\n{base_url}/article.html\n{base_url}/article.html?utm_source=test\n{base_url}/notes.md\n",
             encoding="utf-8",
         )
 
@@ -136,19 +145,19 @@ def test_url_pipeline_downloads_from_local_http_server_and_matches_expected_clea
             config,
             DownloaderFactory.default(config),
             InboxArchive(config, fixed_today),
+            reachability_probe=None,
         ).run(read_queue(config))
 
-        assert download_summary.successful_download_count == 2
-        assert download_summary.failure_count == 1
+        assert download_summary.successful_download_count == 4
+        assert download_summary.failure_count == 0
         assert not inbox_file.exists()
-        assert (inbox_dir / "unprocessed" / "2026-05-31.txt").read_text(encoding="utf-8").splitlines() == [
-            f"{base_url}/notes.md\tUnsupported URL type for download: markdown"
-        ]
+        assert not (inbox_dir / "unprocessed" / "2026-05-31.txt").exists()
 
-        clean_summary = make_clean_pipeline(config_path, data_dir).run()
+        clean_summary = make_clean_pipeline(config_path, data_dir).run(limit=None, raw_path=None, raw_paths=None, force=False)
 
-        assert clean_summary.cleaned_count == 2
+        assert clean_summary.cleaned_count == 4
         assert clean_summary.failure_count == 0
-        for content_type, expected_path in expected_outputs.items():
+        for expected_key, expected_path in expected_outputs.items():
+            content_type = "html" if expected_key == "query_html" else expected_key
             actual_path = config.get_url_cleaned_dir() / content_type / expected_path.name
             assert actual_path.read_text(encoding="utf-8") == expected_path.read_text(encoding="utf-8")
