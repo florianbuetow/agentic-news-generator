@@ -1,0 +1,16 @@
+rules:
+  - id: justfile.no-error-suppression
+    languages: [generic]
+    severity: ERROR
+    message: >
+      Do not suppress errors, instead catch them in if/else blocks and at the
+      end of the pipeline print success/failure using red/green depending on
+      which steps failed.
+
+      A recipe line prefixed with '-' (e.g. '-@just urls-download') makes just
+      ignore a non-zero exit code, silently swallowing the failure. Remove the
+      '-' prefix and handle the failure explicitly.
+    pattern-regex: '(?m)(?<!\\\n)^[ \t]+(?:@-|-@?)'
+    paths:
+      include:
+        - justfile
