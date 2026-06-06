@@ -53,6 +53,14 @@ class CleaningErrorLog:
         return " ".join(value.split())
 
 
+def format_eta(seconds_remaining: float) -> str:
+    """Format remaining duration as hours and minutes."""
+    total_minutes = max(0, int(seconds_remaining // 60))
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    return f"{hours}h{minutes}m"
+
+
 class UrlCleanContentPipeline:
     """Scan raw URL content and process it into cleaned Markdown."""
 
@@ -86,8 +94,17 @@ class UrlCleanContentPipeline:
             print("No raw URL files to clean.", flush=True)
         elif total_pending == 0:
             print("No raw URL files matched the selected processing bounds.", flush=True)
+        run_start = time.monotonic()
         for index, item in enumerate(pending_items, start=1):
-            print(f"[{index}/{total_pending}] {item.content_type}: {item.raw_path}", flush=True)
+            completed = index - 1
+            elapsed = time.monotonic() - run_start
+            avg = (elapsed / completed) if completed > 0 else 0.0
+            eta_seconds = avg * (total_pending - completed)
+            print(
+                f"[{index}/{total_pending}] {index / total_pending * 100:5.1f}% ETA {format_eta(eta_seconds)}  "
+                f"{item.content_type}: {item.raw_path}",
+                flush=True,
+            )
             try:
                 started_at = time.monotonic()
                 processor = self._processor_factory.create(item.content_type)
