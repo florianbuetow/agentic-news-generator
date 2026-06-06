@@ -15,6 +15,8 @@ This system automatically:
 5. Produces a newspaper-style HTML digest
 6. Archives processed videos to save disk space
 
+In addition to YouTube, a second **URL ingestion pipeline** turns bookmarked or hand-supplied web links into cleaned Markdown documents at the same semantic level as cleaned transcripts: it fetches links into an inbox, downloads the raw source (HTML and PDF), and uses an LLM formatting agent to convert that raw content into clean Markdown. See [URL Processing Workflow](#url-processing-workflow).
+
 ## Repository Structure
 
 ```
@@ -166,6 +168,13 @@ just help
 - `just analyze-transcripts` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
+#### URL Processing Pipeline
+- `just url-all` - Run the whole URL pipeline end to end (fetch → download → clean)
+- `just urls-fetch-raindrop [--force]` - Fetch Raindrop.io bookmarks into the URL inbox as categorized `Category->Subcategory:url` lines (only new links by default; `--force` re-emits every bookmark)
+- `just urls-download` - Read the inbox queue, then normalize, deduplicate, classify, and download raw content (writes metadata and archives consumed inbox entries)
+- `just urls-cleancontent` - Convert downloaded raw content into cleaned Markdown using an LLM formatting agent (live per-item progress with percentage and ETA)
+- `just pipelines-all` - Run the URL pipeline (`url-all`) followed by the video pipeline (`video-all`)
+
 #### Tools
 - `just find-files <video-id>` - Find all files for a video ID across all data directories
 - `just check-audio-track <channel> <video-id>` - Probe a downloaded video for audio stream presence + mean/max volume (flags `LOW_VOLUME` below `LOW_VOLUME_THRESHOLD_DB`, default `-40 dB`)
@@ -218,6 +227,60 @@ just archive-videos
 - Channels are grouped by language to minimize model switching
 - Models are cached in `~/.cache/huggingface/hub/`
 - Archive step frees up disk space by moving videos and deleting intermediate audio
+
+### URL Processing Workflow
+
+The URL ingestion pipeline is a second input stream alongside YouTube. It turns bookmarked or hand-supplied web links into cleaned Markdown documents, ready for the same downstream processing as cleaned transcripts. Every stage is idempotent and restart-safe, takes no required CLI arguments, and reads all of its folders from the `url_processing` section of `config/config.yaml` through `src/config.py`.
+
+Run the whole pipeline end to end:
+
+```bash
+just url-all
+```
+
+This chains the three stages below in order. You can also run each stage on its own.
+
+#### Step 1: Fetch bookmarks into the inbox
+
+```bash
+just urls-fetch-raindrop          # only links not seen in a previous run
+just urls-fetch-raindrop --force  # re-emit every bookmark
+```
+
+- Pages through every Raindrop.io bookmark and writes a new dated file into the URL inbox, one line per bookmark in the form `Category->Subcategory:url` (the folder path is preserved; unsorted bookmarks become `Unsorted:url`).
+- By default only links that were not emitted in a previous run are written; the seen-set is tracked in a state file under the URL base directory. Pass `--force` to re-emit everything.
+- Requires a Raindrop API token configured under `integrations.raindrop_io.token` in `config/config.yaml`.
+- This step is optional: you can also drop your own plain-text URL lists into the inbox manually (one URL per line, optionally prefixed with `Category:`).
+
+#### Step 2: Download raw content
+
+```bash
+just urls-download
+```
+
+- Reads every inbox file (the `done/` and `unprocessed/` archive subfolders are excluded), strips any category prefix, and normalizes each URL: a missing scheme gets `http://` prepended, only `http`/`https` are accepted, and empty lines, lines containing whitespace, and URLs with a missing or invalid host/port are rejected as unprocessable.
+- Deduplicates the normalized URLs and classifies each one by path suffix into `pdf`, `html`, `markdown`, `text`, or `unknown`. Extension-less paths are treated as `html`; media/binary suffixes (images, archives, audio, video, etc.) and links to sites that need a dedicated future pipeline (YouTube, X/Twitter, Instagram) are classified `unknown`.
+- Downloads the raw source by type: PDFs via a Python HTTP client that follows redirects, and HTML via a headless Playwright (Chromium) browser that renders the page with a realistic browser user-agent and headers and saves the fully-rendered HTML.
+- Writes a metadata JSON file beside every successful download (source, normalized, and final URL; classified type; HTTP status; timestamp; status).
+- Idempotent: a URL whose raw file already exists on disk is skipped rather than re-downloaded.
+- Archives processed inbox URLs into a dated `done/` file and unprocessable/failed URLs into a dated `unprocessed/` file, then removes a consumed inbox file only when its content hash is unchanged from before processing.
+
+#### Step 3: Clean raw content into Markdown
+
+```bash
+just urls-cleancontent
+```
+
+- Scans the raw content folders directly rather than relying on the inbox, so it is restart-safe and also picks up raw files (for example PDFs) dropped in manually.
+- Extracts text per type (HTML body extraction; `pypdf` for PDFs) and hands it to an LLM formatting agent that converts noisy extracted text into clean Markdown while preserving the information rather than summarizing it.
+- Validates each cleaned document (non-empty, and free of inline HTML), then writes it into the cleaned-content directory organized by type.
+- Skips documents that are already cleaned, and skips oversized documents above the configured context-window threshold; both are reported in the run summary.
+- Prints live per-item progress with a running completion percentage and ETA. Per-item failures are collected, appended to a daily error log, reported at the end, and cause a non-zero exit.
+
+**Notes:**
+- All operations are idempotent and safe to re-run; finished items are skipped on the next run.
+- Failures never halt the batch — each stage processes every remaining item, then prints a failure summary and exits non-zero if anything failed.
+- The LLM formatting agent uses the same local LLM (LM Studio) configuration and retry/skip discipline as transcript summarization; make sure the model is loaded (`just status`).
 
 ### Anti-Hallucination Transcription Features
 
