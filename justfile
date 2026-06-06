@@ -116,6 +116,7 @@ help:
     @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
+    @printf "  %-46s %s\n" "find-files-without-youtube-id" "List data files missing a YouTube ID with no ID-bearing sibling"
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
@@ -913,6 +914,15 @@ check-audio-track CHANNEL VIDEO_ID:
     @printf "\033[0;34m=== Checking Audio Track: {{ CHANNEL }}/{{ VIDEO_ID }} ===\033[0m\n"
     @echo ""
     @bash scripts/check-audio-track.sh {{ CHANNEL }} {{ VIDEO_ID }}
+    @echo ""
+
+# List data files that have no YouTube ID and no ID-bearing sibling (read-only)
+find-files-without-youtube-id:
+    @echo ""
+    @printf "\033[0;34m=== Finding Files Without a YouTube ID ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/find-files-without-youtube-id.py
+    @printf "\033[0;32m✓ find-files-without-youtube-id completed successfully\033[0m\n"
     @echo ""
 
 # Move plain-named duplicate files (no YouTube ID) to backup location
