@@ -18,10 +18,17 @@
 #    Group related targets together and separate groups with an empty
 #    `@echo ""` line in the help output.
 #
-# 5. Composite targets (e.g. ci) that call multiple sub-targets must fail
-#    fast: exit 1 on the first error. Never skip over errors or warnings.
-#    Use `set -e` or `&&` chaining to ensure immediate abort with the
-#    appropriate error message.
+# 5. Composite targets that call multiple sub-targets must surface every
+#    failure — never silently ignore errors:
+#    - Validation/CI/checks composites (e.g. ci, ci-verbose, checks-all) must
+#      fail fast: exit 1 on the first error (use `set -e` or
+#      `|| { ...; exit 1; }`).
+#    - Data pipelines (e.g. url-all, video-all, pipelines-all) must catch each
+#      step in an if/else block, continue through the remaining steps, and
+#      print a red/green per-step summary at the end, exiting non-zero if any
+#      step failed.
+#    NEVER prefix a recipe line with `-` to ignore a non-zero exit code; this
+#    is enforced by config/semgrep/justfile-no-error-suppression.yml.
 #
 # 6. Every target must end with a clear short status message:
 #    - On success: green (\033[32m) message confirming completion.
@@ -111,12 +118,13 @@ help:
     @printf "\033[0;33mTools:\033[0m\n"
     @printf "  %-46s %s\n" "find [query]" "Interactively search cleaned transcripts; with query, list matching files"
     @printf "  %-46s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
+    @printf "  %-46s %s\n" "research \"<keywords>\"" "List transcripts & summaries matching comma-separated keywords"
     @printf "  %-46s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
     @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
-    @printf "  %-46s %s\n" "find-files-without-youtube-id" "List data files missing a YouTube ID with no ID-bearing sibling"
+    @printf "  %-46s %s\n" "find-files-without-youtube-id" "Report data files missing a YouTube ID (writes to reports/)"
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
@@ -125,8 +133,8 @@ help:
     @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
     @printf "  %-38s %s\n" "test-url-ingestion" "Run URL ingestion integration/e2e tests"
     @printf "  %-38s %s\n" "test-coverage" "Run unit tests with coverage report"
-    @printf "  %-38s %s\n" "ci" "Run ALL validation checks (verbose)"
-    @printf "  %-38s %s\n" "ci-quiet" "Run ALL validation checks silently"
+    @printf "  %-38s %s\n" "ci" "Run ALL validation checks silently"
+    @printf "  %-38s %s\n" "ci-verbose" "Run ALL validation checks (verbose)"
     @printf "  %-38s %s\n" "ci-ai" "Run AI-based CI checks"
     @printf "  %-38s %s\n" "ci-ai-quiet" "Run AI-based CI checks silently"
     @echo ""
@@ -186,17 +194,41 @@ check:
 
 # Run the complete video pipeline
 video-all:
-    @just ci-quiet
-    -@just download-videos
-    @just check-video-integrity
-    @just filter-videos
-    @just extract-audio
-    @just transcribe
-    @just archive-videos
-    @just analyze-transcripts-hallucinations
-    @just transcripts-remove-hallucinations
-    @just analyze-transcript-languages
-    @just summarize-transcripts
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Running Video Pipeline ===\033[0m\n"
+    echo ""
+    steps=(
+        ci
+        download-videos
+        check-video-integrity
+        filter-videos
+        extract-audio
+        transcribe
+        archive-videos
+        analyze-transcripts-hallucinations
+        transcripts-remove-hallucinations
+        analyze-transcript-languages
+        summarize-transcripts
+    )
+    failed=()
+    for step in "${steps[@]}"; do
+        if just "$step"; then
+            printf "\033[0;32m✓ %s passed\033[0m\n" "$step"
+        else
+            printf "\033[0;31m✗ %s failed\033[0m\n" "$step"
+            failed+=("$step")
+        fi
+    done
+    echo ""
+    if [ ${#failed[@]} -eq 0 ]; then
+        printf "\033[0;32m✓ video-all completed successfully\033[0m\n"
+        echo ""
+    else
+        printf "\033[0;31m✗ video-all failed: %s\033[0m\n" "${failed[*]}"
+        echo ""
+        exit 1
+    fi
 
 # Run all checks and CI
 checks-all:
@@ -206,18 +238,66 @@ checks-all:
     @just analyze-transcripts-hallucinations
     @just transcripts-remove-hallucinations
     @just analyze-transcript-languages
-    @just ci-quiet
+    @just ci
 
 # Run url-all then video-all
 pipelines-all:
-    @just url-all
-    @just video-all
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Running All Pipelines ===\033[0m\n"
+    echo ""
+    steps=(
+        url-all
+        video-all
+    )
+    failed=()
+    for step in "${steps[@]}"; do
+        if just "$step"; then
+            printf "\033[0;32m✓ %s passed\033[0m\n" "$step"
+        else
+            printf "\033[0;31m✗ %s failed\033[0m\n" "$step"
+            failed+=("$step")
+        fi
+    done
+    echo ""
+    if [ ${#failed[@]} -eq 0 ]; then
+        printf "\033[0;32m✓ pipelines-all completed successfully\033[0m\n"
+        echo ""
+    else
+        printf "\033[0;31m✗ pipelines-all failed: %s\033[0m\n" "${failed[*]}"
+        echo ""
+        exit 1
+    fi
 
 # Run the full URL pipeline: fetch bookmarks from Raindrop, download raw content, clean into Markdown
 url-all:
-    @just urls-fetch-raindrop
-    @just urls-download
-    @just urls-cleancontent
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Running URL Pipeline ===\033[0m\n"
+    echo ""
+    steps=(
+        urls-fetch-raindrop
+        urls-download
+        urls-cleancontent
+    )
+    failed=()
+    for step in "${steps[@]}"; do
+        if just "$step"; then
+            printf "\033[0;32m✓ %s passed\033[0m\n" "$step"
+        else
+            printf "\033[0;31m✗ %s failed\033[0m\n" "$step"
+            failed+=("$step")
+        fi
+    done
+    echo ""
+    if [ ${#failed[@]} -eq 0 ]; then
+        printf "\033[0;32m✓ url-all completed successfully\033[0m\n"
+        echo ""
+    else
+        printf "\033[0;31m✗ url-all failed: %s\033[0m\n" "${failed[*]}"
+        echo ""
+        exit 1
+    fi
 
 # Run all read-only data pipeline health checks (no data modified or deleted)
 maintenance:
@@ -226,6 +306,7 @@ maintenance:
     @just check-missing-metadata
     @just check-config-syntax
     @just find-empty-transcripts
+    @just find-files-without-youtube-id
     @just analyze-transcripts-hallucinations
     @just analyze-transcript-languages
     @printf "\033[0;32m✓ maintenance completed successfully\033[0m\n"
@@ -358,13 +439,13 @@ summarize-transcripts channel="":
     @uv run python scripts/summarize-transcripts.py {{ if channel == "" { "" } else { "--channel " + channel } }}
     @echo ""
 
-# Fetch Raindrop.io bookmarks into the URL inbox as categorized Category->Subcategory:url lines
-urls-fetch-raindrop:
+# Fetch Raindrop.io bookmarks into the URL inbox as categorized Category->Subcategory:url lines (only new links; pass --force to re-emit all)
+urls-fetch-raindrop *ARGS:
     #!/usr/bin/env bash
     set -e
     echo ""
     printf "\033[0;34m=== Fetching Raindrop.io Bookmarks into URL Inbox ===\033[0m\n"
-    if ! uv run python integrations/raindrop_io/fetchurls-raindrop.py; then
+    if ! uv run python integrations/raindrop_io/fetchurls-raindrop.py {{ ARGS }}; then
         printf "\033[0;31m✗ urls-fetch-raindrop failed\033[0m\n"
         exit 1
     fi
@@ -728,7 +809,7 @@ code-audit:
 code-semgrep:
     @echo ""
     @printf "\033[0;34m=== Running Semgrep Static Analysis ===\033[0m\n"
-    @uv run semgrep --config config/semgrep/ --error src scripts
+    @uv run semgrep --config config/semgrep/ --error src scripts justfile
     @echo ""
     @printf "\033[0;32m✓ Semgrep checks passed\033[0m\n"
     @echo ""
@@ -900,6 +981,60 @@ search QUERY="":
     fi
     echo ""
 
+# List cleaned transcripts and summaries relevant to comma-separated keywords/phrases
+# Searches the same corpora as 'find' and 'search', most relevant (most matches) first
+research KEYWORDS:
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Researching Resources ===\033[0m\n"
+    echo ""
+
+    # Build literal rg patterns from the comma-separated keywords (trim whitespace, skip empties)
+    rg_args=()
+    IFS=',' read -ra _raw_terms <<< "{{ KEYWORDS }}"
+    for _t in "${_raw_terms[@]}"; do
+        _term=$(printf '%s' "$_t" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        [[ -n "$_term" ]] && rg_args+=(-e "$_term")
+    done
+    if [[ ${#rg_args[@]} -eq 0 ]]; then
+        printf "\033[0;31m✗ research failed: no keywords provided\033[0m\n"
+        echo ""
+        exit 1
+    fi
+
+    # Resolve the same corpora that 'find' (cleaned transcripts) and 'search' (summaries) read
+    cleaned_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.get_data_downloads_transcripts_cleaned_dir())")
+    summaries_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.get_data_downloads_transcripts_summaries_dir())")
+
+    # List files under a directory as "path:count" ranked by how many lines match any keyword (most relevant first)
+    matches() {
+        rg -c --color=never --ignore-case --fixed-strings "${rg_args[@]}" "$1" --glob "$2" 2>/dev/null | sort -t: -k2 -rn
+    }
+
+    # Render "path:count" lines as a readable channel/title heading with the exact file path beneath it
+    show() {
+        while IFS= read -r line; do
+            f="${line%:*}"
+            count="${line##*:}"
+            printf "%4d  %s/%s\n      %s\n" "$count" "$(basename "$(dirname "$f")")" "$(basename "$f")" "$f"
+        done
+    }
+
+    transcripts=$(matches "$cleaned_dir" "*.txt")
+    summaries=$(matches "$summaries_dir" "*.md")
+
+    printf "\033[0;33mCleaned Transcripts:\033[0m\n"
+    if [[ -n "$transcripts" ]]; then printf "%s\n" "$transcripts" | show; else echo "  (none)"; fi
+    echo ""
+    printf "\033[0;33mSummaries:\033[0m\n"
+    if [[ -n "$summaries" ]]; then printf "%s\n" "$summaries" | show; else echo "  (none)"; fi
+    echo ""
+
+    n_transcripts=0; [[ -n "$transcripts" ]] && n_transcripts=$(printf "%s\n" "$transcripts" | wc -l | tr -d ' ')
+    n_summaries=0; [[ -n "$summaries" ]] && n_summaries=$(printf "%s\n" "$summaries" | wc -l | tr -d ' ')
+    printf "\033[0;32m✓ research completed: %s transcript(s), %s summary(ies)\033[0m\n" "$n_transcripts" "$n_summaries"
+    echo ""
+
 # Find all files for a video ID across all data directories
 find-files VIDEO_ID:
     @echo ""
@@ -942,7 +1077,7 @@ find-empty-transcripts:
     @echo ""
 
 # Run ALL validation checks (verbose)
-ci:
+ci-verbose:
     #!/usr/bin/env bash
     set -e
     echo ""
@@ -967,7 +1102,7 @@ ci:
     echo ""
 
 # Run ALL validation checks silently (only show output on errors)
-ci-quiet:
+ci:
     #!/usr/bin/env bash
     set -e
     echo ""

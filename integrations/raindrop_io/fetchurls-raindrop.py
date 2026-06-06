@@ -5,12 +5,19 @@ Emits one line per bookmark in the form ``Category->Subcategory:url`` (deeper
 nesting extends the chain, e.g. ``A->B->C:url``; unsorted bookmarks become
 ``Unsorted:url``). The Raindrop.io API token is read through the ``Config``
 object from ``config/config.yaml`` (``integrations.raindrop_io.token``). Output
-is written to the project root as ``raindrop-<date>.txt``.
+is written to the configured URL inbox as ``raindrop-<date>.txt``.
+
+By default only bookmarks whose link was not emitted in a previous run are
+written; pass ``--force`` to re-emit every bookmark. Emitted links are tracked
+in ``raindrop-fetched-urls.json`` under the URL ingestion base directory.
 """
 
+import json
+import os
 import sys
 from datetime import date
 from pathlib import Path
+from typing import cast
 
 import requests
 
@@ -24,6 +31,7 @@ MAX_PATH_DEPTH = 20
 REQUEST_TIMEOUT_SECONDS = 30
 UNSORTED_COLLECTION_ID = -1
 TRASH_COLLECTION_ID = -99
+FETCHED_URLS_FILENAME = "raindrop-fetched-urls.json"
 
 
 def fetch_collection_map(token: str) -> dict[int, tuple[str, int | None]]:
@@ -136,8 +144,86 @@ def resolve_output_path(output_dir: Path, today: date) -> Path:
     return chosen
 
 
+def load_fetched_urls(state_path: Path) -> set[str]:
+    """Return the set of raindrop links already emitted to the inbox, or an empty set when no state exists."""
+    if not state_path.is_file():
+        return set()
+    stored = json.loads(state_path.read_text(encoding="utf-8"))
+    if not isinstance(stored, list):
+        raise ValueError(f"expected a JSON array of links, got {type(stored).__name__}")
+    return {str(link) for link in cast("list[object]", stored)}
+
+
+def save_fetched_urls(state_path: Path, links: set[str]) -> None:
+    """Atomically persist the emitted raindrop links as a sorted JSON array."""
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = state_path.with_name(f"{state_path.name}.tmp")
+    temp_path.write_text(json.dumps(sorted(links), indent=2) + "\n", encoding="utf-8")
+    os.replace(temp_path, state_path)
+
+
+def select_unfetched_raindrops(
+    raindrops: list[tuple[int, str]],
+    previously_fetched: set[str],
+    force: bool,
+) -> list[tuple[int, str]]:
+    """Return raindrops to emit: all when forcing, otherwise those whose link was not previously fetched."""
+    if force:
+        return list(raindrops)
+    return [(collection_id, link) for collection_id, link in raindrops if link not in previously_fetched]
+
+
+def emit_new_raindrops(
+    *,
+    raindrops: list[tuple[int, str]],
+    collection_map: dict[int, tuple[str, int | None]],
+    inbox_dir: Path,
+    state_path: Path,
+    previously_fetched: set[str],
+    force: bool,
+) -> int:
+    """Write unfetched raindrops to a new inbox file, persist the seen-set, and print a summary."""
+    selected = select_unfetched_raindrops(raindrops, previously_fetched, force)
+    skipped_already_fetched = len(raindrops) - len(selected)
+
+    if not selected:
+        print("\nSummary:")
+        print(f"raindrops_fetched: {len(raindrops)}")
+        print(f"already_fetched_skipped: {skipped_already_fetched}")
+        print("No new bookmarks to write into the inbox.")
+        return 0
+
+    lines = sorted(f"{resolve_folder_path(collection_id, collection_map)}:{link}" for collection_id, link in selected)
+
+    output_path = resolve_output_path(inbox_dir, date.today())
+    print(f"Writing inbox file: {output_path}", flush=True)
+    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # Persist the seen-set only after the inbox file is written so a crash never
+    # records links as fetched that never reached the inbox.
+    updated_fetched = previously_fetched | {link for _, link in selected}
+    save_fetched_urls(state_path, updated_fetched)
+
+    print("\nSummary:")
+    if force:
+        print("force: re-emitted every bookmark")
+    print(f"raindrops_fetched: {len(raindrops)}")
+    print(f"collections_mapped: {len(collection_map)}")
+    print(f"already_fetched_skipped: {skipped_already_fetched}")
+    print(f"lines_written: {len(lines)}")
+    print(f"fetched_urls_tracked: {len(updated_fetched)}")
+    print(f"output_file: {output_path}")
+    return 0
+
+
 def main() -> int:
     """Fetch raindrops, label each with its folder path, and write to the configured URL inbox."""
+    arguments = sys.argv[1:]
+    if arguments not in ([], ["--force"]):
+        print("Usage: fetchurls-raindrop.py [--force]", file=sys.stderr)
+        return 1
+    force = arguments == ["--force"]
+
     project_root = Path(__file__).parent.parent.parent
     config_path = project_root / "config" / "config.yaml"
 
@@ -175,19 +261,21 @@ def main() -> int:
             print(f"❌ {failure}")
         return 1
 
-    lines = sorted(f"{resolve_folder_path(collection_id, collection_map)}:{link}" for collection_id, link in raindrops)
+    state_path = config.get_url_base_dir() / FETCHED_URLS_FILENAME
+    try:
+        previously_fetched = load_fetched_urls(state_path)
+    except (OSError, ValueError) as exc:
+        print(f"Error: could not read fetched-URL state {state_path}: {exc}", file=sys.stderr)
+        return 1
 
-    output_path = resolve_output_path(inbox_dir, date.today())
-    print(f"Writing inbox file: {output_path}", flush=True)
-    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-    print("\nSummary:")
-    print(f"raindrops_fetched: {len(raindrops)}")
-    print(f"collections_mapped: {len(collection_map)}")
-    print(f"lines_written: {len(lines)}")
-    print(f"output_file: {output_path}")
-
-    return 0
+    return emit_new_raindrops(
+        raindrops=raindrops,
+        collection_map=collection_map,
+        inbox_dir=inbox_dir,
+        state_path=state_path,
+        previously_fetched=previously_fetched,
+        force=force,
+    )
 
 
 if __name__ == "__main__":
