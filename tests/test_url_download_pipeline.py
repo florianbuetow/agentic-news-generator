@@ -203,6 +203,26 @@ def test_download_pipeline_creates_raw_pdf_html_metadata_archives_and_removes_un
     assert summary.failure_count == 0
 
 
+def test_download_pipeline_reroutes_html_url_serving_pdf_to_pdf_downloader(tmp_path: Path) -> None:
+    """Re-route an HTML-classified URL that serves PDF content to the PDF downloader."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    inbox_dir = config.get_url_inbox_dir()
+    inbox_dir.mkdir(parents=True)
+    inbox_file = inbox_dir / "links.txt"
+    inbox_file.write_text("https://example.com/paper\n", encoding="utf-8")
+    http_client = FakeHttpClient(FakeResponse(content=b"%PDF-1.7 rerouted", status_code=200, url="https://example.com/paper"))
+    html_renderer = FakeHtmlRenderer(RenderedHtml(html="", final_url="https://example.com/paper", http_status=200))
+
+    summary = make_pipeline(config, http_client, html_renderer).run(read_queue(config))
+
+    pdf_path = config.get_url_raw_dir() / "pdf" / "https_example_com_paper.pdf"
+    assert pdf_path.read_bytes() == b"%PDF-1.7 rerouted"
+    assert MetadataHelper.load(pdf_path.with_name("https_example_com_paper.metadata.json")).metadata.classified_type == "pdf"
+    assert summary.successful_download_count == 1
+    assert summary.failure_count == 0
+    assert not (config.get_url_raw_dir() / "html" / "https_example_com_paper.html").exists()
+
+
 def test_download_pipeline_second_run_skips_existing_raw_files(tmp_path: Path) -> None:
     """Skip already-downloaded raw files on a second run."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
@@ -262,6 +282,24 @@ def test_download_pipeline_archives_unprocessed_source_lines_and_keeps_changed_i
     assert summary.failure_count == 0
 
 
+def test_inbox_archive_writes_multiline_reason_as_single_line(tmp_path: Path) -> None:
+    """Collapse multi-line download error reasons so one outcome stays on one archive line."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    config.get_url_inbox_dir().mkdir(parents=True)
+    archive = InboxArchive(config, fixed_today)
+
+    archive.append_unprocessed(
+        "https://example.com/page.html",
+        'Page.goto: net::ERR_NAME_NOT_RESOLVED\nCall log:\n  - navigating to "https://example.com/page.html"\n | curl_error=curl: (6)',
+    )
+
+    archive_lines = (config.get_url_inbox_dir() / "unprocessed" / "2026-05-31.txt").read_text(encoding="utf-8").splitlines()
+    assert archive_lines == [
+        "https://example.com/page.html\tPage.goto: net::ERR_NAME_NOT_RESOLVED Call log: - navigating to "
+        '"https://example.com/page.html" | curl_error=curl: (6)'
+    ]
+
+
 def test_download_pipeline_adds_reachability_diagnostic_to_download_failures(tmp_path: Path) -> None:
     """Append curl-style reachability context when a downloader fails."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
@@ -270,22 +308,25 @@ def test_download_pipeline_adds_reachability_diagnostic_to_download_failures(tmp
     inbox_file = inbox_dir / "links.txt"
     inbox_file.write_text("https://example.com/article.html\n", encoding="utf-8")
     probe = FakeReachabilityProbe()
+    http_client = FakeHttpClient(FakeResponse(content=b"blocked", status_code=503, url="https://example.com/article.html"))
     pipeline = UrlDownloadPipeline(
         config,
-        DownloaderFactory(config=config, http_client=None, html_renderer=FailingHtmlRenderer()),
+        DownloaderFactory(config=config, http_client=http_client, html_renderer=FailingHtmlRenderer()),
         InboxArchive(config, fixed_today),
         probe,
     )
 
     summary = pipeline.run(read_queue(config))
 
+    expected_reason = (
+        "HTML render failed for https://example.com/article.html: renderer blocked; "
+        "HTTP fallback returned HTTP 503 for https://example.com/article.html"
+        " | curl_http_status=403, curl_content_type=text/html, curl_final_url=https://example.com/article.html"
+    )
     assert probe.urls == ["https://example.com/article.html"]
     assert summary.failure_count == 1
-    assert summary.failures[0].reason == (
-        "renderer blocked | curl_http_status=403, curl_content_type=text/html, curl_final_url=https://example.com/article.html"
-    )
+    assert summary.failures[0].reason == expected_reason
     assert (inbox_dir / "unprocessed" / "2026-05-31.txt").read_text(encoding="utf-8").splitlines() == [
-        "https://example.com/article.html\trenderer blocked | curl_http_status=403, curl_content_type=text/html, "
-        "curl_final_url=https://example.com/article.html"
+        f"https://example.com/article.html\t{expected_reason}"
     ]
     assert not inbox_file.exists()

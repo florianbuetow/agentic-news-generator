@@ -5,7 +5,7 @@ from pathlib import Path
 import tiktoken
 
 from src.config import LLMConfig
-from src.url_ingestion.clean_content_pipeline import UrlCleanContentPipeline
+from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UrlCleanContentPipeline
 from src.url_ingestion.download_pipeline import InboxArchive, UrlDownloadPipeline
 from src.url_ingestion.downloader import DownloaderFactory
 from src.url_ingestion.formatting import FormattingAgent
@@ -119,7 +119,7 @@ def make_clean_pipeline(config_path: Path, data_dir: Path) -> UrlCleanContentPip
         PdfRawProcessor(PypdfTextExtractor(), formatting_agent),
         PlainTextRawProcessor(formatting_agent),
     )
-    return UrlCleanContentPipeline(RawContentScanner(config), processor_factory)
+    return UrlCleanContentPipeline(RawContentScanner(config), processor_factory, CleaningErrorLog(config, fixed_today))
 
 
 def test_url_pipeline_downloads_from_local_http_server_and_matches_expected_cleaned_outputs(tmp_path: Path) -> None:

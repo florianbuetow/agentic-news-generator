@@ -1,12 +1,12 @@
 """Batch URL download pipeline."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 
 from src.config import Config
-from src.url_ingestion.downloader import DownloaderFactory, UnsupportedUrlTypeError
+from src.url_ingestion.downloader import DownloaderFactory, DownloadResult, NonHtmlContentError, UnsupportedUrlTypeError
 from src.url_ingestion.metadata import Metadata, MetadataHelper
 from src.url_ingestion.normalizer import UnprocessableUrl
 from src.url_ingestion.queue_reader import InboxFileSnapshot, QueuedUrl, UrlQueueSummary
@@ -46,8 +46,12 @@ class InboxArchive:
         self._append_line("done", original_url)
 
     def append_unprocessed(self, source_line: str, reason: str) -> None:
-        """Append an unprocessed source inbox line and reason to today's archive."""
-        self._append_line("unprocessed", f"{source_line}\t{reason}")
+        """Append an unprocessed source inbox line and reason as a single archive line."""
+        self._append_line("unprocessed", f"{self._single_line(source_line)}\t{self._single_line(reason)}")
+
+    def _single_line(self, value: str) -> str:
+        """Collapse newlines and whitespace runs so one archived outcome stays on one line."""
+        return " ".join(value.split())
 
     def remove_unchanged_files(self, snapshots: tuple[InboxFileSnapshot, ...]) -> None:
         """Remove consumed inbox files only when their content hash is unchanged."""
@@ -110,22 +114,15 @@ class UrlDownloadPipeline:
         for index, queued_url in enumerate(queue_summary.queued_urls, start=1):
             self._emit(f"[{index}/{total_queued}] {queued_url.classified_type}: {queued_url.normalized_url}")
             try:
-                downloader = self._downloader_factory.create(queued_url.classified_type)
-                download_result = downloader.download(queued_url)
-                self._save_metadata(
-                    queued_url, download_result.raw_path, download_result.final_url, download_result.http_status, download_result.status
-                )
-                self._archive.append_done(queued_url.original_url)
+                try:
+                    download_result = self._download_and_record(queued_url)
+                except NonHtmlContentError as exc:
+                    self._emit(f"  re-routing to PDF downloader: {exc}")
+                    download_result = self._download_and_record(replace(queued_url, classified_type="pdf"))
                 if download_result.status == "skipped_existing":
                     skipped_download_count += 1
                 else:
                     successful_download_count += 1
-                if download_result.http_status is not None:
-                    self._emit(f"  http_status: {download_result.http_status}")
-                if download_result.final_url and download_result.final_url != queued_url.normalized_url:
-                    self._emit(f"  final_url: {download_result.final_url}")
-                self._emit(f"  raw_bytes: {download_result.raw_path.stat().st_size}")
-                self._emit(f"  {download_result.status}: {download_result.raw_path}")
             except UnsupportedUrlTypeError as exc:
                 unprocessed_count += 1
                 source_line = self._failure_source_line(queued_url)
@@ -147,6 +144,22 @@ class UrlDownloadPipeline:
             failure_count=len(failures),
             failures=tuple(failures),
         )
+
+    def _download_and_record(self, queued_url: QueuedUrl) -> DownloadResult:
+        """Download one queued URL, persist metadata, archive the successful source line, and report progress."""
+        downloader = self._downloader_factory.create(queued_url.classified_type)
+        download_result = downloader.download(queued_url)
+        self._save_metadata(
+            queued_url, download_result.raw_path, download_result.final_url, download_result.http_status, download_result.status
+        )
+        self._archive.append_done(queued_url.original_url)
+        if download_result.http_status is not None:
+            self._emit(f"  http_status: {download_result.http_status}")
+        if download_result.final_url and download_result.final_url != queued_url.normalized_url:
+            self._emit(f"  final_url: {download_result.final_url}")
+        self._emit(f"  raw_bytes: {download_result.raw_path.stat().st_size}")
+        self._emit(f"  {download_result.status}: {download_result.raw_path}")
+        return download_result
 
     def _emit(self, message: str) -> None:
         """Report URL download progress."""

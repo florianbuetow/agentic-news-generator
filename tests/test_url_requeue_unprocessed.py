@@ -6,14 +6,33 @@ from pathlib import Path
 from src.config import Config
 from src.url_ingestion.classifier import UrlClassifier
 from src.url_ingestion.normalizer import UrlNormalizer
+from src.url_ingestion.reachability import ReachabilityResult
 from src.url_ingestion.requeue_unprocessed import RequeueCandidate, UnprocessedUrlRequeuer, select_requeue_candidates
 from tests.test_url_queue_reader import write_config
 
 
+class StubReachabilityProbe:
+    """Reachability probe that returns canned results for requeue tests."""
+
+    def __init__(self, results_by_url: dict[str, ReachabilityResult], default_result: ReachabilityResult) -> None:
+        """Initialize with per-URL results and a default result for unlisted URLs."""
+        self._results_by_url = results_by_url
+        self._default_result = default_result
+
+    def check(self, url: str) -> ReachabilityResult:
+        """Return the canned reachability result for a URL."""
+        return self._results_by_url.get(url, self._default_result)
+
+
+def reachable_probe() -> StubReachabilityProbe:
+    """Return a probe that treats every URL as reachable."""
+    return StubReachabilityProbe({}, ReachabilityResult(http_status="200", final_url=None, content_type="text/html"))
+
+
 def make_requeuer(tmp_path: Path) -> tuple[Config, UnprocessedUrlRequeuer]:
-    """Build a requeuer with a test configuration."""
+    """Build a requeuer with a test configuration and an all-reachable probe."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
-    return config, UnprocessedUrlRequeuer(config, UrlNormalizer(), UrlClassifier())
+    return config, UnprocessedUrlRequeuer(config, UrlNormalizer(), UrlClassifier(), reachable_probe())
 
 
 def test_requeuer_scans_recoverable_unprocessed_urls_without_writing(tmp_path: Path) -> None:
@@ -85,6 +104,39 @@ def test_requeuer_skips_already_downloaded_raw_outputs(tmp_path: Path) -> None:
     assert summary.recoverable_count == 0
     assert summary.already_downloaded_count == 3
     assert candidates == ()
+
+
+def test_requeuer_skips_definitively_unreachable_urls(tmp_path: Path) -> None:
+    """Skip candidates that curl proves are gone via DNS failure or HTTP 404/410."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    unprocessed_dir = config.get_url_inbox_dir() / "unprocessed"
+    unprocessed_dir.mkdir(parents=True)
+    (unprocessed_dir / "2026-06-01.txt").write_text(
+        "\n".join(
+            [
+                "https://gone.example.com/a.html\tHTTP 404",
+                "https://dns-dead.example.com/b.html\tERR_NAME_NOT_RESOLVED",
+                "https://live.example.com/c.html\ttransient failure",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    probe = StubReachabilityProbe(
+        {
+            "https://gone.example.com/a.html": ReachabilityResult(http_status="404", final_url=None, content_type="text/html"),
+            "https://dns-dead.example.com/b.html": ReachabilityResult(
+                http_status=None, final_url=None, content_type=None, error="curl: (6) Could not resolve host: dns-dead.example.com"
+            ),
+        },
+        ReachabilityResult(http_status="200", final_url=None, content_type="text/html"),
+    )
+    requeuer = UnprocessedUrlRequeuer(config, UrlNormalizer(), UrlClassifier(), probe)
+
+    summary, candidates = requeuer.scan()
+
+    assert summary.unreachable_count == 2
+    assert summary.recoverable_count == 1
+    assert [candidate.normalized_url for candidate in candidates] == ["https://live.example.com/c.html"]
 
 
 def test_requeuer_writes_recovery_inbox_file(tmp_path: Path) -> None:

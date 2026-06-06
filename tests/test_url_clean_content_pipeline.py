@@ -1,11 +1,12 @@
 """Integration tests for URL raw-to-cleaned Markdown processing."""
 
+from datetime import date
 from pathlib import Path
 
 import pytest
 import tiktoken
 
-from src.url_ingestion.clean_content_pipeline import UrlCleanContentPipeline, select_pending_items
+from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UrlCleanContentPipeline, select_pending_items
 from src.url_ingestion.formatting import FormattingAgent
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
@@ -17,6 +18,11 @@ from src.url_ingestion.raw_processing import (
 )
 from tests.test_url_formatting import FakeLlmClient, make_llm_config
 from tests.test_url_raw_processing import FakePdfExtractor, write_config
+
+
+def fixed_today() -> date:
+    """Return a fixed processing-error log date for deterministic tests."""
+    return date(2026, 5, 31)
 
 
 def make_pipeline(tmp_path: Path, *, formatter_response: str, pdf_text: str) -> UrlCleanContentPipeline:
@@ -34,7 +40,7 @@ def make_pipeline(tmp_path: Path, *, formatter_response: str, pdf_text: str) -> 
         PdfRawProcessor(FakePdfExtractor(pdf_text), formatting_agent),
         PlainTextRawProcessor(formatting_agent),
     )
-    return UrlCleanContentPipeline(RawContentScanner(config), processor_factory)
+    return UrlCleanContentPipeline(RawContentScanner(config), processor_factory, CleaningErrorLog(config, fixed_today))
 
 
 def test_clean_content_pipeline_writes_cleaned_markdown_for_raw_documents(tmp_path: Path) -> None:
@@ -62,6 +68,25 @@ def test_clean_content_pipeline_writes_cleaned_markdown_for_raw_documents(tmp_pa
     assert (config.get_url_cleaned_dir() / "markdown" / "readme.md").read_text(encoding="utf-8") == "# Cleaned\n\nUseful content."
     assert (config.get_url_cleaned_dir() / "pdf" / "report.md").read_text(encoding="utf-8") == "# Cleaned\n\nUseful content."
     assert (config.get_url_cleaned_dir() / "text" / "notes.md").read_text(encoding="utf-8") == "# Cleaned\n\nUseful content."
+
+
+def test_clean_content_pipeline_writes_failures_to_durable_error_log(tmp_path: Path) -> None:
+    """Persist clean-content failures to a dated processing-error log under the cleaned dir for human review."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    raw_html = config.get_url_raw_dir() / "html" / "article.html"
+    raw_html.parent.mkdir(parents=True)
+    raw_html.write_text("<html><body><h1>Article</h1><p>Useful content.</p></body></html>", encoding="utf-8")
+    # Inline HTML in the formatted output fails cleaned-Markdown validation, producing a processing failure.
+    pipeline = make_pipeline(tmp_path, formatter_response="<div>inline html is not allowed</div>", pdf_text="unused")
+
+    summary = pipeline.run(limit=None, raw_path=None, raw_paths=None, force=False)
+
+    assert summary.failure_count == 1
+    assert summary.cleaned_count == 0
+    error_lines = (config.get_url_cleaned_dir() / "errors" / "2026-05-31.txt").read_text(encoding="utf-8").splitlines()
+    assert len(error_lines) == 1
+    assert error_lines[0].startswith(f"{raw_html}\t")
+    assert not (config.get_url_cleaned_dir() / "html" / "article.md").exists()
 
 
 def test_clean_content_pipeline_second_run_skips_existing_cleaned_files(tmp_path: Path) -> None:

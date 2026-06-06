@@ -8,6 +8,7 @@ from src.config import Config
 from src.url_ingestion.classifier import UrlClassifier, UrlContentType
 from src.url_ingestion.identity import sanitize_normalized_url_to_stem
 from src.url_ingestion.normalizer import NormalizedUrl, UrlNormalizer
+from src.url_ingestion.reachability import ReachabilityProbe
 
 RECOVERABLE_TYPES: frozenset[UrlContentType] = frozenset({"html", "markdown", "pdf", "text"})
 RAW_SUFFIX_BY_TYPE: dict[UrlContentType, str] = {
@@ -29,6 +30,7 @@ class RequeueSummary:
     already_downloaded_count: int
     unsupported_count: int
     unprocessable_count: int
+    unreachable_count: int
     selected_count: int
     written_count: int
     output_file: Path | None
@@ -46,11 +48,12 @@ class RequeueCandidate:
 class UnprocessedUrlRequeuer:
     """Scan unprocessed archives and optionally write recoverable URLs back to inbox."""
 
-    def __init__(self, config: Config, normalizer: UrlNormalizer, classifier: UrlClassifier) -> None:
+    def __init__(self, config: Config, normalizer: UrlNormalizer, classifier: UrlClassifier, reachability_probe: ReachabilityProbe) -> None:
         """Initialize the requeuer with explicit processing dependencies."""
         self._config = config
         self._normalizer = normalizer
         self._classifier = classifier
+        self._reachability_probe = reachability_probe
 
     def scan(self) -> tuple[RequeueSummary, tuple[RequeueCandidate, ...]]:
         """Return currently recoverable URL candidates without writing an inbox file."""
@@ -59,6 +62,7 @@ class UnprocessedUrlRequeuer:
         unsupported_count = 0
         unprocessable_count = 0
         already_downloaded_count = 0
+        unreachable_count = 0
         candidates_by_normalized_url: dict[str, RequeueCandidate] = {}
         duplicate_count = 0
 
@@ -82,6 +86,9 @@ class UnprocessedUrlRequeuer:
                 if normalized_result.normalized_url in candidates_by_normalized_url:
                     duplicate_count += 1
                     continue
+                if self._is_definitively_unreachable(normalized_result.normalized_url):
+                    unreachable_count += 1
+                    continue
                 candidates_by_normalized_url[normalized_result.normalized_url] = RequeueCandidate(
                     source_line=source_line,
                     normalized_url=normalized_result.normalized_url,
@@ -96,6 +103,7 @@ class UnprocessedUrlRequeuer:
             already_downloaded_count=already_downloaded_count,
             unsupported_count=unsupported_count,
             unprocessable_count=unprocessable_count,
+            unreachable_count=unreachable_count,
             selected_count=len(candidates),
             written_count=0,
             output_file=None,
@@ -114,6 +122,7 @@ class UnprocessedUrlRequeuer:
                 already_downloaded_count=summary.already_downloaded_count,
                 unsupported_count=summary.unsupported_count,
                 unprocessable_count=summary.unprocessable_count,
+                unreachable_count=summary.unreachable_count,
                 selected_count=0,
                 written_count=0,
                 output_file=None,
@@ -129,6 +138,7 @@ class UnprocessedUrlRequeuer:
             already_downloaded_count=summary.already_downloaded_count,
             unsupported_count=summary.unsupported_count,
             unprocessable_count=summary.unprocessable_count,
+            unreachable_count=summary.unreachable_count,
             selected_count=len(selected_candidates),
             written_count=len(selected_candidates),
             output_file=output_file,
@@ -156,6 +166,13 @@ class UnprocessedUrlRequeuer:
         suffix = RAW_SUFFIX_BY_TYPE[classified_type]
         raw_path = self._config.get_url_raw_dir() / classified_type / f"{stem}{suffix}"
         return raw_path.is_file() and raw_path.stat().st_size > 0
+
+    def _is_definitively_unreachable(self, normalized_url: str) -> bool:
+        """Return whether curl proves a URL is permanently gone via DNS failure or HTTP 404/410."""
+        result = self._reachability_probe.check(normalized_url)
+        if result.error is not None and "could not resolve host" in result.error.lower():
+            return True
+        return result.http_status in {"404", "410"}
 
     def _next_output_file(self, today: date) -> Path:
         """Return a recovery inbox path without overwriting an existing file."""

@@ -13,7 +13,7 @@ from src.url_ingestion.queue_reader import QueuedUrl
 
 CONTENT_FETCH_TIMEOUT_SECONDS: int = 10
 HtmlRenderWaitUntil = Literal["commit", "domcontentloaded", "load", "networkidle"]
-HTML_RENDER_WAIT_UNTIL: HtmlRenderWaitUntil = "load"
+HTML_RENDER_WAIT_UNTIL: HtmlRenderWaitUntil = "domcontentloaded"
 
 
 class UnsupportedUrlTypeError(ValueError):
@@ -22,6 +22,10 @@ class UnsupportedUrlTypeError(ValueError):
 
 class UrlDownloadError(RuntimeError):
     """Raised when a URL download fails validation."""
+
+
+class NonHtmlContentError(ValueError):
+    """Raised when an HTML-classified URL serves non-HTML content that must be re-routed."""
 
 
 @dataclass(frozen=True)
@@ -249,38 +253,78 @@ class TextDocumentDownloader:
 
 
 class HtmlDownloader:
-    """Download rendered HTML URLs to the configured raw HTML folder."""
+    """Download rendered HTML URLs, falling back to a direct HTTP fetch when rendering is blocked."""
 
-    def __init__(self, config: Config, renderer: HtmlRenderer) -> None:
+    def __init__(self, config: Config, renderer: HtmlRenderer, http_client: HttpClient) -> None:
         """Initialize the HTML downloader."""
         self._config = config
         self._renderer = renderer
+        self._http_client = http_client
 
     def download(self, queued_url: QueuedUrl) -> DownloadResult:
-        """Render and save one HTML URL or skip an existing non-empty raw file."""
+        """Render and save one HTML URL, fall back to a direct HTTP fetch when blocked, or skip an existing raw file."""
         raw_path = self.expected_raw_path(queued_url)
         if self._is_non_empty_file(raw_path):
             return DownloadResult(raw_path=raw_path, final_url=queued_url.normalized_url, http_status=None, status="skipped_existing")
 
-        rendered_html = self._renderer.render(queued_url.normalized_url)
-        if rendered_html.http_status is not None and rendered_html.http_status >= 400:
-            raise UrlDownloadError(f"HTML download returned HTTP {rendered_html.http_status} for {queued_url.normalized_url}")
-        if not rendered_html.html.strip():
-            raise UrlDownloadError(f"HTML renderer returned empty content for {queued_url.normalized_url}")
-
-        raw_path.parent.mkdir(parents=True, exist_ok=True)
-        raw_path.write_text(rendered_html.html, encoding="utf-8")
-        self._validate_raw_file(raw_path)
-        return DownloadResult(
-            raw_path=raw_path,
-            final_url=rendered_html.final_url,
-            http_status=rendered_html.http_status,
-            status="downloaded",
-        )
+        render_outcome = self._render(queued_url.normalized_url, raw_path)
+        if isinstance(render_outcome, DownloadResult):
+            return render_outcome
+        return self._download_via_http_fallback(queued_url, raw_path, render_outcome)
 
     def expected_raw_path(self, queued_url: QueuedUrl) -> Path:
         """Return the expected raw HTML output path."""
         return self._config.get_url_raw_dir() / "html" / f"{queued_url.sanitized_url_stem}.html"
+
+    def _render(self, normalized_url: str, raw_path: Path) -> DownloadResult | str:
+        """Render HTML and persist it, or return the reason rendering did not yield usable HTML."""
+        try:
+            rendered_html = self._renderer.render(normalized_url)
+        except Exception as exc:
+            return f"HTML render failed for {normalized_url}: {exc}"
+        if rendered_html.http_status is not None and rendered_html.http_status >= 400:
+            return f"HTML render returned HTTP {rendered_html.http_status} for {normalized_url}"
+        if not rendered_html.html.strip():
+            return f"HTML render returned empty content for {normalized_url}"
+        return self._persist_html(raw_path, rendered_html.html, rendered_html.final_url, rendered_html.http_status)
+
+    def _download_via_http_fallback(self, queued_url: QueuedUrl, raw_path: Path, render_error: str) -> DownloadResult:
+        """Fetch HTML directly when the headless renderer is blocked, or signal non-HTML content for re-routing."""
+        try:
+            response = self._http_client.get(
+                queued_url.normalized_url,
+                headers=self._browser_headers(),
+                timeout=CONTENT_FETCH_TIMEOUT_SECONDS,
+                allow_redirects=True,
+            )
+        except requests.RequestException as exc:
+            raise UrlDownloadError(f"{render_error}; HTTP fallback failed for {queued_url.normalized_url}: {exc}") from exc
+        if response.status_code >= 400:
+            raise UrlDownloadError(f"{render_error}; HTTP fallback returned HTTP {response.status_code} for {queued_url.normalized_url}")
+        content = response.content
+        if content.startswith(b"%PDF"):
+            raise NonHtmlContentError(f"{queued_url.normalized_url} served PDF content for an HTML-classified URL")
+        decoded_html = content.decode("utf-8", errors="replace")
+        if "<" not in decoded_html or not decoded_html.strip():
+            raise UrlDownloadError(f"{render_error}; HTTP fallback returned non-HTML content for {queued_url.normalized_url}")
+        return self._persist_html(raw_path, decoded_html, response.url, response.status_code)
+
+    def _persist_html(self, raw_path: Path, html: str, final_url: str | None, http_status: int | None) -> DownloadResult:
+        """Write rendered or fetched HTML to the configured raw HTML folder."""
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        raw_path.write_text(html, encoding="utf-8")
+        self._validate_raw_file(raw_path)
+        return DownloadResult(raw_path=raw_path, final_url=final_url, http_status=http_status, status="downloaded")
+
+    def _browser_headers(self) -> dict[str, str]:
+        """Return browser-like headers for the HTTP fallback fetch."""
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
 
     def _validate_raw_file(self, raw_path: Path) -> None:
         """Validate the raw HTML output exists and is non-empty."""
@@ -319,5 +363,7 @@ class DownloaderFactory:
         if classified_type == "html":
             if self._html_renderer is None:
                 raise UrlDownloadError("HTML downloader requires a renderer")
-            return HtmlDownloader(self._config, self._html_renderer)
+            if self._http_client is None:
+                raise UrlDownloadError("HTML downloader requires an HTTP client")
+            return HtmlDownloader(self._config, self._html_renderer, self._http_client)
         raise UnsupportedUrlTypeError(f"Unsupported URL type for download: {classified_type}")

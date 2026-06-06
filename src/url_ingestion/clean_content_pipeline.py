@@ -1,9 +1,12 @@
 """URL raw-to-cleaned Markdown processing pipeline."""
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
+from src.config import Config
 from src.url_ingestion.formatting import OversizedDocumentError
 from src.url_ingestion.raw_processing import RawContentItem, RawContentScanner, RawProcessorFactory
 
@@ -29,13 +32,35 @@ class CleanContentRunSummary:
     failures: tuple[RawContentProcessingFailure, ...]
 
 
+class CleaningErrorLog:
+    """Append clean-content failures to a durable daily processing-error log for human review."""
+
+    def __init__(self, config: Config, today_provider: Callable[[], date]) -> None:
+        """Initialize the cleaning error log."""
+        self._config = config
+        self._today_provider = today_provider
+
+    def append_failure(self, raw_path: str, reason: str) -> None:
+        """Append one raw path and failure reason as a single processing-error line."""
+        errors_dir = self._config.get_url_cleaned_dir() / "errors"
+        errors_dir.mkdir(parents=True, exist_ok=True)
+        log_path = errors_dir / f"{self._today_provider().isoformat()}.txt"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{self._single_line(raw_path)}\t{self._single_line(reason)}\n")
+
+    def _single_line(self, value: str) -> str:
+        """Collapse newlines and whitespace runs so one failure stays on one line."""
+        return " ".join(value.split())
+
+
 class UrlCleanContentPipeline:
     """Scan raw URL content and process it into cleaned Markdown."""
 
-    def __init__(self, scanner: RawContentScanner, processor_factory: RawProcessorFactory) -> None:
+    def __init__(self, scanner: RawContentScanner, processor_factory: RawProcessorFactory, error_log: CleaningErrorLog) -> None:
         """Initialize the clean-content pipeline."""
         self._scanner = scanner
         self._processor_factory = processor_factory
+        self._error_log = error_log
 
     def run(
         self,
@@ -82,9 +107,11 @@ class UrlCleanContentPipeline:
             except OversizedDocumentError as exc:
                 oversized_count += 1
                 failures.append(RawContentProcessingFailure(raw_path=str(item.raw_path), reason=str(exc)))
+                self._error_log.append_failure(str(item.raw_path), str(exc))
                 print(f"  oversized: {exc}", flush=True)
             except Exception as exc:
                 failures.append(RawContentProcessingFailure(raw_path=str(item.raw_path), reason=str(exc)))
+                self._error_log.append_failure(str(item.raw_path), str(exc))
                 print(f"  failed: {exc}", flush=True)
 
         return CleanContentRunSummary(

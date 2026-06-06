@@ -9,6 +9,7 @@ from pathlib import Path
 from src.config import Config
 from src.url_ingestion.classifier import UrlClassifier
 from src.url_ingestion.normalizer import UrlNormalizer
+from src.url_ingestion.reachability import CurlReachabilityProbe
 from src.url_ingestion.requeue_unprocessed import UnprocessedUrlRequeuer, select_requeue_candidates
 
 
@@ -26,7 +27,7 @@ def main() -> int:
     try:
         print(f"Loading config: {config_path}", flush=True)
         config = Config(config_path)
-        requeuer = UnprocessedUrlRequeuer(config, UrlNormalizer(), UrlClassifier())
+        requeuer = UnprocessedUrlRequeuer(config, UrlNormalizer(), UrlClassifier(), CurlReachabilityProbe())
         if args.write:
             summary = requeuer.write(date.today(), limit=args.limit, offset=args.offset)
             candidates = ()
@@ -42,6 +43,7 @@ def main() -> int:
     print(f"already_downloaded_count: {summary.already_downloaded_count}")
     print(f"unsupported_count: {summary.unsupported_count}")
     print(f"unprocessable_count: {summary.unprocessable_count}")
+    print(f"unreachable_count: {summary.unreachable_count}")
     selected_count = (
         summary.selected_count if args.write else len(select_requeue_candidates(candidates, limit=args.limit, offset=args.offset))
     )

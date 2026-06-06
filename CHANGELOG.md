@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 2026-06
+
+### 2026-06-06
+
+#### Added
+
+- `urls-requeue-unprocessed` now skips URLs that are definitively gone (DNS-unresolvable or HTTP 404/410) using a curl reachability pre-filter, so permanently dead URLs are no longer re-queued every run (new `unreachable_count`).
+- Added a durable cleaning processing-error log at `data/urls/data_cleaned/errors/<YYYY-MM-DD>.txt`: raw files that fail, produce empty/invalid output, or are oversized during clean-content processing are appended (one line each) for human review.
+
+#### Changed
+
+- HTML render wait strategy changed from `load` to `domcontentloaded`, so otherwise-reachable pages no longer time out waiting on images and trackers.
+
+#### Fixed
+
+- HTML downloader now falls back to a direct HTTP fetch when the headless renderer is blocked, errors, or returns empty/blocked content, recovering reachable pages that fail browser rendering (e.g. bot-detection 403s).
+- HTML-classified URLs that actually serve PDF content (e.g. extensionless `/pdf?id=` links) are re-routed to the PDF downloader instead of failing.
+- Download `unprocessed` archive entries are now written as a single line; multi-line Playwright error text previously polluted the line-oriented log and was mis-read as separate entries by the requeue scan.
+
+---
+
 ## 2026-05
 
 ### 2026-05-31

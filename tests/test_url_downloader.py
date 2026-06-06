@@ -14,6 +14,7 @@ from src.url_ingestion.downloader import (
     HTML_RENDER_WAIT_UNTIL,
     DownloaderFactory,
     HtmlDownloader,
+    NonHtmlContentError,
     PdfDownloader,
     PlaywrightHtmlRenderer,
     RenderedHtml,
@@ -312,7 +313,8 @@ def test_html_downloader_expected_path_and_skip_existing(tmp_path: Path) -> None
     """Calculate expected HTML output path and skip non-empty existing raw files."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
     renderer = FakeHtmlRenderer(RenderedHtml(html="<html>new</html>", final_url="https://example.com/file.html", http_status=200))
-    downloader = HtmlDownloader(config, renderer)
+    http_client = FakeHttpClient(FakeResponse(content=b"<html>fallback</html>", status_code=200, url="https://example.com/file.html"))
+    downloader = HtmlDownloader(config, renderer, http_client)
     item = queued_url("html", "https_example_com_file_html")
     expected_path = config.get_url_raw_dir() / "html" / "https_example_com_file_html.html"
     expected_path.parent.mkdir(parents=True)
@@ -324,13 +326,45 @@ def test_html_downloader_expected_path_and_skip_existing(tmp_path: Path) -> None
     assert result.raw_path == expected_path
     assert result.status == "skipped_existing"
     assert renderer.calls == []
+    assert http_client.calls == []
 
 
-def test_html_downloader_rejects_http_error_status(tmp_path: Path) -> None:
-    """Do not persist rendered error pages as successful HTML downloads."""
+def test_html_downloader_falls_back_to_http_when_renderer_is_blocked(tmp_path: Path) -> None:
+    """Save directly fetched HTML when the headless renderer returns a blocked status."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    renderer = FakeHtmlRenderer(RenderedHtml(html="<html>blocked</html>", final_url="https://example.com/page.html", http_status=403))
+    http_client = FakeHttpClient(FakeResponse(content=b"<html>real article</html>", status_code=200, url="https://example.com/page.html"))
+    downloader = HtmlDownloader(config, renderer, http_client)
+    item = queued_url("html", "https_example_com_page_html")
+
+    result = downloader.download(item)
+
+    assert result.status == "downloaded"
+    assert result.http_status == 200
+    assert http_client.calls == [item.normalized_url]
+    assert downloader.expected_raw_path(item).read_text(encoding="utf-8") == "<html>real article</html>"
+
+
+def test_html_downloader_signals_non_html_content_for_pdf_fallback(tmp_path: Path) -> None:
+    """Raise a re-routing signal when an HTML-classified URL serves PDF bytes."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    renderer = FakeHtmlRenderer(RenderedHtml(html="", final_url="https://example.com/doc", http_status=200))
+    http_client = FakeHttpClient(FakeResponse(content=b"%PDF-1.7 fake", status_code=200, url="https://example.com/doc"))
+    downloader = HtmlDownloader(config, renderer, http_client)
+    item = queued_url("html", "https_example_com_doc")
+
+    with pytest.raises(NonHtmlContentError):
+        downloader.download(item)
+
+    assert not downloader.expected_raw_path(item).exists()
+
+
+def test_html_downloader_raises_when_render_and_fallback_both_fail(tmp_path: Path) -> None:
+    """Combine the render failure and the HTTP fallback failure without persisting a file."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
     renderer = FakeHtmlRenderer(RenderedHtml(html="<html>missing</html>", final_url="https://example.com/missing.html", http_status=404))
-    downloader = HtmlDownloader(config, renderer)
+    http_client = FakeHttpClient(FakeResponse(content=b"<html>missing</html>", status_code=404, url="https://example.com/missing.html"))
+    downloader = HtmlDownloader(config, renderer, http_client)
     item = queued_url("html", "https_example_com_missing_html")
 
     with pytest.raises(UrlDownloadError, match="HTTP 404"):

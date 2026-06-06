@@ -5,12 +5,13 @@ import logging
 import sys
 from argparse import ArgumentParser, ArgumentTypeError
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import tiktoken
 
 from src.config import Config
-from src.url_ingestion.clean_content_pipeline import UrlCleanContentPipeline, select_pending_items
+from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UrlCleanContentPipeline, select_pending_items
 from src.url_ingestion.formatting import FormattingAgent, FormattingWorkEstimate, LiteLlmClient
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
@@ -103,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
             max_estimated_prompt_tokens=args.max_estimated_prompt_tokens,
         )
         print("Processing raw URL content...", flush=True)
-        summary = UrlCleanContentPipeline(RawContentScanner(config), processor_factory).run(
+        summary = UrlCleanContentPipeline(RawContentScanner(config), processor_factory, CleaningErrorLog(config, date.today)).run(
             limit=args.limit if selected_raw_paths is None else None,
             raw_path=args.raw_path if selected_raw_paths is None else None,
             raw_paths=selected_raw_paths,
