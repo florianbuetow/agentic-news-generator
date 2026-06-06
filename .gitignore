@@ -249,5 +249,10 @@ data/
 debug/
 .guardfile
 
+# Local utility scripts and tools
+.impeccable/
+update.sh
+archive-videos.sh
+
 # Dolt (beads issue tracker)
 .doltcfg/
