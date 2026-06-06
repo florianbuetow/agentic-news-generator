@@ -89,7 +89,11 @@ useHead({
 }
 
 .article-container {
-  /* Inherits background from main content */
+  /* A single centered reading column. The multi-column front page caps its own
+     measure; the article page is single-column, so cap it here to keep the line
+     length in the comfortable 65-75ch band for sustained reading. */
+  max-width: 40rem;
+  margin-inline: auto;
 }
 
 .article-header {
@@ -114,6 +118,7 @@ useHead({
   font-weight: 800;
   line-height: 1.1;
   margin: 0 0 15px 0;
+  text-wrap: balance;
 }
 
 .article-subhead {
@@ -170,6 +175,9 @@ useHead({
 .article-body :deep(p) {
   margin-bottom: 20px;
   text-align: justify;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  text-wrap: pretty;
 }
 
 .article-body :deep(p:first-of-type:first-letter) {

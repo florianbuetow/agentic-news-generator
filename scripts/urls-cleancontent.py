@@ -122,9 +122,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"oversized_count: {summary.oversized_count}")
     print(f"failure_count: {summary.failure_count}")
     if summary.failures:
-        print("\n--- Failure Summary ---", file=sys.stderr)
+        print("", file=sys.stderr)
         for failure in summary.failures:
-            print(f"{failure.raw_path}: {failure.reason}", file=sys.stderr)
+            print(f"ERROR: {failure.raw_path}: {failure.reason}", file=sys.stderr)
+        print(f"Encountered {len(summary.failures)} errors", file=sys.stderr)
         return 1
     return 0
 
@@ -174,9 +175,10 @@ def run_dry_run(
     print(f"estimated_prompt_tokens: {total_prompt_tokens}")
     print(f"failure_count: {len(failures)}")
     if failures:
-        print("\n--- Failure Summary ---", file=sys.stderr)
+        print("", file=sys.stderr)
         for raw_path, reason in failures:
-            print(f"{raw_path}: {reason}", file=sys.stderr)
+            print(f"ERROR: {raw_path}: {reason}", file=sys.stderr)
+        print(f"Encountered {len(failures)} errors", file=sys.stderr)
         return 1
     return 0
 

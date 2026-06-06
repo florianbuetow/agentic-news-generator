@@ -1018,35 +1018,6 @@ class TestChannelConfigLanguage:
         finally:
             temp_path.unlink()
 
-    def test_config_get_topic_segmentation_when_missing(self) -> None:
-        """Test that get_topic_segmentation_config raises KeyError when not configured."""
-        config_data = {
-            "paths": get_valid_paths_config(),
-            "channels": [
-                {
-                    "url": "https://www.youtube.com/@test",
-                    "name": "Test Channel",
-                    "category": "test",
-                    "description": "Test",
-                    "download-limiter": 20,
-                    "transcription-limiter": 20,
-                    "language": "en",
-                }
-            ],
-            # No topic_segmentation section
-        }
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            yaml.dump(config_data, f)
-            temp_path = Path(f.name)
-
-        try:
-            config = Config(temp_path)
-            with pytest.raises(KeyError) as exc_info:
-                config.get_topic_segmentation_config()
-            assert "topic_segmentation" in str(exc_info.value)
-        finally:
-            temp_path.unlink()
-
     def test_config_get_article_compiler_when_missing(self) -> None:
         """Test that get_article_compiler_config raises KeyError when not configured."""
         config_data = {

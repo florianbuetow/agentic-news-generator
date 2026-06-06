@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   app: {
     baseURL: '/',
     head: {
+      htmlAttrs: { lang: 'en' },
       title: 'The Artificial Intelligence Times',
       meta: [
         { charset: 'utf-8' },

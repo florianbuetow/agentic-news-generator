@@ -1,1 +1,1 @@
-"""Agents package for topic segmentation and content generation."""
+"""Agents package for content generation."""

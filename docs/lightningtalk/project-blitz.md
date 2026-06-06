@@ -26,8 +26,7 @@ graph LR
 
 ```mermaid
 graph LR
-    E[Cleaned Transcripts] -->|Topic Segmentation| F[Topic Segments JSON]
-    F -->|Article Generation Agent| G[News Articles]
+    E[Cleaned Transcripts] -->|Article Generation Agent| G[News Articles]
     G -->|Nuxt Generator| H[Static HTML Newspaper]
     H -->|Web Server| I[User Interface]
 
@@ -44,8 +43,7 @@ graph LR
 | **Audio Extraction** | Videos | Audio + silence maps | `.wav`, `.json` | [`../data/downloads/audio/{channel}/`](../data/downloads/audio/) <br> [`../data/downloads/metadata/{channel}/`](../data/downloads/metadata/) |
 | **Transcription** | Audio | Multi-format transcripts | `.srt`, `.txt`, `.vtt`, `.tsv`, `.json` | [`../data/downloads/transcripts/{channel}/`](../data/downloads/transcripts/) |
 | **Hallucination Detection** | Transcripts | Analysis + digest | `.json`, `.md` | [`../data/downloads/transcripts/{channel}/transcript-analysis/`](../data/downloads/transcripts/) <br> [`../data/output/hallucination_digest.md`](../data/output/hallucination_digest.md) |
-| **Topic Segmentation** | Transcripts | Topic segments | `.json` | [`../data/output/topics/`](../data/output/topics/) |
-| **Article Generation** | Topic segments | News articles | `.json` | [`../data/input/newspaper/articles.js`](../data/input/newspaper/articles.js) |
+| **Article Generation** | Transcripts | News articles | `.json` | [`../data/input/newspaper/articles.js`](../data/input/newspaper/articles.js) |
 | **Web Generation** | Articles | Static website | `.html`, `.css`, `.js` | [`../data/output/newspaper/`](../data/output/newspaper/) |
 
 ## System Components
@@ -68,11 +66,6 @@ graph TB
         G[SVM Hallucination Classifier]
     end
 
-    subgraph "Content Processing"
-        H[Topic Segmentation Agent]
-        I[Token Usage Monitor]
-    end
-
     subgraph "Article Generation"
         J[Content Aggregator]
         K[Article Generation Agent]
@@ -89,9 +82,7 @@ graph TB
     C --> E
     E --> F
     F --> G
-    G --> H
-    H --> I
-    H --> J
+    G --> J
     J --> K
     K --> L
     L --> M
@@ -99,7 +90,6 @@ graph TB
     style E fill:#ffcccc
     style F fill:#ffcccc
     style G fill:#ffcccc
-    style H fill:#cce5ff
     style K fill:#ccffcc
     style M fill:#e6ccff
 ```
@@ -136,16 +126,8 @@ The newspaper interface is organized into four main sections:
 
 **Code:** [`scripts/transcribe_audio.sh`](../scripts/transcribe_audio.sh) | [`scripts/convert_to_audio.sh`](../scripts/convert_to_audio.sh)
 
-### Topic Segmentation
-- **Agent-Critic Pattern**: Dual LLM validation for quality
-- **Token Monitoring**: Pre-flight validation prevents context overflow
-- **Threshold**: 90% of 262K context window (configurable)
-- **Observability**: Logs token count and percentage for every API call
-
-**Code:** [`src/agents/topic_segmentation/orchestrator.py`](../src/agents/topic_segmentation/orchestrator.py) | [`src/agents/topic_segmentation/agent.py`](../src/agents/topic_segmentation/agent.py) | [`src/agents/topic_segmentation/critic.py`](../src/agents/topic_segmentation/critic.py) | [`src/agents/topic_segmentation/token_validator.py`](../src/agents/topic_segmentation/token_validator.py)
-
 ### Article Generation
-- **Content Aggregation**: Combines related topics across multiple videos
+- **Content Aggregation**: Combines related content across multiple videos
 - **LLM-based Synthesis**: Generates newspaper-style articles
 - **Source Tracking**: Maintains video timestamps and metadata
 
@@ -174,13 +156,6 @@ The newspaper interface is organized into four main sections:
 - **Scale**: Can process 1000+ transcripts in minutes vs hours
 - **Token costs**: Zero API costs vs $100s for corpus-wide analysis
 
-### Why segment videos by topic instead of processing whole transcripts?
-- **Context management**: Prevents LLM context window overflow
-- **Content aggregation**: Combines related topics across multiple videos
-- **Relevance filtering**: Focus on specific AI domains (e.g., "LLMs", "Computer Vision")
-- **Article quality**: Tighter topic scope produces more coherent articles
-- **Processing efficiency**: Parallel processing of independent segments
-
 ### Why generate a static HTML newspaper instead of a dynamic web app?
 - **Zero infrastructure**: Deploy to any static host (GitHub Pages, Netlify, S3)
 - **Performance**: Instant load times, no server-side rendering
@@ -199,7 +174,7 @@ The newspaper interface is organized into four main sections:
 - **Temporal coherence**: Weekly digest requires synthesis, not retrieval
 - **Cross-video aggregation**: RAG retrieves per-query, not across corpus
 - **Narrative structure**: Articles need story arc, not fact retrieval
-- **Topic evolution**: Tracks how ideas develop across multiple sources
+- **Idea evolution**: Tracks how ideas develop across multiple sources
 - **Curation vs search**: Human-like editorial judgment, not keyword matching
 
 ### Why archive videos after processing?
@@ -271,7 +246,7 @@ agentic-news-generator/
 - **Visual integration**: Extract keyframes for article images
 - **Interactive player**: Embedded video with auto-skip to timestamp
 - **Source linking**: Click article text to see original video moment
-- **Relevance ranking**: Order topics by user interests/reading history
+- **Relevance ranking**: Order stories by user interests/reading history
 - **Multi-format output**: Email digest, RSS feed, mobile app
 
 ## Key Takeaways

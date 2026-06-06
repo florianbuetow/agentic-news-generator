@@ -98,9 +98,6 @@ Autogen + local LLM scan of `tests/` via AST. Flags tests that don't actually ex
 ### `tools/shellscript_analyzer/shellscript_analyzer.py` — `just ai-review-shell-scripts` / `-nocache`
 Autogen scan of every `.sh` file. Flags env-var reliance and missing CLI parameterisation. Cache at `.cache/shell_script_hashes.json`.
 
-### `tools/llm-topic-performance/benchmark.py`
-Queries LM Studio for all completion models, runs each against the production topic-extraction prompt, logs timing + output under `reports/llm-topic-extraction-comparison/`. Direct `uv run python tools/llm-topic-performance/benchmark.py`.
-
 ---
 
 ## Code Quality Diagnostics (grouped)
@@ -312,8 +309,7 @@ Reference: https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-co
 ## Playbook: Pipeline Stalls at LLM Step
 
 1. `just status` — verify LM Studio + required models loaded.
-2. `uv run python tools/llm-topic-performance/benchmark.py` — sanity-check model throughput.
-3. Check `reports/` for most recent stage output.
+2. Check `reports/` for most recent stage output.
 
 ---
 

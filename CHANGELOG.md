@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - HTML render wait strategy changed from `load` to `domcontentloaded`, so otherwise-reachable pages no longer time out waiting on images and trackers.
 
+#### Removed
+
+- Removed all topic-processing code: agent-critic topic segmentation, the LLM topic-experiment script, Codex-driven topic extraction, the `topic_detection` module, and their config models, tests, and LM Studio status checks. The code is preserved in the external archive.
+
 #### Fixed
 
 - HTML downloader now falls back to a direct HTTP fetch when the headless renderer is blocked, errors, or returns empty/blocked content, recovering reachable pages that fail browser rendering (e.g. bot-detection 403s).

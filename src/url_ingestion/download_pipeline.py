@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 from src.config import Config
-from src.url_ingestion.downloader import DownloaderFactory, DownloadResult, NonHtmlContentError, UnsupportedUrlTypeError
+from src.url_ingestion.downloader import Downloader, DownloaderFactory, DownloadResult, NonHtmlContentError, UnsupportedUrlTypeError
 from src.url_ingestion.metadata import Metadata, MetadataHelper
 from src.url_ingestion.normalizer import UnprocessableUrl
 from src.url_ingestion.queue_reader import InboxFileSnapshot, QueuedUrl, UrlQueueSummary
@@ -100,7 +100,6 @@ class UrlDownloadPipeline:
         """Run downloads for a prepared queue summary."""
         failures: list[UrlDownloadFailure] = []
         successful_download_count = 0
-        skipped_download_count = 0
         unprocessed_count = 0
 
         for unprocessable_url in queue_summary.unprocessable_urls:
@@ -108,32 +107,42 @@ class UrlDownloadPipeline:
             unprocessed_count += 1
             self._emit(f"unprocessable: {unprocessable_url.original_url} | {unprocessable_url.reason}")
 
-        total_queued = len(queue_summary.queued_urls)
-        if total_queued == 0:
+        pending_urls = tuple(url for url in queue_summary.queued_urls if not self._is_already_downloaded(url))
+        skipped_download_count = len(queue_summary.queued_urls) - len(pending_urls)
+        if skipped_download_count:
+            self._emit(f"Skipping {skipped_download_count} previously downloaded urls.")
+        if not queue_summary.queued_urls:
             self._emit("No queued URLs to download.")
-        for index, queued_url in enumerate(queue_summary.queued_urls, start=1):
-            self._emit(f"[{index}/{total_queued}] {queued_url.classified_type}: {queued_url.normalized_url}")
+
+        total_pending = len(pending_urls)
+        for index, queued_url in enumerate(pending_urls, start=1):
+            progress = f"[{index}/{total_pending}]"
             try:
-                try:
-                    download_result = self._download_and_record(queued_url)
-                except NonHtmlContentError as exc:
-                    self._emit(f"  re-routing to PDF downloader: {exc}")
-                    download_result = self._download_and_record(replace(queued_url, classified_type="pdf"))
-                if download_result.status == "skipped_existing":
-                    skipped_download_count += 1
-                else:
-                    successful_download_count += 1
+                downloader = self._downloader_factory.create(queued_url.classified_type)
             except UnsupportedUrlTypeError as exc:
                 unprocessed_count += 1
-                source_line = self._failure_source_line(queued_url)
-                self._archive.append_unprocessed(source_line, str(exc))
-                self._emit(f"  unprocessed: {exc}")
-            except Exception as exc:
-                reason = self._failure_reason_with_reachability(queued_url, str(exc))
-                failure = UrlDownloadFailure(original_url=self._failure_source_line(queued_url), reason=reason)
-                failures.append(failure)
-                self._archive.append_unprocessed(failure.original_url, failure.reason)
-                self._emit(f"  failed: {failure.reason}")
+                self._archive.append_unprocessed(self._failure_source_line(queued_url), str(exc))
+                self._emit(f"{progress} Unsupported type, archived for review: {queued_url.normalized_url}")
+            else:
+                self._emit(f"{progress} Processing: {queued_url.normalized_url}")
+                try:
+                    rerouted = False
+                    try:
+                        download_result = self._download_and_record(queued_url, downloader)
+                    except NonHtmlContentError:
+                        rerouted = True
+                        self._emit("  re-routing to PDF (served non-HTML content)...")
+                        pdf_downloader = self._downloader_factory.create("pdf")
+                        download_result = self._download_and_record(replace(queued_url, classified_type="pdf"), pdf_downloader)
+                    successful_download_count += 1
+                    size = download_result.raw_path.stat().st_size
+                    resolved_type = "pdf (re-routed from html)" if rerouted else queued_url.classified_type
+                    self._emit(f"  done: {resolved_type} ({size:,} bytes)")
+                except Exception as exc:
+                    reason = " ".join(self._failure_reason_with_reachability(queued_url, str(exc)).split())
+                    failures.append(UrlDownloadFailure(original_url=self._failure_source_line(queued_url), reason=reason))
+                    self._archive.append_unprocessed(self._failure_source_line(queued_url), reason)
+                    self._emit(f"  failed: {reason}")
 
         self._archive.remove_unchanged_files(queue_summary.inbox_file_snapshots)
         return UrlDownloadRunSummary(
@@ -145,20 +154,21 @@ class UrlDownloadPipeline:
             failures=tuple(failures),
         )
 
-    def _download_and_record(self, queued_url: QueuedUrl) -> DownloadResult:
-        """Download one queued URL, persist metadata, archive the successful source line, and report progress."""
-        downloader = self._downloader_factory.create(queued_url.classified_type)
+    def _is_already_downloaded(self, queued_url: QueuedUrl) -> bool:
+        """Return whether a supported URL already has a non-empty raw file on disk."""
+        try:
+            downloader = self._downloader_factory.create(queued_url.classified_type)
+        except UnsupportedUrlTypeError:
+            return False
+        return downloader.already_downloaded(queued_url)
+
+    def _download_and_record(self, queued_url: QueuedUrl, downloader: Downloader) -> DownloadResult:
+        """Download one queued URL with the given downloader, persist metadata, and archive the source line."""
         download_result = downloader.download(queued_url)
         self._save_metadata(
             queued_url, download_result.raw_path, download_result.final_url, download_result.http_status, download_result.status
         )
         self._archive.append_done(queued_url.original_url)
-        if download_result.http_status is not None:
-            self._emit(f"  http_status: {download_result.http_status}")
-        if download_result.final_url and download_result.final_url != queued_url.normalized_url:
-            self._emit(f"  final_url: {download_result.final_url}")
-        self._emit(f"  raw_bytes: {download_result.raw_path.stat().st_size}")
-        self._emit(f"  {download_result.status}: {download_result.raw_path}")
         return download_result
 
     def _emit(self, message: str) -> None:

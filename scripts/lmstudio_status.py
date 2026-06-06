@@ -47,19 +47,7 @@ def collect_required_models(config: _Cfg) -> list[RequiredModel]:
     """Walk config and collect all (section, model, api_base) tuples for LM Studio endpoints."""
     models: list[RequiredModel] = []
 
-    ts = _sub(config, "topic_segmentation")
-    for key in ("agent_llm", "critic_llm"):
-        llm = _sub(ts, key)
-        if llm.get("api_base"):
-            models.append(
-                RequiredModel(
-                    section=f"topic_segmentation.{key}",
-                    model=str(llm["model"]),
-                    api_base=str(llm["api_base"]),
-                )
-            )
-
-    for top_key in ("summarize_transcripts", "topic_boundaries", "url_clean_content"):
+    for top_key in ("summarize_transcripts", "url_clean_content"):
         llm = _sub(_sub(config, top_key), "llm")
         if llm.get("api_base"):
             models.append(

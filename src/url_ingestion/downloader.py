@@ -45,6 +45,10 @@ class Downloader(Protocol):
         """Download a queued URL and return the raw file path."""
         ...
 
+    def already_downloaded(self, queued_url: QueuedUrl) -> bool:
+        """Return whether a non-empty raw file already exists for this URL."""
+        ...
+
 
 class HttpResponse(Protocol):
     """Minimal HTTP response protocol used by the PDF downloader."""
@@ -171,6 +175,10 @@ class PdfDownloader:
         """Return the expected raw PDF output path."""
         return self._config.get_url_raw_dir() / "pdf" / f"{queued_url.sanitized_url_stem}.pdf"
 
+    def already_downloaded(self, queued_url: QueuedUrl) -> bool:
+        """Return whether a non-empty raw PDF already exists for this URL."""
+        return self._is_non_empty_file(self.expected_raw_path(queued_url))
+
     def _browser_headers(self) -> dict[str, str]:
         """Return browser-like headers for HTTP downloads."""
         return {
@@ -232,6 +240,10 @@ class TextDocumentDownloader:
         suffix = ".md" if self._classified_type == "markdown" else ".txt"
         return self._config.get_url_raw_dir() / self._classified_type / f"{queued_url.sanitized_url_stem}{suffix}"
 
+    def already_downloaded(self, queued_url: QueuedUrl) -> bool:
+        """Return whether a non-empty raw text document already exists for this URL."""
+        return self._is_non_empty_file(self.expected_raw_path(queued_url))
+
     def _browser_headers(self) -> dict[str, str]:
         """Return browser-like headers for text downloads."""
         return {
@@ -275,6 +287,10 @@ class HtmlDownloader:
     def expected_raw_path(self, queued_url: QueuedUrl) -> Path:
         """Return the expected raw HTML output path."""
         return self._config.get_url_raw_dir() / "html" / f"{queued_url.sanitized_url_stem}.html"
+
+    def already_downloaded(self, queued_url: QueuedUrl) -> bool:
+        """Return whether a non-empty raw HTML file already exists for this URL."""
+        return self._is_non_empty_file(self.expected_raw_path(queued_url))
 
     def _render(self, normalized_url: str, raw_path: Path) -> DownloadResult | str:
         """Render HTML and persist it, or return the reason rendering did not yield usable HTML."""

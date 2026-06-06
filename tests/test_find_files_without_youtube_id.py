@@ -26,8 +26,9 @@ class _PathsConfig:
 
 
 class _Config:
-    def __init__(self, data_dir: Path, category_dirs: dict[str, Path]) -> None:
+    def __init__(self, data_dir: Path, category_dirs: dict[str, Path], reports_dir: Path | None = None) -> None:
         self._data_dir = data_dir
+        self._reports_dir = reports_dir if reports_dir is not None else data_dir.parent / "reports"
         paths = {"data_dir": str(data_dir)}
         for key, path in category_dirs.items():
             paths[key] = str(path)
@@ -35,6 +36,9 @@ class _Config:
 
     def get_data_dir(self) -> Path:
         return self._data_dir
+
+    def get_reports_dir(self) -> Path:
+        return self._reports_dir
 
     def get_paths_config(self) -> _PathsConfig:
         return self._paths_config
@@ -128,13 +132,61 @@ def test_iter_orphan_files_excludes_download_archives(tmp_path: Path) -> None:
     assert orphans == [orphan]
 
 
+def test_iter_orphan_files_ignores_shell_scripts(tmp_path: Path) -> None:
+    module = _load_script_module()
+    base_dir = tmp_path / "metadata"
+    channel_dir = base_dir / "Example Channel"
+    channel_dir.mkdir(parents=True)
+
+    (channel_dir / "rsync-to-nas.sh").write_text("#!/bin/sh\n")
+    orphan = channel_dir / "Orphan.json"
+    orphan.write_text("{}")
+
+    orphans = list(module.iter_orphan_files(base_dir))
+
+    # Shell scripts are never downloadable content and are ignored.
+    assert orphans == [orphan]
+
+
+def test_iter_orphan_files_ignores_dot_directories(tmp_path: Path) -> None:
+    module = _load_script_module()
+    base_dir = tmp_path / "videos"
+    channel_dir = base_dir / "Example Channel"
+    dot_dir = base_dir / ".claude"
+    channel_dir.mkdir(parents=True)
+    dot_dir.mkdir(parents=True)
+
+    (dot_dir / "settings.local.json").write_text("{}")
+    orphan = channel_dir / "Orphan.mp4"
+    orphan.write_text("content")
+
+    orphans = list(module.iter_orphan_files(base_dir))
+
+    # Files under dot-directories (e.g. .claude) are ignored.
+    assert orphans == [orphan]
+
+
 def test_iter_orphan_files_returns_nothing_for_missing_directory(tmp_path: Path) -> None:
     module = _load_script_module()
 
     assert list(module.iter_orphan_files(tmp_path / "does-not-exist")) == []
 
 
-def test_print_scan_groups_by_category_and_counts(tmp_path: Path, capsys: Any) -> None:
+def test_render_box_table_is_aligned_with_total() -> None:
+    module = _load_script_module()
+
+    table = module.render_box_table([("downloads/videos", 1), ("downloads/transcripts", 110)], 111)
+    lines = table.splitlines()
+
+    # Every rendered line shares the same width -> columns are aligned.
+    assert len({len(line) for line in lines}) == 1
+    assert lines[0].startswith("┌") and lines[0].endswith("┐")
+    assert lines[-1].startswith("└") and lines[-1].endswith("┘")
+    assert "Category" in table and "Orphans" in table
+    assert "TOTAL" in table and "111" in table
+
+
+def test_collect_results_and_render_report(tmp_path: Path) -> None:
     module = _load_script_module()
     data_dir = tmp_path / "data"
     videos_dir = data_dir / "downloads" / "videos" / "Example Channel"
@@ -142,8 +194,7 @@ def test_print_scan_groups_by_category_and_counts(tmp_path: Path, capsys: Any) -
     videos_dir.mkdir(parents=True)
     audio_dir.mkdir(parents=True)
 
-    orphan_video = videos_dir / "Orphan.mp4"
-    orphan_video.write_text("content")
+    (videos_dir / "Orphan.mp4").write_text("content")
     (audio_dir / "Paired [abcDEF123_-].wav").write_text("content")
     (audio_dir / "Paired.wav").write_text("content")
 
@@ -155,11 +206,69 @@ def test_print_scan_groups_by_category_and_counts(tmp_path: Path, capsys: Any) -
         },
     )
 
-    total = module.print_scan(config)
-    captured = capsys.readouterr()
+    results = module.collect_results(config)
+    by_key = {result.config_key: result for result in results}
 
-    assert total == 1
-    assert "=== Scanning data_downloads_videos_dir:" in captured.out
-    assert "=== Scanning data_downloads_audio_dir:" in captured.out
-    assert "downloads/videos/Example Channel/Orphan.mp4" in captured.out
-    assert "No files without a YouTube ID found in this folder." in captured.out
+    assert [str(orphan) for orphan in by_key["data_downloads_videos_dir"].orphans] == ["Example Channel/Orphan.mp4"]
+    assert by_key["data_downloads_audio_dir"].orphans == []
+
+    report = module.render_report(results)
+    assert report.startswith("```")
+    assert "# downloads/videos" in report
+    assert "Example Channel/Orphan.mp4" in report
+    # The empty audio folder gets no H1 section.
+    assert "# downloads/audio" not in report
+    # Second processing step: the deduplicated channel/video list at the bottom.
+    assert "# Channel/Video list" in report
+    assert "Example Channel — Orphan" in report
+
+
+def test_format_channel_video_line() -> None:
+    module = _load_script_module()
+
+    assert module.format_channel_video_line("AI_Engineer", "Some Title") == "AI_Engineer — Some Title"
+    assert module.format_channel_video_line("", "Loose Title") == "Loose Title"
+
+
+def test_deduplicated_channel_video_pairs_collapses_across_folders() -> None:
+    module = _load_script_module()
+
+    results = [
+        module.FolderResult(
+            "data_downloads_transcripts_dir",
+            Path("downloads/transcripts"),
+            [Path("AI_Engineer/Some Title.srt"), Path("AI_Engineer/Some Title.vtt"), Path("Anthropic/Other.srt")],
+        ),
+        module.FolderResult(
+            "data_downloads_transcripts_summaries_dir",
+            Path("downloads/transcripts_summaries"),
+            [Path("AI_Engineer/Some Title.md")],
+        ),
+    ]
+
+    pairs = module.deduplicated_channel_video_pairs(results)
+
+    # "Some Title" appears as .srt/.vtt/.md across two folders -> one pair; sorted by channel then title.
+    assert pairs == [("AI_Engineer", "Some Title"), ("Anthropic", "Other")]
+
+
+def test_write_report_writes_to_reports_dir(tmp_path: Path) -> None:
+    module = _load_script_module()
+    data_dir = tmp_path / "data"
+    reports_dir = tmp_path / "reports"
+    videos_dir = data_dir / "downloads" / "videos" / "Example Channel"
+    videos_dir.mkdir(parents=True)
+    (videos_dir / "Orphan.mp4").write_text("content")
+
+    config = _Config(
+        data_dir,
+        {"data_downloads_videos_dir": data_dir / "downloads" / "videos"},
+        reports_dir=reports_dir,
+    )
+
+    results = module.collect_results(config)
+    report_path = module.write_report(config, module.render_report(results))
+
+    assert report_path == reports_dir / "files-without-youtube-id.md"
+    assert report_path.is_file()
+    assert "# downloads/videos" in report_path.read_text(encoding="utf-8")

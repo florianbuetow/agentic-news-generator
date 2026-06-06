@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Any
 
+import pytest
 import yaml
 
 from src.config import Config
@@ -248,6 +249,46 @@ def test_download_pipeline_second_run_skips_existing_raw_files(tmp_path: Path) -
     assert second_summary.failure_count == 0
     assert second_http_client.calls == []
     assert second_html_renderer.calls == []
+
+
+def test_download_pipeline_filters_previously_downloaded_urls_and_prints_count(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Previously-downloaded URLs are filtered out before the loop and reported as a single count."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    inbox_dir = config.get_url_inbox_dir()
+    inbox_dir.mkdir(parents=True)
+    (inbox_dir / "links.txt").write_text("https://example.com/article.html\n", encoding="utf-8")
+    raw_path = config.get_url_raw_dir() / "html" / "https_example_com_article_html.html"
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_text("<html>existing</html>", encoding="utf-8")
+    http_client = FakeHttpClient(FakeResponse(content=b"x", status_code=200, url="https://example.com/article.html"))
+    html_renderer = FakeHtmlRenderer(RenderedHtml(html="<html></html>", final_url="https://example.com/article.html", http_status=200))
+
+    summary = make_pipeline(config, http_client, html_renderer).run(read_queue(config))
+
+    out = capsys.readouterr().out
+    assert summary.skipped_download_count == 1
+    assert "Skipping 1 previously downloaded urls." in out
+    assert "Processing:" not in out
+    assert str(raw_path) not in out
+
+
+def test_download_pipeline_prints_processing_line_before_a_fresh_download(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A fresh (non-skipped) download announces 'Processing' before the work and 'done' after."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    inbox_dir = config.get_url_inbox_dir()
+    inbox_dir.mkdir(parents=True)
+    (inbox_dir / "links.txt").write_text("https://example.com/fresh.html\n", encoding="utf-8")
+    http_client = FakeHttpClient(FakeResponse(content=b"x", status_code=200, url="https://example.com/fresh.html"))
+    html_renderer = FakeHtmlRenderer(
+        RenderedHtml(html="<html>fresh body</html>", final_url="https://example.com/fresh.html", http_status=200)
+    )
+
+    summary = make_pipeline(config, http_client, html_renderer).run(read_queue(config))
+
+    out = capsys.readouterr().out
+    assert summary.successful_download_count == 1
+    assert "Processing: https://example.com/fresh.html" in out
+    assert "done: html" in out
 
 
 def test_download_pipeline_archives_unprocessed_source_lines_and_keeps_changed_inbox_file(tmp_path: Path) -> None:

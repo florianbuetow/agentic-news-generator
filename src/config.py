@@ -133,35 +133,6 @@ class LLMConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class TopicSegmentationConfig(BaseModel):
-    """Configuration for topic segmentation agent system."""
-
-    agent_llm: LLMConfig = Field(..., description="LLM config for segmentation agent")
-    critic_llm: LLMConfig = Field(..., description="LLM config for critic agent")
-    retry_limit: int = Field(..., description="Maximum retry attempts")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicsExperimentConfig(BaseModel):
-    """Configuration for the experimental LLM topic segmentation script."""
-
-    api_base: str = Field(..., description="LM Studio OpenAI-compatible base URL")
-    models_endpoint: str = Field(..., description="LM Studio native /api/v0/models endpoint URL")
-    api_key: str = Field(..., description="API key for LM Studio (any non-empty string)")
-    models_http_timeout: float = Field(..., gt=0, description="HTTP timeout in seconds for the models endpoint call")
-    output_subdir: str = Field(..., min_length=1, description="Sub-directory under data_output_dir for experiment JSON files")
-    temperature: float = Field(..., ge=0.0, description="Sampling temperature for segmentation calls")
-    max_output_tokens: int = Field(..., gt=0, description="Maximum tokens reserved for LLM response")
-    token_safety_factor: float = Field(..., ge=1.0, description="Multiplier applied to measured input tokens")
-    prompt_overhead_tokens: int = Field(..., ge=0, description="Extra tokens reserved for system prompt and wrapping")
-    prefer_loaded: bool = Field(..., description="Prefer models already loaded in LM Studio when selecting")
-    max_retries: int = Field(..., gt=0, description="Number of LLM retries on parse/validation errors")
-    retry_delay: float = Field(..., gt=0, description="Delay in seconds between retries")
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
 class SummarizeTranscriptsConfig(BaseModel):
     """Configuration for transcript summarization via LLM."""
 
@@ -204,21 +175,6 @@ class UrlCleanContentConfig(BaseModel):
         ge=0,
         le=100,
         description="Skip URL documents when prompt token count exceeds this percentage of the model context window",
-    )
-
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-
-class TopicsConfig(BaseModel):
-    """Configuration for topic extraction from hallucination-freed SRT transcripts."""
-
-    input_dir: str = Field(..., min_length=1, description="Input directory of hallucination-freed SRT files (relative to data_dir)")
-    output_dir: str = Field(..., min_length=1, description="Output directory for topic extraction results (relative to data_dir)")
-    codex_model: str = Field(..., min_length=1, description="Codex model identifier passed to `codex exec -m`")
-    prompt_template: str = Field(
-        ...,
-        min_length=1,
-        description="Prompt template path (relative to project root) with {{INPUT_SRT_FILE}} and {{OUTPUT_JSON_FILE}} placeholders",
     )
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -359,18 +315,12 @@ class Config:
 
     def _validate_pipeline_sections(self) -> None:
         """Validate optional pipeline-related config sections."""
-        if "topic_segmentation" in self._data:
-            self._topic_segmentation = self._validate_topic_segmentation()
         if "transcription" in self._data:
             self._transcription = self._validate_transcription()
-        if "topics_experiment" in self._data:
-            self._topics_experiment = self._validate_topics_experiment()
         if "summarize_transcripts" in self._data:
             self._summarize_transcripts = self._validate_summarize_transcripts()
         if "url_clean_content" in self._data:
             self._url_clean_content = self._validate_url_clean_content()
-        if "topics" in self._data:
-            self._topics = self._validate_topics()
         if "url_processing" in self._data:
             self._url_processing = self._validate_url_processing()
 
@@ -490,21 +440,6 @@ class Config:
                 return channel
         raise KeyError(f"No channel found with name: {name}")
 
-    def _validate_topic_segmentation(self) -> TopicSegmentationConfig:
-        """Validate topic segmentation configuration.
-
-        Returns:
-            Validated TopicSegmentationConfig instance.
-
-        Raises:
-            ValueError: If topic segmentation configuration is invalid.
-        """
-        try:
-            return TopicSegmentationConfig.model_validate(self._data["topic_segmentation"])
-        except ValidationError as e:
-            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
-            raise ValueError(f"Topic segmentation configuration validation failed: {error_messages}") from e
-
     def _validate_transcription(self) -> TranscriptionConfig:
         """Validate transcription configuration.
 
@@ -519,18 +454,6 @@ class Config:
         except ValidationError as e:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Transcription configuration validation failed: {error_messages}") from e
-
-    def _validate_topics_experiment(self) -> TopicsExperimentConfig:
-        """Validate topics_experiment configuration.
-
-        Raises:
-            ValueError: If topics_experiment configuration is invalid.
-        """
-        try:
-            return TopicsExperimentConfig.model_validate(self._data["topics_experiment"])
-        except ValidationError as e:
-            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
-            raise ValueError(f"Topics experiment configuration validation failed: {error_messages}") from e
 
     def _validate_summarize_transcripts(self) -> SummarizeTranscriptsConfig:
         """Validate summarize_transcripts configuration."""
@@ -547,14 +470,6 @@ class Config:
         except ValidationError as e:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"URL clean content configuration validation failed: {error_messages}") from e
-
-    def _validate_topics(self) -> TopicsConfig:
-        """Validate topics configuration."""
-        try:
-            return TopicsConfig.model_validate(self._data["topics"])
-        except ValidationError as e:
-            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
-            raise ValueError(f"Topics configuration validation failed: {error_messages}") from e
 
     def _validate_url_processing(self) -> UrlProcessingConfig:
         """Validate URL processing configuration."""
@@ -603,29 +518,6 @@ class Config:
         """Get the validated paths configuration model."""
         return self._paths
 
-    def get_topic_segmentation_config(self) -> TopicSegmentationConfig:
-        """Get topic segmentation configuration.
-
-        Returns:
-            TopicSegmentationConfig instance.
-
-        Raises:
-            KeyError: If topic_segmentation section is not configured.
-        """
-        if not hasattr(self, "_topic_segmentation"):
-            raise KeyError("Missing required key 'topic_segmentation' in config file")
-        return self._topic_segmentation
-
-    def get_topics_experiment_config(self) -> TopicsExperimentConfig:
-        """Get topics_experiment configuration.
-
-        Raises:
-            KeyError: If topics_experiment section is not configured.
-        """
-        if not hasattr(self, "_topics_experiment"):
-            raise KeyError("Missing required key 'topics_experiment' in config file")
-        return self._topics_experiment
-
     def get_summarize_transcripts_config(self) -> SummarizeTranscriptsConfig:
         """Get summarize_transcripts configuration."""
         if not hasattr(self, "_summarize_transcripts"):
@@ -637,12 +529,6 @@ class Config:
         if not hasattr(self, "_url_clean_content"):
             raise KeyError("Missing required key 'url_clean_content' in config file")
         return self._url_clean_content
-
-    def get_topics_config(self) -> TopicsConfig:
-        """Get topics configuration."""
-        if not hasattr(self, "_topics"):
-            raise KeyError("Missing required key 'topics' in config file")
-        return self._topics
 
     def get_url_processing_config(self) -> UrlProcessingConfig:
         """Get URL processing configuration."""

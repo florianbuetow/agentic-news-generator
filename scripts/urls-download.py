@@ -57,9 +57,10 @@ def main() -> int:
     print(f"unprocessed_count: {run_summary.unprocessed_count}")
     print(f"failure_count: {run_summary.failure_count}")
     if run_summary.failures:
-        print("\n--- Failure Summary ---", file=sys.stderr)
+        print("", file=sys.stderr)
         for failure in run_summary.failures:
-            print(f"{failure.original_url}: {failure.reason}", file=sys.stderr)
+            print(f"ERROR: {failure.original_url}: {failure.reason}", file=sys.stderr)
+        print(f"Encountered {len(run_summary.failures)} errors", file=sys.stderr)
         return 1
     return 0
 

@@ -2,7 +2,7 @@
 
 # Agentic News Generator
 
-An AI-powered YouTube news aggregator that crawls AI-focused YouTube channels, transcribes video content, segments transcripts by topic, and generates a weekly newspaper-style HTML digest using autonomous AI agents.
+An AI-powered YouTube news aggregator that crawls AI-focused YouTube channels, transcribes video content, and generates a weekly newspaper-style HTML digest using autonomous AI agents.
 
 
 ## Overview
@@ -11,11 +11,9 @@ This system automatically:
 1. Downloads videos from pre-configured YouTube channels
 2. Extracts audio from videos to WAV format
 3. Transcribes audio using MLX Whisper (medium.en for English, medium for other languages) with automatic translation to English and multiple output formats
-4. Segments transcripts into topic-based sections using AI analysis
-5. Aggregates related topic segments across multiple videos
-6. Generates news articles from aggregated content using AI agents
-7. Produces a newspaper-style HTML digest
-8. Archives processed videos to save disk space
+4. Generates news articles from transcribed content using AI agents
+5. Produces a newspaper-style HTML digest
+6. Archives processed videos to save disk space
 
 ## Repository Structure
 
@@ -76,7 +74,6 @@ agentic-news-generator/
     ├── temp/              # Temporary processing files
     └── output/
         ├── hallucination_digest.md  # Hallucination report
-        ├── topics/        # Per-topic aggregated JSON
         └── newspaper/     # Generated static site
 ```
 
@@ -570,53 +567,7 @@ print(f"Trimmed 125.0s → Original {original_time:.2f}s")
 - **Faster transcription**: 10-30% time savings from shorter audio
 - **Reduced costs**: Less audio to process with cloud transcription services
 - **Precise mapping**: `aselect` filter ensures exact timestamp alignment with detected intervals
-- **Video referencing**: Accurate reconstruction of original video timestamps for topic segmentation
-
-### Topic Segmentation: Token Usage Monitoring
-
-The topic segmentation pipeline includes proactive token usage monitoring to prevent context window overflow and silent failures during LLM API calls.
-
-**How It Works:**
-- **Pre-flight validation**: Before each LLM API call (agent and critic), the system counts tokens using tiktoken
-- **Threshold enforcement**: Raises `ContextWindowExceededError` when token usage exceeds the configured threshold
-- **Observability**: Logs token count and percentage for every API call for monitoring
-
-**Configuration** (in `config/config.yaml`):
-```yaml
-topic_segmentation:
-  agent_llm:
-    context_window: 262144              # Model's maximum context window
-    context_window_threshold: 90        # Raise error at 90% usage (0-100)
-
-  critic_llm:
-    context_window: 262144
-    context_window_threshold: 90
-```
-
-**Example Output:**
-```
-[Agent] Token count: 185,432 tokens (70.7% of context window)
-[Agent] Calling LLM API...
-```
-
-**When Threshold Exceeded:**
-```
-[Agent] ✗ Token validation failed: Token usage (250,000 tokens) exceeds 90% threshold
-(235,929 tokens) of context window (262,144 tokens). Current usage: 95.4%
-```
-
-**Benefits:**
-- **Early failure detection**: Catch issues before wasting time on API calls that will fail
-- **Clear diagnostics**: Know exactly why processing failed and by how much
-- **Cost savings**: Avoid wasted API calls on paid services (Claude API, GPT-4, etc.)
-- **Visibility**: Track token usage trends across transcripts to identify problematic videos
-- **Configurable**: Tune threshold per deployment (0-100%) based on your needs
-
-**Technical Details:**
-- Uses tiktoken library with `o200k_base` encoding (GPT-4o compatible)
-- Runs locally with no external API costs
-- Compatible with existing error handling (ValueError → SegmentationResult with success=False)
-- Comprehensive test coverage with 44 tests for validation logic
+- **Video referencing**: Accurate reconstruction of original video timestamps for source referencing
 
 ## Troubleshooting
 
@@ -838,11 +789,6 @@ The system is configured via `config/config.yaml`. The configuration defines:
   - `min_window_size`: Window size in words (default: 500)
   - `overlap_percent`: Overlap between windows (default: 25.0)
 
-- **Topic Segmentation**: LLM configuration for topic analysis
-  - Agent and critic LLM settings
-  - Context window thresholds
-  - Retry limits
-
 - **Defaults**: Centralized default parameter values
   - `encoding_name`: Tiktoken encoding for token counting (default: `o200k_base`)
   - `repetition_min_k`: Minimum phrase length for repetition detection (default: 1)
@@ -1003,10 +949,8 @@ This project is in active development. Current implementation status:
 - ✅ Transcript hallucination detection (`scripts/transcript-hallucination-detection.py`)
 - ✅ Video archiving and cleanup (`scripts/archive-videos.sh`)
 - ✅ HTML newspaper frontend (Nuxt-based, `frontend/newspaper/`)
-- 🚧 Topic segmentation
 - 🚧 Article generation
-- 🚧 Python-to-frontend data pipeline (transform topic data to articles.js format)
-- 🚧 Topic ordering based on relevancy ("interests")
+- 🚧 Python-to-frontend data pipeline (transform article data to articles.js format)
 
 __Known Issues / TODO__
 
@@ -1084,7 +1028,7 @@ Initial transcription with `large-v3` had two issues:
 **What We Chose:** Extract title + description from metadata
 
 **Why:**
-- Videos already have topic summaries
+- Videos already have descriptive summaries
 - Context helps with technical terms
 - Whisper benefits from domain hints
 
