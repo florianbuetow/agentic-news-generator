@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 2026-06
 
+### 2026-06-07
+
+#### Removed
+
+- Archived two duplicate transcript files (without YouTube ID) that were superseded by a properly-versioned counterpart already on disk. Preserved in the external archive.
+
+---
+
 ### 2026-06-06
 
 #### Added
