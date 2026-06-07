@@ -185,7 +185,7 @@ just help
 
 #### Tools
 - `just find-files <video-id>` - Find all files for a video ID across all data directories
-- `just check-audio-track <channel> <video-id>` - Probe a downloaded video for audio stream presence + mean/max volume (flags `LOW_VOLUME` below `LOW_VOLUME_THRESHOLD_DB`, default `-40 dB`)
+- `just check-audio-track <channel> <video-id>` - Probe a downloaded video for audio stream presence + mean/max volume (flags `LOW_VOLUME` below a `-40 dB` threshold hardcoded in `scripts/check-audio-track.sh`)
 - `just filter-videos` - Scan videos + audio dirs, add any file shorter than `transcription.min_duration` (or any video with no audio stream) to `config/filefilter.json`, then delete every referenced file together with its upstream copies (video → audio → transcript pipeline)
 
 #### Development
@@ -354,8 +354,8 @@ The target is wired into `just video-all` immediately after `just check-video-in
 ```bash
 just check-audio-track <Channel> <video-id>
 # Statuses: HAS_AUDIO | LOW_VOLUME | NO_AUDIO_STREAM | EMPTY_AUDIO_STREAM | NOT_FOUND | AMBIGUOUS
-# Tune the low-volume threshold (default -40 dB):
-LOW_VOLUME_THRESHOLD_DB=-45 just check-audio-track Anthropic 56kq0VTkU4k
+# The low-volume threshold is -40 dB, hardcoded in scripts/check-audio-track.sh
+just check-audio-track Anthropic 56kq0VTkU4k
 ```
 
 **Preventing future short-video downloads:**
@@ -398,7 +398,7 @@ channels:
 - **English-only model**: `mlx-community/whisper-medium.en-mlx` (769M parameters)
   - Optimized for English transcription
   - Task: `transcribe` (same language output)
-  - 99.3% accuracy on technical AI/ML terminology
+  - High accuracy on technical AI/ML terminology (~99.3% observed in the project's own early testing, not an independently verified benchmark)
 
 - **Multilingual model**: `mlx-community/whisper-medium-mlx` (769M parameters)
   - Supports 100+ languages
@@ -906,7 +906,7 @@ frontend/newspaper/
 │   ├── BriefItem.vue       # Single news brief
 │   └── BriefsSection.vue   # Briefs grid section
 ├── data/
-│   └── articles.js         # All content data in one place
+│   └── articles.js         # All content data (generated; gitignored)
 ├── layouts/
 │   └── default.vue         # Default page layout
 └── pages/
