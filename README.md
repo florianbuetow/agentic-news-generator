@@ -24,7 +24,7 @@ agentic-news-generator/
 ├── pyproject.toml          # Dependencies and metadata
 ├── justfile                # Build and run commands
 ├── AGENTS.md               # AI agent development rules
-├── CLAUDE.md               # Redirect to AGENTS.md
+├── CLAUDE.md               # Redirect to CONVENTIONS.md
 ├── README.md               # This file
 ├── ARCHIVE-GUIDE.md        # Archiving stale code and data
 ├── TROUBLESHOOTING-GUIDE.md # Diagnostic scripts and failure playbooks
@@ -36,6 +36,7 @@ agentic-news-generator/
 │   ├── config.py          # Config loading
 │   ├── processing/
 │   │   └── repetition_detector.py  # Hallucination detection
+│   ├── url_ingestion/     # URL pipeline: normalize, classify, download, clean
 │   └── util/
 │       └── fs_util.py     # Filesystem utilities
 ├── scripts/
@@ -50,7 +51,12 @@ agentic-news-generator/
 │   ├── filter-short-videos.py  # Flag short / no-audio files
 │   ├── remove-filtered-files.py  # Delete flagged + upstream copies
 │   ├── fetch-video-metadata.py  # Backfill missing info.json
-│   └── find-empty-transcripts.sh  # List silently-failed transcripts
+│   ├── find-empty-transcripts.sh  # List silently-failed transcripts
+│   ├── urls-download.py    # URL pipeline: inbox → raw content
+│   └── urls-cleancontent.py  # URL pipeline: raw → cleaned Markdown
+├── integrations/
+│   └── raindrop_io/
+│       └── fetchurls-raindrop.py  # Fetch Raindrop.io bookmarks → URL inbox
 ├── tests/                  # Test suite
 ├── prompts/                # LLM prompt templates
 ├── frontend/
