@@ -41,7 +41,7 @@ agentic-news-generator/
 ├── scripts/
 │   ├── yt-downloader.sh   # Download videos (skips <120s)
 │   ├── convert_to_audio.sh  # Video → audio
-│   ├── transcribe_audio.sh  # Transcribe (MLX Whisper)
+│   ├── transcribe_audio.py  # Transcribe (MLX Whisper)
 │   ├── transcript-hallucination-detection.py
 │   ├── create-hallucination-digest.py  # Digest report
 │   ├── archive-videos.sh  # Archive processed videos
@@ -50,7 +50,7 @@ agentic-news-generator/
 │   ├── filter-short-videos.py  # Flag short / no-audio files
 │   ├── remove-filtered-files.py  # Delete flagged + upstream copies
 │   ├── fetch-video-metadata.py  # Backfill missing info.json
-│   └── find-empty-transcripts.py  # List silently-failed transcripts
+│   └── find-empty-transcripts.sh  # List silently-failed transcripts
 ├── tests/                  # Test suite
 ├── prompts/                # LLM prompt templates
 ├── frontend/
@@ -141,10 +141,12 @@ See `config/config.yaml.template` for all available configuration options includ
 
 ## Usage
 
-### Run the Main Application
+### Run the Pipelines
+
+Run the full URL and video pipelines end to end:
 
 ```bash
-just run
+just pipelines-all
 ```
 
 ### View Available Commands
@@ -165,7 +167,7 @@ just help
 - `just download-videos` - Download videos from configured YouTube channels
 - `just extract-audio` - Convert downloaded videos to WAV audio files
 - `just transcribe` - Transcribe audio files using MLX Whisper (medium.en/medium with auto-translation)
-- `just analyze-transcripts` - Analyze transcripts for hallucinations and generate digest
+- `just analyze-transcripts-hallucinations` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
 #### URL Processing Pipeline
@@ -182,7 +184,7 @@ just help
 
 #### Development
 - `just init` - Initialize development environment
-- `just run` - Run the main application
+- `just pipelines-all` - Run the full URL and video pipelines end to end
 - `just newspaper-generate` - Generate static newspaper website from articles data
 - `just newspaper-serve` - Run newspaper development server at http://localhost:3000
 - `just test` - Run unit tests
@@ -212,7 +214,7 @@ just transcribe
 
 # Step 4: Analyze transcripts for hallucinations
 # Generates: JSON analysis + markdown digest
-just analyze-transcripts
+just analyze-transcripts-hallucinations
 
 # Step 5: Archive processed videos and clean up audio files
 # Moves videos to data/archive/videos/
@@ -340,7 +342,7 @@ This single target chains two scripts:
 1. `scripts/filter-short-videos.py` walks `data_downloads_videos_dir/<channel>/` **and** `data_downloads_audio_dir/<channel>/` (orphan wav files without a matching video are caught too). It uses `ffprobe` to verify audio presence and reads `.info.json` for duration. Any file shorter than `transcription.min_duration` (from `config.yaml`), or any video with no audio stream, is appended to `config/filefilter.json` under `data_downloads_audio_dir`.
 2. `scripts/remove-filtered-files.py` resolves every filter entry to concrete on-disk paths and unlinks them together with their upstream copies. The pipeline order is `videos → audio → transcripts`, so an entry under `data_downloads_audio_dir` also removes the video file; an entry under `data_downloads_transcripts_dir` removes audio and video too. Matching is lexical on the `[<video_id>]` substring, so every sibling file (`.info.json`, `.silence_map.json`, `._*` sidecars) is swept up automatically.
 
-The target is wired into `just all`, `just ingestion-all`, and `just all-quiet` immediately after `just check-video-integrity`. Both scripts read everything from `config/config.yaml` and operate on `config/filefilter.json`; they take no CLI arguments and there is no dry-run mode.
+The target is wired into `just video-all` immediately after `just check-video-integrity`. Both scripts read everything from `config/config.yaml` and operate on `config/filefilter.json`; they take no CLI arguments and there is no dry-run mode.
 
 **Probe a single video for audio health:**
 ```bash
@@ -505,7 +507,7 @@ After transcription, the system analyzes all transcripts to detect and report an
 
 **Run Hallucination Detection:**
 ```bash
-just analyze-transcripts
+just analyze-transcripts-hallucinations
 ```
 
 This command:
@@ -728,10 +730,10 @@ After every change to the code, tests must be executed:
 just test
 ```
 
-Always verify the program runs correctly:
+Always verify all checks pass before considering a change complete:
 
 ```bash
-just run
+just ci
 ```
 
 ### Code Quality
@@ -1005,7 +1007,7 @@ This project is in active development. Current implementation status:
 - ✅ Basic project structure
 - ✅ Video downloading pipeline (`scripts/yt-downloader.sh`)
 - ✅ Audio extraction pipeline (`scripts/convert_to_audio.sh`)
-- ✅ Multi-language transcription pipeline with MLX Whisper (`scripts/transcribe_audio.sh`)
+- ✅ Multi-language transcription pipeline with MLX Whisper (`scripts/transcribe_audio.py`)
   - ✅ Language grouping for optimized processing
   - ✅ Automatic translation of non-English content to English
   - ✅ medium.en model for English, medium model for other languages
