@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.config import Config
 from src.url_ingestion.formatting import OutputWindowExceededError, OversizedDocumentError
-from src.url_ingestion.raw_processing import RawContentItem, RawContentScanner, RawProcessorFactory
+from src.url_ingestion.raw_processing import RawContentItem, RawContentScanner, RawProcessingError, RawProcessorFactory
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,9 @@ class CleanContentRunSummary:
     cleaned_count: int
     skipped_existing_count: int
     skipped_uncleanable_count: int
+    skipped_unextractable_count: int
     uncleanable_count: int
+    unextractable_count: int
     failure_count: int
     failures: tuple[RawContentProcessingFailure, ...]
 
@@ -95,6 +97,41 @@ class UncleanableRegistry:
         self._status_path.write_text(json.dumps(self._entries, indent=2, sort_keys=True), encoding="utf-8")
 
 
+class UnextractableRegistry:
+    """Persistent record of raw files whose text extraction yields nothing usable."""
+
+    def __init__(self, status_path: Path) -> None:
+        """Load any previously recorded unextractable entries from disk."""
+        self._status_path = status_path
+        self._entries = self._load()
+
+    def _load(self) -> dict[str, dict[str, object]]:
+        """Read recorded unextractable entries, returning an empty map when no file exists."""
+        if not self._status_path.is_file():
+            return {}
+        parsed = json.loads(self._status_path.read_text(encoding="utf-8"))
+        return {
+            str(raw_name): {"raw_bytes": int(record["raw_bytes"]), "reason": str(record["reason"])} for raw_name, record in parsed.items()
+        }
+
+    def is_unextractable(self, raw_name: str, raw_bytes: int) -> bool:
+        """Return whether a raw file already failed extraction at its current byte size."""
+        record = self._entries.get(raw_name)
+        if record is None:
+            return False
+        return record["raw_bytes"] == raw_bytes
+
+    def record(self, raw_name: str, *, raw_bytes: int, reason: str) -> None:
+        """Persist that a raw file produced no extractable text at the given byte size."""
+        self._entries[raw_name] = {"raw_bytes": raw_bytes, "reason": reason}
+        self._save()
+
+    def _save(self) -> None:
+        """Write the unextractable entries to disk as sorted JSON for human inspection."""
+        self._status_path.parent.mkdir(parents=True, exist_ok=True)
+        self._status_path.write_text(json.dumps(self._entries, indent=2, sort_keys=True), encoding="utf-8")
+
+
 def format_eta(seconds_remaining: float) -> str:
     """Format remaining duration as hours and minutes."""
     total_minutes = max(0, int(seconds_remaining // 60))
@@ -112,6 +149,7 @@ class UrlCleanContentPipeline:
         processor_factory: RawProcessorFactory,
         error_log: CleaningErrorLog,
         uncleanable_registry: UncleanableRegistry,
+        unextractable_registry: UnextractableRegistry,
         max_output_tokens: int,
     ) -> None:
         """Initialize the clean-content pipeline."""
@@ -119,6 +157,7 @@ class UrlCleanContentPipeline:
         self._processor_factory = processor_factory
         self._error_log = error_log
         self._uncleanable_registry = uncleanable_registry
+        self._unextractable_registry = unextractable_registry
         self._max_output_tokens = max_output_tokens
 
     def run(
@@ -133,23 +172,20 @@ class UrlCleanContentPipeline:
         scan_result = self._scanner.scan(include_existing_cleaned=force)
         selected_items = select_pending_items(scan_result.pending_items, limit=limit, raw_path=raw_path, raw_paths=raw_paths)
 
-        processable_items: list[RawContentItem] = []
-        skipped_uncleanable_count = 0
-        for candidate in selected_items:
-            if not force and self._uncleanable_registry.is_uncleanable_at(candidate.raw_path.name, self._max_output_tokens):
-                skipped_uncleanable_count += 1
-                print(f"Skipping (recorded uncleanable until output window grows): {candidate.raw_path}", flush=True)
-                continue
-            processable_items.append(candidate)
+        processable_items, skipped_uncleanable_count, skipped_unextractable_count = self._select_processable_items(
+            selected_items, force=force
+        )
 
         cleaned_count = 0
         uncleanable_count = 0
+        unextractable_count = 0
         failures: list[RawContentProcessingFailure] = []
 
         print(f"raw_files_pending: {len(scan_result.pending_items)}", flush=True)
         print(f"raw_files_selected: {len(selected_items)}", flush=True)
         print(f"skipped_existing_cleaned_count: {scan_result.skipped_existing_count}", flush=True)
         print(f"skipped_uncleanable_count: {skipped_uncleanable_count}", flush=True)
+        print(f"skipped_unextractable_count: {skipped_unextractable_count}", flush=True)
 
         total_pending = len(processable_items)
         if len(scan_result.pending_items) == 0:
@@ -193,6 +229,15 @@ class UrlCleanContentPipeline:
                 failures.append(RawContentProcessingFailure(raw_path=str(item.raw_path), reason=str(exc)))
                 self._error_log.append_failure(str(item.raw_path), str(exc))
                 print(f"  uncleanable: {exc}", flush=True)
+            except RawProcessingError as exc:
+                # Deterministic extraction failure: the same raw bytes extract to nothing every run, so
+                # record it keyed to current raw size and skip it until a re-download changes the file.
+                item.cleaned_path.unlink(missing_ok=True)
+                self._unextractable_registry.record(item.raw_path.name, raw_bytes=item.raw_path.stat().st_size, reason=str(exc))
+                unextractable_count += 1
+                failures.append(RawContentProcessingFailure(raw_path=str(item.raw_path), reason=str(exc)))
+                self._error_log.append_failure(str(item.raw_path), str(exc))
+                print(f"  unextractable: {exc}", flush=True)
             except Exception as exc:
                 failures.append(RawContentProcessingFailure(raw_path=str(item.raw_path), reason=str(exc)))
                 self._error_log.append_failure(str(item.raw_path), str(exc))
@@ -204,10 +249,31 @@ class UrlCleanContentPipeline:
             cleaned_count=cleaned_count,
             skipped_existing_count=scan_result.skipped_existing_count,
             skipped_uncleanable_count=skipped_uncleanable_count,
+            skipped_unextractable_count=skipped_unextractable_count,
             uncleanable_count=uncleanable_count,
+            unextractable_count=unextractable_count,
             failure_count=len(failures),
             failures=tuple(failures),
         )
+
+    def _select_processable_items(
+        self, selected_items: tuple[RawContentItem, ...], *, force: bool
+    ) -> tuple[list[RawContentItem], int, int]:
+        """Filter out raw files that are recorded as currently unprocessable."""
+        processable_items: list[RawContentItem] = []
+        skipped_uncleanable_count = 0
+        skipped_unextractable_count = 0
+        for candidate in selected_items:
+            if not force and self._uncleanable_registry.is_uncleanable_at(candidate.raw_path.name, self._max_output_tokens):
+                skipped_uncleanable_count += 1
+                print(f"Skipping (recorded uncleanable until output window grows): {candidate.raw_path}", flush=True)
+                continue
+            if not force and self._unextractable_registry.is_unextractable(candidate.raw_path.name, candidate.raw_path.stat().st_size):
+                skipped_unextractable_count += 1
+                print(f"Skipping (recorded unextractable until the raw file changes): {candidate.raw_path}", flush=True)
+                continue
+            processable_items.append(candidate)
+        return processable_items, skipped_uncleanable_count, skipped_unextractable_count
 
 
 def select_pending_items(

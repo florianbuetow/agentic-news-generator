@@ -5,7 +5,7 @@ from pathlib import Path
 import tiktoken
 
 from src.config import LLMConfig
-from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UncleanableRegistry, UrlCleanContentPipeline
+from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UncleanableRegistry, UnextractableRegistry, UrlCleanContentPipeline
 from src.url_ingestion.download_pipeline import InboxArchive, UrlDownloadPipeline
 from src.url_ingestion.downloader import DownloaderFactory
 from src.url_ingestion.formatting import FormattingAgent
@@ -120,11 +120,13 @@ def make_clean_pipeline(config_path: Path, data_dir: Path) -> UrlCleanContentPip
         PlainTextRawProcessor(formatting_agent),
     )
     registry = UncleanableRegistry(config.get_url_cleaned_dir() / "uncleanable.json")
+    unextractable_registry = UnextractableRegistry(config.get_url_cleaned_dir() / "unextractable.json")
     return UrlCleanContentPipeline(
         RawContentScanner(config),
         processor_factory,
         CleaningErrorLog(config, fixed_today),
         registry,
+        unextractable_registry,
         make_llm_config().max_tokens,
     )
 

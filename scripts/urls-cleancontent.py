@@ -11,7 +11,13 @@ from pathlib import Path
 import tiktoken
 
 from src.config import Config
-from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UncleanableRegistry, UrlCleanContentPipeline, select_pending_items
+from src.url_ingestion.clean_content_pipeline import (
+    CleaningErrorLog,
+    UncleanableRegistry,
+    UnextractableRegistry,
+    UrlCleanContentPipeline,
+    select_pending_items,
+)
 from src.url_ingestion.formatting import FormattingAgent, FormattingWorkEstimate, LiteLlmClient
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
@@ -105,11 +111,13 @@ def main(argv: list[str] | None = None) -> int:
         )
         print("Processing raw URL content...", flush=True)
         uncleanable_registry = UncleanableRegistry(config.get_url_cleaned_dir() / "uncleanable.json")
+        unextractable_registry = UnextractableRegistry(config.get_url_cleaned_dir() / "unextractable.json")
         summary = UrlCleanContentPipeline(
             RawContentScanner(config),
             processor_factory,
             CleaningErrorLog(config, date.today),
             uncleanable_registry,
+            unextractable_registry,
             clean_config.llm.max_tokens,
         ).run(
             limit=args.limit if selected_raw_paths is None else None,
@@ -128,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"skipped_existing_count: {summary.skipped_existing_count}")
     print(f"skipped_uncleanable_count: {summary.skipped_uncleanable_count}")
     print(f"uncleanable_count: {summary.uncleanable_count}")
+    print(f"skipped_unextractable_count: {summary.skipped_unextractable_count}")
+    print(f"unextractable_count: {summary.unextractable_count}")
     print(f"failure_count: {summary.failure_count}")
     if summary.failures:
         print("", file=sys.stderr)

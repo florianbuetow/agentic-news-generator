@@ -8,7 +8,13 @@ import pytest
 import tiktoken
 
 from src.config import LLMConfig
-from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UncleanableRegistry, UrlCleanContentPipeline, select_pending_items
+from src.url_ingestion.clean_content_pipeline import (
+    CleaningErrorLog,
+    UncleanableRegistry,
+    UnextractableRegistry,
+    UrlCleanContentPipeline,
+    select_pending_items,
+)
 from src.url_ingestion.formatting import FormattingAgent, LlmClient, OutputWindowExceededError
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
@@ -72,11 +78,13 @@ def make_pipeline(
         PlainTextRawProcessor(formatting_agent),
     )
     registry = UncleanableRegistry(config.get_url_cleaned_dir() / "uncleanable.json")
+    unextractable_registry = UnextractableRegistry(config.get_url_cleaned_dir() / "unextractable.json")
     return UrlCleanContentPipeline(
         RawContentScanner(config),
         processor_factory,
         CleaningErrorLog(config, fixed_today),
         registry,
+        unextractable_registry,
         max_output_tokens,
     )
 
@@ -227,6 +235,57 @@ def test_clean_content_pipeline_records_oversized_documents_in_the_same_ledger(t
     assert second_summary.skipped_uncleanable_count == 1
     assert second_summary.uncleanable_count == 0
     assert client.prompts == []
+
+
+def test_clean_content_pipeline_records_and_skips_unextractable_documents(tmp_path: Path) -> None:
+    """Record empty-text extraction failures and skip the same raw bytes on later runs without LLM calls."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    raw_html = config.get_url_raw_dir() / "html" / "empty.html"
+    raw_html.parent.mkdir(parents=True)
+    raw_html.write_text("<html><body></body></html>", encoding="utf-8")
+    status_path = config.get_url_cleaned_dir() / "unextractable.json"
+    client = FakeLlmClient("unused")
+
+    first_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused").run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert first_summary.unextractable_count == 1
+    assert first_summary.cleaned_count == 0
+    assert first_summary.failure_count == 1
+    assert client.prompts == []
+    assert json.loads(status_path.read_text(encoding="utf-8"))["empty.html"]["raw_bytes"] == raw_html.stat().st_size
+
+    second_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused").run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert second_summary.skipped_unextractable_count == 1
+    assert second_summary.unextractable_count == 0
+    assert client.prompts == []
+
+
+def test_clean_content_pipeline_reattempts_unextractable_after_raw_file_changes(tmp_path: Path) -> None:
+    """Re-attempt an unextractable raw file after its byte size changes."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    raw_html = config.get_url_raw_dir() / "html" / "empty.html"
+    raw_html.parent.mkdir(parents=True)
+    raw_html.write_text("<html><body></body></html>", encoding="utf-8")
+    first_client = FakeLlmClient("unused")
+    first_summary = make_pipeline(tmp_path, llm_client=first_client, pdf_text="unused").run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+    original_raw_bytes = raw_html.stat().st_size
+
+    raw_html.write_text("<html><body><h1>Now</h1><p>Real.</p></body></html>", encoding="utf-8")
+    second_summary = make_pipeline(tmp_path, formatter_response="# Now\n\nReal.", pdf_text="unused").run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert first_summary.unextractable_count == 1
+    assert raw_html.stat().st_size != original_raw_bytes
+    assert second_summary.skipped_unextractable_count == 0
+    assert second_summary.cleaned_count == 1
 
 
 def test_clean_content_pipeline_can_limit_selected_pending_items(tmp_path: Path) -> None:
