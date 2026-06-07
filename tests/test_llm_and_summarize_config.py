@@ -1,0 +1,365 @@
+"""Tests for LLMConfig and SummarizeTranscriptsConfig configuration models."""
+
+import pytest
+from pydantic import ValidationError
+
+from src.config import LLMConfig, SummarizeTranscriptsConfig
+
+
+class TestLLMConfig:
+    """Tests for LLMConfig model."""
+
+    def test_valid_llm_config(self) -> None:
+        """Test valid LLM configuration."""
+        config = LLMConfig(
+            model="qwen3-30b-a3b-thinking-2507-mlx@8bit",
+            api_base="http://127.0.0.1:1234/v1",
+            api_key="LMSTUDIO_API_KEY",
+            context_window=262144,
+            max_tokens=32000,
+            temperature=0.7,
+            context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+        assert config.model == "qwen3-30b-a3b-thinking-2507-mlx@8bit"
+        assert config.api_base == "http://127.0.0.1:1234/v1"
+        assert config.api_key == "LMSTUDIO_API_KEY"
+        assert config.context_window == 262144
+        assert config.max_tokens == 32000
+        assert config.temperature == 0.7
+        assert config.context_window_threshold == 90
+        assert config.max_retries == 3
+        assert config.retry_delay == 2.0
+
+    def test_valid_llm_config_with_none_api_base(self) -> None:
+        """Test valid LLM configuration with None api_base."""
+        config = LLMConfig(
+            model="anthropic/claude-3-5-sonnet-20241022",
+            api_base=None,
+            api_key="ANTHROPIC_API_KEY",
+            context_window=200000,
+            max_tokens=4096,
+            temperature=0.5,
+            context_window_threshold=85,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+        assert config.model == "anthropic/claude-3-5-sonnet-20241022"
+        assert config.api_base is None
+        assert config.api_key == "ANTHROPIC_API_KEY"
+        assert config.context_window_threshold == 85
+
+    def test_missing_model_field(self) -> None:
+        """Test LLM config with missing model field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("model",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_api_key_field(self) -> None:
+        """Test LLM config with missing api_key field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("api_key",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_context_window_field(self) -> None:
+        """Test LLM config with missing context_window field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_max_tokens_field(self) -> None:
+        """Test LLM config with missing max_tokens field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("max_tokens",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_temperature_field(self) -> None:
+        """Test LLM config with missing temperature field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("temperature",) and err["type"] == "missing" for err in errors)
+
+    def test_missing_api_base_field(self) -> None:
+        """Test LLM config with missing api_base field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("api_base",) and err["type"] == "missing" for err in errors)
+
+    def test_wrong_type_for_context_window(self) -> None:
+        """Test LLM config with wrong type for context_window."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": "not_an_int",
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window",) for err in errors)
+
+    def test_wrong_type_for_max_tokens(self) -> None:
+        """Test LLM config with wrong type for max_tokens."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": "not_an_int",
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("max_tokens",) for err in errors)
+
+    def test_wrong_type_for_temperature(self) -> None:
+        """Test LLM config with wrong type for temperature."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": "not_a_float",
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("temperature",) for err in errors)
+
+    def test_extra_fields_forbidden(self) -> None:
+        """Test that extra fields are forbidden in LLM config."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "extra_field": "not_allowed",
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["type"] == "extra_forbidden" for err in errors)
+
+    def test_frozen_model(self) -> None:
+        """Test that LLM config is frozen."""
+        config = LLMConfig(
+            model="test-model",
+            api_base="http://localhost:1234/v1",
+            api_key="API_KEY",
+            context_window=100000,
+            max_tokens=2048,
+            temperature=0.7,
+            context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+        with pytest.raises(ValidationError):
+            config.temperature = 0.5
+
+    def test_missing_context_window_threshold_field(self) -> None:
+        """Test LLM config with missing context_window_threshold field."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window_threshold",) and err["type"] == "missing" for err in errors)
+
+    def test_context_window_threshold_below_zero(self) -> None:
+        """Test LLM config with context_window_threshold below 0."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": -1,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window_threshold",) and err["type"] == "greater_than_equal" for err in errors)
+
+    def test_context_window_threshold_above_100(self) -> None:
+        """Test LLM config with context_window_threshold above 100."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 101,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window_threshold",) and err["type"] == "less_than_equal" for err in errors)
+
+    def test_context_window_threshold_boundary_values(self) -> None:
+        """Test LLM config with context_window_threshold at boundary values (0 and 100)."""
+        # Test 0
+        config_0 = LLMConfig(
+            model="test-model",
+            api_base="http://localhost:1234/v1",
+            api_key="API_KEY",
+            context_window=100000,
+            max_tokens=2048,
+            temperature=0.7,
+            context_window_threshold=0,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+        assert config_0.context_window_threshold == 0
+
+        # Test 100
+        config_100 = LLMConfig(
+            model="test-model",
+            api_base="http://localhost:1234/v1",
+            api_key="API_KEY",
+            context_window=100000,
+            max_tokens=2048,
+            temperature=0.7,
+            context_window_threshold=100,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+        assert config_100.context_window_threshold == 100
+
+
+def _make_llm() -> LLMConfig:
+    return LLMConfig(
+        model="openai/test-model",
+        api_base="http://127.0.0.1:1234/v1",
+        api_key="test-key",
+        context_window=131072,
+        max_tokens=4096,
+        temperature=0.3,
+        context_window_threshold=90,
+        max_retries=3,
+        retry_delay=2.0,
+    )
+
+
+class TestSummarizeTranscriptsConfig:
+    """Tests for SummarizeTranscriptsConfig model."""
+
+    def test_valid_config_explicit_threshold(self) -> None:
+        config = SummarizeTranscriptsConfig(
+            llm=_make_llm(),
+            skip_transcripts_above_context_window_pct=75,
+        )
+        assert config.skip_transcripts_above_context_window_pct == 75
+
+    def test_threshold_is_required(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig.model_validate({"llm": _make_llm().model_dump()})
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "missing" for err in errors)
+
+    def test_threshold_boundary_zero(self) -> None:
+        config = SummarizeTranscriptsConfig(
+            llm=_make_llm(),
+            skip_transcripts_above_context_window_pct=0,
+        )
+        assert config.skip_transcripts_above_context_window_pct == 0
+
+    def test_threshold_boundary_100(self) -> None:
+        config = SummarizeTranscriptsConfig(
+            llm=_make_llm(),
+            skip_transcripts_above_context_window_pct=100,
+        )
+        assert config.skip_transcripts_above_context_window_pct == 100
+
+    def test_threshold_below_zero_rejected(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig(
+                llm=_make_llm(),
+                skip_transcripts_above_context_window_pct=-1,
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "greater_than_equal" for err in errors)
+
+    def test_threshold_above_100_rejected(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig(
+                llm=_make_llm(),
+                skip_transcripts_above_context_window_pct=101,
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "less_than_equal" for err in errors)
