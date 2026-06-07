@@ -1,13 +1,15 @@
 """Integration tests for URL raw-to-cleaned Markdown processing."""
 
+import json
 from datetime import date
 from pathlib import Path
 
 import pytest
 import tiktoken
 
-from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UrlCleanContentPipeline, select_pending_items
-from src.url_ingestion.formatting import FormattingAgent
+from src.config import LLMConfig
+from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UncleanableRegistry, UrlCleanContentPipeline, select_pending_items
+from src.url_ingestion.formatting import FormattingAgent, LlmClient, OutputWindowExceededError
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
     HtmlTextExtractor,
@@ -25,22 +27,58 @@ def fixed_today() -> date:
     return date(2026, 5, 31)
 
 
-def make_pipeline(tmp_path: Path, *, formatter_response: str, pdf_text: str) -> UrlCleanContentPipeline:
+class WindowAwareTruncatingClient:
+    """Fake client that reports output-window truncation until the configured window is large enough."""
+
+    def __init__(self, *, required_output_window: int, cleaned: str) -> None:
+        """Record the output window required to finish and the content returned once it fits."""
+        self._required_output_window = required_output_window
+        self._cleaned = cleaned
+
+    def complete(self, prompt: str, llm: LLMConfig) -> str:
+        """Raise as if truncated while the output window is too small, otherwise return cleaned content."""
+        if llm.max_tokens < self._required_output_window:
+            raise OutputWindowExceededError("simulated finish_reason=length", max_output_tokens=llm.max_tokens)
+        return self._cleaned
+
+
+def make_pipeline(
+    tmp_path: Path,
+    *,
+    formatter_response: str | None = None,
+    llm_client: LlmClient | None = None,
+    pdf_text: str,
+    max_output_tokens: int = 100,
+) -> UrlCleanContentPipeline:
     """Create a clean-content pipeline with fake extraction and formatting."""
     config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    selected_client: LlmClient
+    if llm_client is not None:
+        selected_client = llm_client
+    elif formatter_response is not None:
+        selected_client = FakeLlmClient(formatter_response)
+    else:
+        raise ValueError("make_pipeline requires formatter_response or llm_client")
     formatting_agent = FormattingAgent(
-        llm=make_llm_config(),
+        llm=make_llm_config(max_tokens=max_output_tokens),
         prompt_template="{source_text}",
         encoder=tiktoken.get_encoding("o200k_base"),
         skip_threshold_pct=80,
-        llm_client=FakeLlmClient(formatter_response),
+        llm_client=selected_client,
     )
     processor_factory = RawProcessorFactory(
         HtmlRawProcessor(HtmlTextExtractor(), formatting_agent),
         PdfRawProcessor(FakePdfExtractor(pdf_text), formatting_agent),
         PlainTextRawProcessor(formatting_agent),
     )
-    return UrlCleanContentPipeline(RawContentScanner(config), processor_factory, CleaningErrorLog(config, fixed_today))
+    registry = UncleanableRegistry(config.get_url_cleaned_dir() / "uncleanable.json")
+    return UrlCleanContentPipeline(
+        RawContentScanner(config),
+        processor_factory,
+        CleaningErrorLog(config, fixed_today),
+        registry,
+        max_output_tokens,
+    )
 
 
 def test_clean_content_pipeline_writes_cleaned_markdown_for_raw_documents(tmp_path: Path) -> None:
@@ -122,6 +160,73 @@ def test_clean_content_pipeline_force_reprocesses_existing_cleaned_raw_path(tmp_
 
     assert summary.cleaned_count == 1
     assert cleaned_html.read_text(encoding="utf-8") == "new cleaned content"
+
+
+def test_clean_content_pipeline_records_skips_and_recleans_uncleanable_documents(tmp_path: Path) -> None:
+    """Delete truncated output, record the failing window, skip re-runs, then reclean once the output window grows."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    raw_html = config.get_url_raw_dir() / "html" / "article.html"
+    raw_html.parent.mkdir(parents=True)
+    raw_html.write_text("<html><body><h1>Article</h1><p>Body.</p></body></html>", encoding="utf-8")
+    cleaned_path = config.get_url_cleaned_dir() / "html" / "article.md"
+    status_path = config.get_url_cleaned_dir() / "uncleanable.json"
+    client = WindowAwareTruncatingClient(required_output_window=1000, cleaned="# Clean\n\nBody.")
+
+    first_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused", max_output_tokens=100).run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert first_summary.uncleanable_count == 1
+    assert first_summary.cleaned_count == 0
+    assert first_summary.failure_count == 1
+    assert not cleaned_path.exists()
+    assert json.loads(status_path.read_text(encoding="utf-8"))["article.html"]["failed_output_window_tokens"] == 100
+
+    second_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused", max_output_tokens=100).run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert second_summary.skipped_uncleanable_count == 1
+    assert second_summary.uncleanable_count == 0
+    assert second_summary.cleaned_count == 0
+
+    third_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused", max_output_tokens=100000).run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert third_summary.cleaned_count == 1
+    assert third_summary.skipped_uncleanable_count == 0
+    assert cleaned_path.read_text(encoding="utf-8") == "# Clean\n\nBody."
+
+
+def test_clean_content_pipeline_records_oversized_documents_in_the_same_ledger(tmp_path: Path) -> None:
+    """A document too large for the output window lands in uncleanable.json and is skipped next run, with no LLM call."""
+    config = write_config(tmp_path / "config.yaml", tmp_path / "data")
+    raw_html = config.get_url_raw_dir() / "html" / "big.html"
+    raw_html.parent.mkdir(parents=True)
+    big_text = " ".join(f"word{index}" for index in range(300))
+    raw_html.write_text(f"<html><body>{big_text}</body></html>", encoding="utf-8")
+    cleaned_path = config.get_url_cleaned_dir() / "html" / "big.md"
+    status_path = config.get_url_cleaned_dir() / "uncleanable.json"
+    client = FakeLlmClient("unused")
+
+    first_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused", max_output_tokens=100).run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert first_summary.uncleanable_count == 1
+    assert first_summary.cleaned_count == 0
+    assert client.prompts == []
+    assert not cleaned_path.exists()
+    assert json.loads(status_path.read_text(encoding="utf-8"))["big.html"]["failed_output_window_tokens"] == 100
+
+    second_summary = make_pipeline(tmp_path, llm_client=client, pdf_text="unused", max_output_tokens=100).run(
+        limit=None, raw_path=None, raw_paths=None, force=False
+    )
+
+    assert second_summary.skipped_uncleanable_count == 1
+    assert second_summary.uncleanable_count == 0
+    assert client.prompts == []
 
 
 def test_clean_content_pipeline_can_limit_selected_pending_items(tmp_path: Path) -> None:

@@ -4,7 +4,7 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
 
 import litellm
 import tiktoken
@@ -15,6 +15,15 @@ from src.config import LLMConfig
 
 class OversizedDocumentError(ValueError):
     """Raised when a raw document exceeds the configured context threshold."""
+
+
+class OutputWindowExceededError(ValueError):
+    """Raised when the model stops at its output token limit, producing truncated content."""
+
+    def __init__(self, message: str, *, max_output_tokens: int) -> None:
+        """Record the output token window that was exhausted."""
+        super().__init__(message)
+        self.max_output_tokens = max_output_tokens
 
 
 class MarkdownValidationError(ValueError):
@@ -47,6 +56,12 @@ class FormattingWorkEstimate:
     prompt_tokens: int
 
 
+class _CompletionChoice(Protocol):
+    """Minimal view of a completion choice needed to detect output truncation."""
+
+    finish_reason: str | None
+
+
 class LiteLlmClient:
     """LiteLLM-backed formatting client."""
 
@@ -67,7 +82,14 @@ class LiteLlmClient:
                 raise RuntimeError(f"No models loaded in LM Studio. Expected model: {llm.model}") from exc
             raise
 
-        response_text = response.choices[0].message.content
+        choice = response.choices[0]
+        if cast(_CompletionChoice, choice).finish_reason == "length":
+            raise OutputWindowExceededError(
+                f"model stopped at its output token limit (finish_reason='length', "
+                f"output window {llm.max_tokens:,} tokens); content is truncated",
+                max_output_tokens=llm.max_tokens,
+            )
+        response_text = choice.message.content
         if response_text is None or not response_text.strip():
             raise ValueError("LLM returned empty response")
         return strip_think_tags(response_text.strip())
@@ -123,6 +145,8 @@ class FormattingAgent:
                 elapsed_seconds = time.monotonic() - started_at
                 self._emit_progress(f"formatting_done: attempt={attempt}/{self.llm.max_retries} elapsed_seconds={elapsed_seconds:.2f}")
                 return cleaned_markdown, prompt_tokens, attempt, elapsed_seconds
+            except OutputWindowExceededError:
+                raise
             except Exception:
                 self._emit_progress(f"formatting_failed: attempt={attempt}/{self.llm.max_retries} error={format_exception_summary()}")
                 if attempt == self.llm.max_retries:
@@ -141,19 +165,28 @@ class FormattingAgent:
         """Return rendered prompt token count for source text."""
         return len(self.encoder.encode(self.render_prompt(source_text), disallowed_special=()))
 
-    def _token_limit(self) -> int:
-        """Return configured prompt token limit."""
+    def _context_token_limit(self) -> int:
+        """Return the prompt token limit imposed by the context-window threshold."""
         return int(self.llm.context_window * self.skip_threshold_pct / 100)
 
+    def _token_limit(self) -> int:
+        """Return the prompt token limit: the smaller of the context-window threshold and the output window."""
+        return min(self._context_token_limit(), self.llm.max_tokens)
+
     def _raise_if_oversized(self, prompt_tokens: int) -> None:
-        """Raise when the rendered prompt exceeds the configured context threshold."""
+        """Raise when the prompt cannot be cleaned: too large for the context threshold or the output window.
+
+        A no-summarize reformat produces roughly as many output tokens as input, so a prompt larger than
+        the output window can never finish - the model truncates or times out. Skip it before any LLM call.
+        """
         token_limit = self._token_limit()
         if prompt_tokens <= token_limit:
             return
-        usage_pct = (prompt_tokens / self.llm.context_window * 100.0) if self.llm.context_window > 0 else 0.0
+        bound_by = "output window" if self.llm.max_tokens < self._context_token_limit() else "context-window threshold"
         raise OversizedDocumentError(
-            f"document prompt contains {prompt_tokens:,} tokens ({usage_pct:.1f}% of context window "
-            f"{self.llm.context_window:,}; threshold: {self.skip_threshold_pct}%/{token_limit:,} tokens)"
+            f"document prompt contains {prompt_tokens:,} tokens, over the {token_limit:,}-token clean limit "
+            f"(bound by {bound_by}; output window {self.llm.max_tokens:,}, "
+            f"context threshold {self.skip_threshold_pct}% of {self.llm.context_window:,})"
         )
 
 

@@ -10,6 +10,7 @@ from src.url_ingestion.formatting import (
     FormattingAgent,
     LiteLlmClient,
     MarkdownValidationError,
+    OutputWindowExceededError,
     OversizedDocumentError,
     validate_cleaned_markdown,
 )
@@ -95,7 +96,7 @@ def test_litellm_client_passes_configured_request_timeout(monkeypatch: pytest.Mo
 
     def fake_completion(**kwargs: object) -> SimpleNamespace:
         captured_kwargs.update(kwargs)
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="# Done"))])
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="# Done"))])
 
     monkeypatch.setattr("src.url_ingestion.formatting.litellm.completion", fake_completion)
     llm = make_llm_config().model_copy(update={"request_timeout_seconds": 12.5})
@@ -104,6 +105,50 @@ def test_litellm_client_passes_configured_request_timeout(monkeypatch: pytest.Mo
 
     assert result == "# Done"
     assert captured_kwargs["timeout"] == 12.5
+
+
+def test_litellm_client_raises_when_output_window_is_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Treat a length finish reason as truncated output the formatter must not accept."""
+
+    def fake_completion(**kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason="length", message=SimpleNamespace(content="partial output"))])
+
+    monkeypatch.setattr("src.url_ingestion.formatting.litellm.completion", fake_completion)
+
+    with pytest.raises(OutputWindowExceededError) as exc_info:
+        LiteLlmClient().complete("Format this", make_llm_config(max_tokens=100))
+
+    assert exc_info.value.max_output_tokens == 100
+
+
+def test_formatting_agent_does_not_retry_when_output_window_is_exhausted() -> None:
+    """Do not retry a truncated generation because a same-size window will truncate again."""
+
+    class TruncatingClient:
+        """Fake client that always reports an exhausted output window."""
+
+        def __init__(self) -> None:
+            """Initialize the call counter."""
+            self.call_count = 0
+
+        def complete(self, prompt: str, llm: LLMConfig) -> str:
+            """Raise as if the model stopped at its output token limit."""
+            self.call_count += 1
+            raise OutputWindowExceededError("truncated", max_output_tokens=llm.max_tokens)
+
+    client = TruncatingClient()
+    agent = FormattingAgent(
+        llm=make_llm_config(max_retries=3),
+        prompt_template="{source_text}",
+        encoder=tiktoken.get_encoding("o200k_base"),
+        skip_threshold_pct=80,
+        llm_client=client,
+    )
+
+    with pytest.raises(OutputWindowExceededError):
+        agent.format_markdown_with_stats("Source text")
+
+    assert client.call_count == 1
 
 
 def test_formatting_agent_skips_oversized_documents() -> None:
@@ -126,6 +171,25 @@ def test_formatting_agent_skips_oversized_documents() -> None:
     assert "document prompt contains" in str(exc_info.value)
     assert fake_client.prompts == []
     assert progress_messages == []
+
+
+def test_formatting_agent_skips_documents_that_exceed_output_window() -> None:
+    """Skip a document whose prompt fits the context window but is larger than the model output window."""
+    fake_client = FakeLlmClient("unused")
+    agent = FormattingAgent(
+        llm=make_llm_config(context_window=100_000, max_tokens=100),
+        prompt_template="{source_text}",
+        encoder=tiktoken.get_encoding("o200k_base"),
+        skip_threshold_pct=80,
+        llm_client=fake_client,
+    )
+    source_text = " ".join(f"word{i}" for i in range(300))
+
+    with pytest.raises(OversizedDocumentError) as exc_info:
+        agent.format_markdown_with_stats(source_text)
+
+    assert "output window" in str(exc_info.value)
+    assert fake_client.prompts == []
 
 
 def test_formatting_agent_reports_retry_failures() -> None:
