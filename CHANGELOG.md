@@ -13,9 +13,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 2026-06-07
 
+#### Added
+
+- The clean-content pipeline now detects documents whose prompt exceeds the model output window (or the context-window threshold) and records them in `data_cleaned/uncleanable.json`, deleting any partial output and skipping the file on later runs until the output window grows; `LiteLlmClient` raises `OutputWindowExceededError` on a `length` finish reason.
+- URL clean-content progress now shows a per-item completion percentage and running-average ETA (mirroring `summarize-transcripts`).
+- Added a Semgrep rule (`justfile-no-error-suppression.yml`) banning just's error-ignoring recipe-line prefixes (`-`, `-@`, `@-`), wired into the `code-semgrep` scan target.
+
+#### Changed
+
+- Data pipelines (`url-all`, `video-all`, `pipelines-all`) now continue past a failed step and print a red/green per-step summary, exiting non-zero if any step failed; `ci`, `ci-verbose`, and `checks-all` remain fail-fast.
+- The URL download pipeline now pre-filters already-downloaded URLs (non-empty raw file on disk) before the loop, reports how many were skipped, and counts only pending URLs in the `[n/total]` progress.
+- Raindrop fetcher now dedupes bookmarks against a persisted seen-set (`raindrop-fetched-urls.json`), emitting only URLs not seen in a prior run; new `--force` re-emits every bookmark.
+- Reduced `url_clean_content` max retries from 3 to 1.
+
 #### Removed
 
 - Archived two duplicate transcript files (without YouTube ID) that were superseded by a properly-versioned counterpart already on disk. Preserved in the external archive.
+
+#### Security
+
+- Upgraded `pip` to `26.1.2` to patch PYSEC-2026-196.
 
 ---
 
@@ -25,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `urls-requeue-unprocessed` now skips URLs that are definitively gone (DNS-unresolvable or HTTP 404/410) using a curl reachability pre-filter, so permanently dead URLs are no longer re-queued every run (new `unreachable_count`).
 - Added a durable cleaning processing-error log at `data/urls/data_cleaned/errors/<YYYY-MM-DD>.txt`: raw files that fail, produce empty/invalid output, or are oversized during clean-content processing are appended (one line each) for human review.
+- Added `find-files-without-youtube-id`: a read-only finder that reports data files lacking a bracketed YouTube ID with no ID-bearing sibling in the same folder, grouped by folder category (per-channel `downloaded.txt` archives excluded).
 
 #### Changed
 
