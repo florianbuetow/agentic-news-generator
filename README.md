@@ -93,7 +93,7 @@ agentic-news-generator/
 - [just](https://github.com/casey/just) command runner installed
 - [FFmpeg](https://ffmpeg.org/) for audio extraction (`brew install ffmpeg`)
 - [jq](https://jqlang.github.io/jq/) for JSON processing (`brew install jq`)
-- Chrome browser (for YouTube cookie authentication with yt-dlp)
+- A web browser logged into YouTube for yt-dlp cookie authentication (Firefox by default; configurable via the `BROWSER` variable)
 - Node.js 18+ and npm (for the Nuxt newspaper frontend)
 
 ## Setup
@@ -533,18 +533,12 @@ hallucination_detection:
 Total files processed: 1072
 Files with hallucinations: 31
 Total hallucinations detected: 44
-
-Score Distribution:
-  Low Score (11-19): 3 patterns
-  Medium Score (21-49): 7 patterns
-  High Score (51-99): 9 patterns
-  Very High Score (101-∞): 22 patterns
 ```
 
 **Detection Algorithm:**
-- **Repetition Score**: `k × n` where `k` = sequence length, `n` = repetition count
-- **Natural Speech Filtering**: Filters out common patterns like "you know", "I think", etc.
-- **Threshold**: Patterns with score ≥ 11 are flagged for review
+- **SVM Classifier**: A trained SVM scores each candidate repetition from two features — its repetition count and sequence length — via a decision function
+- **Decision Rule**: A pattern is flagged as a hallucination when the SVM decision score is positive
+- **Natural Speech Handling**: Repetitions that differ only in capitalization or punctuation are treated as natural speech
 - **Window Tracking**: Records exact word count of analysis window for each detection
 
 **Benefits:**
@@ -562,7 +556,7 @@ The audio extraction script automatically removes silence from videos to improve
 2. **Pass 2**: Extracts only speech segments using FFmpeg's `aselect` filter for precise timestamp alignment
 3. **Generates JSON mapping**: Creates `{video}.silence_map.json` with timestamp reconstruction data
 
-**Default Parameters** (configurable in `scripts/convert_to_audio.sh`):
+**Default Parameters** (configurable in `scripts/config.sh`):
 - **Threshold**: -40dB (moderate - removes clear silence while preserving quiet speech)
 - **Minimum Duration**: 2 seconds (only removes obvious long pauses)
 
@@ -647,27 +641,27 @@ print(f"Trimmed 125.0s → Original {original_time:.2f}s")
 The video downloader uses `yt-dlp` with browser cookies for authentication with YouTube. The browser selection is controlled by the `BROWSER` environment variable.
 
 **Default Configuration:**
-- **Location**: `scripts/config.sh:96`
-- **Default value**: `chrome`
+- **Location**: the `BROWSER` variable in `scripts/config.sh`
+- **Default value**: `firefox`
 
 **Changing the Browser:**
 
-If you need to use a different browser (Firefox, Safari, Edge, etc.), you can override the default in two ways:
+If you need to use a different browser (Chrome, Safari, Edge, etc.), you can override the default in two ways:
 
 1. **Per-command override:**
    ```bash
-   BROWSER=firefox just download-videos
+   BROWSER=chrome just download-videos
    ```
 
 2. **Session-wide override:**
    ```bash
-   export BROWSER=firefox
+   export BROWSER=chrome
    just download-videos
    ```
 
 **Supported Browsers:**
-- `chrome` (default)
-- `firefox`
+- `firefox` (default)
+- `chrome`
 - `safari`
 - `edge`
 - `brave`
@@ -1082,7 +1076,7 @@ Initial transcription with `large-v3` had two issues:
 - large-v3 hallucinates 4x more (WER: 53.4 vs 12.7)
 - large-v3 generates phantom text during silence
 - medium.en: 99.3% accuracy on technical terms
-- 769M params vs 2.3B = 2-3x faster
+- 769M params vs ~1.5B = 2-3x faster
 - Specialized for English-only
 
 **Results:**
@@ -1143,13 +1137,13 @@ Description: The latest AI News. Learn about LLMs, Gen AI...
 - -30dB, -40dB, -50dB thresholds
 - 0.5s, 1s, 2s, 3s minimum durations
 
-**What We Chose:** -40dB threshold, >1s minimum
+**What We Chose:** -40dB threshold, 2s minimum
 
 **Why:**
 - Hallucinations increase with silence >30s
 - Silence adds processing time, no transcription value
 - -40dB: removes clear silence, keeps quiet speech
-- 1s: removes pauses, keeps natural speech
+- 2s: removes obvious long pauses, keeps natural speech
 
 **Results:**
 - ✅ 10-30% faster transcription
