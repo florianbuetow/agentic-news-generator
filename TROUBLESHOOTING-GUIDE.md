@@ -143,6 +143,30 @@ Degenerate transcripts (Whisper hallucinations with repetitive tokens like "AI, 
 3. If silent → `just filter-videos` (sweeps every channel for short / no-audio videos and unlinks them).
 4. If audible but transcript empty → `just clean-video-files VIDEO_ID=<id>` and redownload (re-run `just download-videos`).
 
+## Playbook: Extract-Audio Skips a Channel Entirely (0 Files Processed)
+
+When `just extract-audio` reports `0 to process` for a channel and its `downloads/videos/<channel>/` contains only `downloaded.txt`, **check whether the videos were already transcribed** before investigating further.
+
+**Step 1 — Count existing transcripts:**
+
+```bash
+ls downloads/transcripts/<channel>/*.srt | wc -l
+```
+
+If the count matches the number of entries in `downloaded.txt`, the pipeline ran to completion for this channel. No action needed.
+
+**Why this happens:** `just archive-videos` (step 6 of `video-all`) moves every transcribed MP4 from `downloads/videos/<channel>/` to `archive/videos/<channel>/` and deletes the corresponding WAV. After archival, `downloads/videos/<channel>/` is empty and `extract-audio` has nothing to process — which is correct behaviour.
+
+**If transcripts are missing** (count is lower than expected), the videos were archived prematurely or the transcription step was skipped. In that case:
+
+1. Identify which video IDs have an archived MP4 but no `.srt`: compare `ls archive/videos/<channel>/*.mp4` against `ls downloads/transcripts/<channel>/*.srt`.
+2. For each missing transcript, move the MP4 back: `mv archive/videos/<channel>/<file>.mp4 downloads/videos/<channel>/`.
+3. `just extract-audio` — re-extracts WAV from the restored MP4.
+4. `just transcribe` — generates the missing transcript.
+5. `just archive-videos` — re-archives once transcription is complete.
+
+---
+
 ## Playbook: Extract-Audio Fails With "No Audio Stream Found"
 
 When `just extract-audio` reports `❌ FAILED: No audio stream found (video-only file)`, first confirm the downloaded file has no audio stream, then determine whether YouTube had audio available.
