@@ -8,14 +8,15 @@ A 1950s New York Times inspired newspaper template built with Nuxt 3.
 - **Responsive design** - works on desktop, tablet, and mobile
 - **Modular components** - reusable ArticleCard, HeroSection, BriefsSection, etc.
 - **Static site generation** - deploy anywhere
-- **Data-driven content** - edit `data/articles.js` to update content
+- **Content-driven** - articles authored as Markdown under `content/articles/`, arranged by `content/layout.json` via `@nuxt/content`
 
 ## Project Structure
 
 ```
 newspaper/
 ├── app.vue                 # App entry point
-├── nuxt.config.ts          # Nuxt configuration
+├── nuxt.config.ts          # Nuxt configuration (dev port 12000)
+├── content.config.ts       # @nuxt/content collections: articles + layout
 ├── package.json            # Dependencies
 ├── assets/
 │   └── css/
@@ -27,12 +28,14 @@ newspaper/
 │   ├── SidebarArticle.vue  # Compact sidebar article
 │   ├── BriefItem.vue       # Single news brief
 │   └── BriefsSection.vue   # Briefs grid section
-├── data/
-│   └── articles.js         # Article content data
+├── content/
+│   ├── articles/           # One Markdown file per article (YAML frontmatter + body)
+│   └── layout.json         # Front-page layout by article slug
 ├── layouts/
 │   └── default.vue         # Default page layout
 └── pages/
-    └── index.vue           # Homepage
+    ├── index.vue           # Homepage (queries articles + layout collections)
+    └── articles/[slug].vue # Individual article page
 ```
 
 ## Setup
@@ -45,7 +48,7 @@ npm install
 
 ## Development
 
-Start the development server on `http://localhost:3000`:
+Start the development server on `http://localhost:12000`:
 
 ```bash
 npm run dev
@@ -75,13 +78,15 @@ npm run preview
 
 ### Updating Content
 
-Edit `data/articles.js` to update:
+Content is managed via `@nuxt/content` (see `content.config.ts`), with two collections:
 
-- `heroArticle` - The main featured article
-- `featuredArticles` - Grid of top stories
-- `secondaryMain` - Secondary featured article
-- `sidebarArticles` - Sidebar article lists
-- `briefsColumns` - News briefs at the bottom
+- **`articles`** — one Markdown file per article under `content/articles/`, each with YAML frontmatter (`title`, `subtitle`, `slug`, `author`, `date`, `dateline`, `tags`, `summary`, `image`) followed by the article body.
+- **`layout`** — `content/layout.json`, which arranges the front page by article slug:
+  - `hero` - The main featured article
+  - `featured` - Grid of top stories
+  - `secondary` - Secondary featured article
+  - `sidebar` - Sidebar article columns
+  - `briefs` - News briefs at the bottom
 
 ### Adding New Pages
 

@@ -28,13 +28,13 @@
 
 ## Testing
 - After **every change** to the code, the tests must be executed
-- Always verify changes with `just ci-quiet` after modifications
-- **NEVER** run `just run` as a routine verification step; it executes the full pipeline and may perform long-running or side-effectful work
+- Always verify changes with `just ci` after modifications
+- **NEVER** run a full-pipeline target (`just pipelines-all`, `just video-all`, `just url-all`) as a routine verification step; they perform long-running, side-effectful work (downloads, transcription, LLM calls)
 
 ## Python Execution Rules
 - Python code must be executed **only** via `uv run ...`
-  - Example: `uv run src/main.py`
-  - **Never** use: `python src/main.py` or `python3 src/main.py`
+  - Example: `uv run scripts/summarize-transcripts.py`
+  - **Never** use: `python scripts/summarize-transcripts.py` or `python3 scripts/summarize-transcripts.py`
 - The virtual environment must be created and updated **only** via `uv sync`
   - **Never** use: `pip install`, `python -m pip`, or `uv pip`
 - All dependencies must be managed through `uv` and declared in `pyproject.toml`
@@ -42,7 +42,7 @@
 ## Justfile Rules
 - All Python execution in the justfile uses `uv run`, never `python` directly
 - Use `just init` to set up the project
-- Use `just run` to execute the main program
+- Use `just pipelines-all` to run the full URL + video pipelines (or `just video-all` / `just url-all` for one)
 - Use `just` (without arguments) to see all available targets
 
 ## Project Structure

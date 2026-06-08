@@ -16,15 +16,7 @@ The tool automatically discovers and analyzes all `.sh` files in:
 - `scripts/` directory (recursively, including subdirectories)
 - Project root directory (non-recursive)
 
-Currently analyzes **8 shell scripts** in this project:
-- `scripts/archive-videos.sh`
-- `scripts/config.sh`
-- `scripts/convert_to_audio.sh`
-- `scripts/init-directories.sh`
-- `scripts/move-metadata.sh`
-- `scripts/move-transcript-metadata.sh`
-- `scripts/transcribe_single.sh`
-- `scripts/yt-downloader.sh`
+The set of scripts is determined at run time by discovery — there is no hardcoded list. It analyzes every `.sh` file found under `scripts/` (recursively) plus any `.sh` files in the project root.
 
 ## Usage
 
@@ -38,7 +30,7 @@ This will:
 1. Find all `.sh` files in `scripts/` directory and root level
 2. Extract script content
 3. Analyze each script with a local LLM via Autogen
-4. Generate a markdown report at `reports/shell_script_params.md`
+4. Generate a markdown report at `reports/shell_env_var_violations.md`
 
 ### Run Without Cache
 
@@ -52,43 +44,25 @@ Forces a complete re-scan of all scripts, ignoring the hash-based cache.
 
 ```bash
 # Analyze all scripts
-uv run python tools/shellscript_analyzer/detect_shell_params.py
+uv run python tools/shellscript_analyzer/shellscript_analyzer.py
 
 # Analyze a specific script
-uv run python tools/shellscript_analyzer/detect_shell_params.py --file scripts/convert_to_audio.sh
+uv run python tools/shellscript_analyzer/shellscript_analyzer.py --file scripts/convert_to_audio.sh
 
 # Run discovery test (find all scripts)
-uv run python tools/shellscript_analyzer/detect_shell_params.py --test discover
+uv run python tools/shellscript_analyzer/shellscript_analyzer.py --test discover
 
 # Run extraction test (extract content from first script)
-uv run python tools/shellscript_analyzer/detect_shell_params.py --test extract
+uv run python tools/shellscript_analyzer/shellscript_analyzer.py --test extract
 
 # Run analysis test (analyze first script)
-uv run python tools/shellscript_analyzer/detect_shell_params.py --test analyze
+uv run python tools/shellscript_analyzer/shellscript_analyzer.py --test analyze
 ```
 
 ## Requirements
 
-- LM Studio (or compatible OpenAI-compatible LLM server) running locally
-- Default: `http://localhost:1234/v1`
-- Default model: `qwen2.5-7b-instruct-mlx`
-
-You can override these with environment variables:
-
-```bash
-export LM_STUDIO_BASE_URL="http://localhost:1234/v1"
-export LM_STUDIO_MODEL="qwen2.5-7b-instruct-mlx"
-export LM_STUDIO_API_KEY="local"
-```
-
-Or with command-line arguments:
-
-```bash
-uv run python tools/shellscript_analyzer/detect_shell_params.py \
-  --base-url http://localhost:1234/v1 \
-  --model qwen2.5-7b-instruct-mlx \
-  --api-key local
-```
+- LM Studio (or a compatible OpenAI-compatible LLM server) running locally.
+- The base URL, model, and API key are read from `config/config.yaml` (via `Config.get_agentic_shell_script_reviews_config()`). The tool does **not** read environment variables and does **not** accept connection details as CLI arguments — configure the server in `config.yaml` and make sure the model is loaded (`just status`).
 
 ## Analysis Criteria
 
@@ -104,52 +78,44 @@ The tool evaluates scripts based on:
    - Analyzes argument parsing logic
    - Checks for usage/help functions
 
-3. **Parameter Quality Score (0.0-1.0)**
-   - **0.8-1.0 (High)**: Primarily uses CLI args with good defaults, env vars as optional overrides
-   - **0.5-0.7 (Medium)**: Mixed approach or well-documented env var usage
-   - **0.0-0.4 (Low)**: Relies heavily on undocumented env vars without CLI arg alternatives
+3. **Violation Status (PASS / FAIL / ERROR)**
+   - **PASS**: Uses no environment variables, or every environment-derived value is passed in as a CLI argument
+   - **FAIL**: Depends on environment variables (or sourced configuration) that are not passed as CLI arguments
+   - **ERROR**: The script could not be analyzed (e.g. the LLM API was unavailable)
 
 4. **Recommendations**
-   - Suggests improvements for scripts scoring below 0.7
-   - Identifies missing documentation
-   - Recommends adding CLI argument support
+   - For FAIL scripts, identifies the offending variables and recommends passing them as CLI arguments
 
 ## Output
 
 ### Report Location
 
-`reports/shell_script_params.md`
+`reports/shell_env_var_violations.md`
 
 ### Report Sections
 
-1. **Summary**: Overall statistics and average quality score
-2. **Scripts Needing Improvement**: Scripts with score < 0.7
-3. **All Scripts Analysis**: Complete breakdown of all analyzed scripts
+1. **Summary**: How many scripts passed, failed, or errored
+2. **Scripts With Violations**: Scripts that FAIL, with their offending variables
+3. **All Scripts**: Complete PASS / FAIL / ERROR breakdown
 
 ### Example Report Entry
 
 ```markdown
-### scripts/convert_to_audio.sh
+### scripts/example.sh
 
-**Parameter Quality Score:** 0.85/1.0
-
-✅ **Status:** Good parameter handling
+**Status:** ❌ FAIL
 
 **Environment Variables:** Yes
-  - `ENABLE_SILENCE_REMOVAL`
-  - `SILENCE_THRESHOLD_DB`
+  - `SOME_VAR`
 
-**CLI Arguments:** Yes
-  - Accepts input video files as positional arguments
-
-**Recommendation:**
+**Recommendation:** Pass `SOME_VAR` as a CLI argument instead of reading it from the environment.
 ```
 
 ## Caching
 
 The tool uses hash-based caching to skip unchanged files:
 - Cache location: `.cache/shell_script_hashes.json`
-- Tracks file hash, last check time, and parameter score
+- Tracks file hash, last check time, and analysis status
 - Use `--no-cache` flag to force re-scan
 
 ## Integration with CI
@@ -166,8 +132,8 @@ This runs:
 
 ## Exit Codes
 
-- `0`: All scripts have good parameter handling (score >= 0.7)
-- `1`: Some scripts need improvement (score < 0.7)
+- `0`: All scripts pass (no environment-variable violations)
+- `1`: One or more scripts fail (violations found)
 - `2`: Error occurred during analysis or LLM API unavailable
 - `130`: Interrupted by user (Ctrl+C)
 
@@ -207,7 +173,7 @@ The tool consists of 5 main classes:
    └─> Recommendations for improvement
 
 6. Update cache
-   └─> Store file hash and scores
+   └─> Store file hash and status
 ```
 
 ## Tips
@@ -215,4 +181,4 @@ The tool consists of 5 main classes:
 - Run with `--test discover` first to verify it finds the expected scripts
 - Use `--file` to test analysis on a single script before running full analysis
 - Keep LM Studio running to avoid API connection errors
-- Review `reports/shell_script_params.md` for detailed findings
+- Review `reports/shell_env_var_violations.md` for detailed findings

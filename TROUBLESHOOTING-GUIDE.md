@@ -116,7 +116,7 @@ Run individually when CI fails:
 | `just code-audit` | pip-audit |
 | `just code-stats` | pygount → `reports/code-stats.txt` |
 
-`just ci-quiet` runs them all, showing only the failing target's output.
+`just ci` runs them all, showing only the failing target's output.
 
 ---
 

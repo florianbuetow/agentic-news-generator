@@ -1,5 +1,7 @@
 # Notebook Restructuring TODO
 
+> **Status: COMPLETED.** The restructuring described below has been applied to `shellscript_analyzer.ipynb` — narrative now lives in markdown cells, the decorative `=`-bordered narrative prints have been removed from code cells, and the "Analysis Goals" intro is in place. This file is retained as a record of the plan.
+
 ## Goal
 Separate narrative text (markdown) from computation (code) to improve readability.
 

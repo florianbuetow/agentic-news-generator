@@ -14,7 +14,7 @@ The AI landscape is evolving at breakneck speed with hundreds of YouTube channel
 graph LR
     A[YouTube Videos] -->|yt-dlp| B[Raw Video Files .mp4]
     B -->|FFmpeg| C[Audio Extraction .wav]
-    C -->|MLX Whisper large-v3| D[Transcripts .srt/.txt/.json]
+    C -->|MLX Whisper medium.en/medium| D[Transcripts .srt/.txt/.json]
     D -->|Hallucination Detection| E[Cleaned Transcripts]
 
     style A fill:#e1f5ff
@@ -119,12 +119,12 @@ The newspaper interface is organized into four main sections:
 **Code:** [`scripts/transcript-hallucination-detection.py`](../scripts/transcript-hallucination-detection.py) | [`src/processing/repetition_detector.py`](../src/processing/repetition_detector.py) | [`src/models/hallucination_classifier.py`](../src/models/hallucination_classifier.py)
 
 ### Transcription Optimization
-- **Model**: MLX Whisper large-v3 (Apple Silicon optimized)
+- **Model**: MLX Whisper medium.en (English) / medium (multilingual), Apple Silicon optimized — large-v3 was tried and rejected for hallucinating
 - **Metadata Prompting**: Uses YouTube title/description for domain context
 - **Silence Removal**: -40dB threshold, >2s minimum (10-30% time savings)
 - **Anti-hallucination Parameters**: `hallucination_silence_threshold=2.0`, `compression_ratio_threshold=2.0`
 
-**Code:** [`scripts/transcribe_audio.sh`](../scripts/transcribe_audio.sh) | [`scripts/convert_to_audio.sh`](../scripts/convert_to_audio.sh)
+**Code:** [`scripts/transcribe_audio.py`](../scripts/transcribe_audio.py) | [`scripts/convert_to_audio.sh`](../scripts/convert_to_audio.sh)
 
 ### Article Generation
 - **Content Aggregation**: Combines related content across multiple videos
@@ -222,19 +222,19 @@ agentic-news-generator/
 ├── scripts/                    # Processing scripts
 │   ├── yt-downloader.sh       # YouTube video acquisition
 │   ├── convert_to_audio.sh    # Audio extraction + silence removal
-│   ├── transcribe_audio.sh    # MLX Whisper transcription
+│   ├── transcribe_audio.py    # MLX Whisper transcription
 │   ├── transcript-hallucination-detection.py
 │   └── archive-videos.sh      # Cleanup and archiving
 ├── src/                        # Core processing logic
 │   ├── processing/
 │   │   └── repetition_detector.py  # Suffix array algorithm
 │   └── config.py              # Configuration management
-├── frontend/newspaper/         # Nuxt static site
+├── frontend/newspaper/         # Nuxt static site (@nuxt/content)
 │   ├── components/            # Vue components
-│   ├── data/articles.js       # Generated content
+│   ├── content/              # Articles (Markdown) + layout.json
 │   └── assets/css/            # 1950s newspaper styling
 ├── config/
-│   └── config.yaml            # 16 pre-configured AI channels
+│   └── config.yaml            # pre-configured AI channels
 └── data/
     ├── downloads/             # Videos, audio, transcripts
     ├── archive/               # Processed videos

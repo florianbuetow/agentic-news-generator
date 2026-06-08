@@ -155,7 +155,7 @@ Do NOT remove targets whose scripts still exist and work.
 ### 9. Verify
 
 ```bash
-just ci-quiet
+just ci
 ```
 
 Must pass. Any new failure means the move broke an active code path — investigate, do not silently bypass.
