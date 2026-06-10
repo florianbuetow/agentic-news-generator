@@ -133,7 +133,7 @@ def find_metadata_file(metadata_video_dir: Path, base_name: str) -> Path:
         (
             candidate
             for candidate in sorted(metadata_video_dir.glob("*.info.json"))
-            if extract_video_id_from_stem(candidate.name.removesuffix(".info.json")) == video_id
+            if not candidate.name.startswith(".") and extract_video_id_from_stem(candidate.name.removesuffix(".info.json")) == video_id
         ),
         exact_path,
     )

@@ -101,3 +101,18 @@ def test_find_metadata_file_matches_format_suffixed_stem_by_video_id(tmp_path: P
     result = find_metadata_file(metadata_dir, "Some Video [abc123XYZ].f251")
 
     assert result == metadata_file
+
+
+def test_find_metadata_file_ignores_appledouble_sidecar(tmp_path: Path) -> None:
+    metadata_dir = tmp_path / "metadata"
+    metadata_dir.mkdir()
+    metadata_file = metadata_dir / "Some Video [abc123XYZ].info.json"
+    metadata_file.write_text("{}")
+    # macOS writes binary AppleDouble shadow files on non-Apple filesystems; the
+    # glob fallback must skip them or json.load reads their binary header as UTF-8.
+    sidecar = metadata_dir / "._Some Video [abc123XYZ].info.json"
+    sidecar.write_bytes(b"\x00\x05\x16\x07\x00\x02\x00\x00Mac OS X")
+
+    result = find_metadata_file(metadata_dir, "Some Video [abc123XYZ].f251")
+
+    assert result == metadata_file

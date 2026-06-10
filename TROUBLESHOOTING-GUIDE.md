@@ -263,6 +263,42 @@ The root cause is yt-dlp intermediate files left behind from a failed format mer
 
 ---
 
+## Playbook: Transcription Fails With "UnicodeDecodeError ... invalid start byte"
+
+Symptom: `just transcribe` aborts with a traceback ending in `metadata = json.load(f)` and:
+
+```
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid start byte
+```
+
+Root cause: the transcription script reads a **macOS AppleDouble shadow file** (`._<name>.info.json`) as if it were the real metadata JSON. AppleDouble files are binary — they begin with the magic header `00 05 16 07 ... "Mac OS X"` — so `json.load` chokes on the first non-UTF-8 byte. The `0xb0` at position 37 is part of that binary header, not real content. (The byte/position may differ; any `invalid start byte` from `json.load` on a metadata file is the same problem.)
+
+Why the wrong file gets picked (verified at `scripts/transcribe_audio.py:122-139`):
+
+- `find_metadata_file` first tries the exact stem `<base_name>.info.json`. For a normal WAV this hits the real file and the bug never triggers.
+- When the WAV carries a **format-code suffix** (e.g. `… [VIDEO_ID].f251-11.wav` — see **Case 2** of the previous playbook), the exact stem `… .f251-11.info.json` does not exist, so the code falls back to `sorted(metadata_video_dir.glob("*.info.json"))` and returns the first file whose bracketed video ID matches.
+- On the external data drive (a non-APFS/HFS+ filesystem — exFAT/SMB/etc.), macOS writes an AppleDouble `._<name>.info.json` sidecar next to every real file. The glob returns **both**, and `sorted()` ranks `._…` first because `.` (`0x2E`) sorts before `A` (`0x41`). The script therefore opens the binary sidecar.
+
+So two conditions must both hold: a format-code-suffixed WAV **and** AppleDouble sidecars on disk. WAV discovery already filters these out (`scripts/transcribe_audio.py:405,483` — `if not f.name.startswith(".")`); only the metadata glob fallback at `scripts/transcribe_audio.py:135` is missing the same filter.
+
+**Immediate fix — remove the AppleDouble sidecars** (they carry no real content, only resource-fork/xattr metadata):
+
+1. Dry run — list what would be removed under the metadata dir (narrow to one channel with `/<CHANNEL>`):
+   ```bash
+   find <metadata_dir> -name '._*' -print
+   ```
+2. Delete them:
+   ```bash
+   find <metadata_dir> -name '._*' -delete
+   ```
+3. Re-run `just transcribe`.
+
+**This recurs.** macOS recreates `._` files whenever it touches that filesystem (Finder copy, Spotlight indexing, etc.), so deletion is a band-aid. The permanent fix is in code: `find_metadata_file` must skip dotfiles in its glob fallback, mirroring the WAV-discovery filter at `scripts/transcribe_audio.py:405,483`.
+
+The underlying `.f251-11` format-code artifact is itself a broken-download symptom — see **Case 2** above for cleaning it up and re-downloading.
+
+---
+
 ## Playbook: YouTube Cookies Expired During Download
 
 When `just download-videos` fails with `ERROR: YouTube cookies are expired or invalid. Aborting.`, the browser cookies that yt-dlp extracted are no longer accepted by YouTube.
