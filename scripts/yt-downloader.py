@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from src.config import Config
+from src.config import ChannelConfig, Config
 from src.util.channel_name import sanitize_channel_name
 from src.util.log_util import configure_root_logger, get_logger
 
@@ -38,8 +38,46 @@ EXIT_CODE_REASONS: dict[int, str] = {
 }
 
 
+def filter_channels_by_name(channels: list[ChannelConfig], channel_filter: str) -> list[ChannelConfig]:
+    """Return channels whose name matches channel_filter.
+
+    Matching accepts either the raw ``name`` from config.yaml or its sanitized
+    directory form, so callers can pass the CLI-friendly directory name.
+    """
+    return [channel for channel in channels if channel.name == channel_filter or sanitize_channel_name(channel.name) == channel_filter]
+
+
+def parse_channel_filter(argv: list[str]) -> str:
+    """Parse the optional ``--channel`` argument from argv."""
+    if len(argv) == 3 and argv[1] == "--channel":
+        return argv[2].strip()
+    if len(argv) != 1:
+        print("Usage: yt-downloader.py [--channel CHANNEL]", file=sys.stderr)
+        sys.exit(1)
+    return ""
+
+
+def resolve_channels(config: Config, channel_filter: str) -> list[ChannelConfig]:
+    """Return the channels to process, applying the optional channel filter."""
+    channels = config.get_channels()
+    if not channels:
+        logger.error("No channels found in config.yaml")
+        sys.exit(1)
+    if not channel_filter:
+        return channels
+    matched = filter_channels_by_name(channels, channel_filter)
+    if not matched:
+        available = ", ".join(sorted(sanitize_channel_name(c.name) for c in channels))
+        logger.error(f"No channel matching '{channel_filter}' found in config.yaml. Available: {available}")
+        sys.exit(1)
+    logger.info(f"Filtered to {len(matched)} channel(s) matching '{channel_filter}'")
+    return matched
+
+
 def main() -> None:
     """Read config.yaml and invoke yt-downloader.sh for each channel."""
+    channel_filter = parse_channel_filter(sys.argv)
+
     project_root = Path(__file__).parent.parent
     config_path = project_root / "config" / "config.yaml"
     shell_script_path = project_root / "scripts" / "yt-downloader.sh"
@@ -55,11 +93,7 @@ def main() -> None:
 
     configure_root_logger(config.get_data_logs_dir())
 
-    channels = config.get_channels()
-
-    if not channels:
-        logger.error("No channels found in config.yaml")
-        sys.exit(1)
+    channels = resolve_channels(config, channel_filter)
 
     random.shuffle(channels)
 

@@ -72,7 +72,7 @@ help:
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
     @echo ""
     @printf "\033[0;33mVideo-Pipeline:\033[0m\n"
-    @printf "  %-38s %s\n" "download-videos" "Download YouTube videos from channels in config.yaml"
+    @printf "  %-38s %s\n" "download-videos [<channel>]" "Download YouTube videos from channels in config.yaml"
     @printf "  %-38s %s\n" "check-video-integrity" "Check video files for corruption"
     @printf "  %-38s %s\n" "filter-videos" "Filter and delete videos shorter than transcription.min_duration"
     @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
@@ -311,14 +311,14 @@ maintenance:
     @just analyze-transcript-languages
     @printf "\033[0;32m✓ maintenance completed successfully\033[0m\n"
 
-# Download YouTube videos from channels in config.yaml
-download-videos:
+# Download YouTube videos from channels in config.yaml (optional: just download-videos <channel>)
+download-videos channel="":
     #!/usr/bin/env bash
     set +e
     mkdir -p reports
     echo ""
     printf "\033[0;34m=== Downloading YouTube Videos ===\033[0m\n"
-    uv run scripts/yt-downloader.py 2>&1 | tee reports/video-download.log
+    uv run scripts/yt-downloader.py {{ if channel == "" { "" } else { "--channel " + channel } }} 2>&1 | tee reports/video-download.log
     download_exit_code=${PIPESTATUS[0]}
     echo ""
     if [ $download_exit_code -ne 0 ]; then
