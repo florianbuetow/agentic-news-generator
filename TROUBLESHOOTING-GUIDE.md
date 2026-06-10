@@ -17,6 +17,7 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | Fetch missing `.info.json` | `just fetch-video-metadata <CHANNEL> <ID...>` |
 | Nuke every file for a video ID | `just clean-video-files VIDEO_ID=<id>` |
 | Find format-code artifacts | `find <audio_dir> -name '*.f[0-9]*.wav'` |
+| Find macOS AppleDouble sidecars | `find <data_dir> -name '._*'` |
 
 ---
 
