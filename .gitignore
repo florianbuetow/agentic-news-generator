@@ -248,6 +248,7 @@ data/
 # Debug scripts (temporary)
 debug/
 scratch/
+.playwright-cli/
 .guardfile
 
 # Local utility scripts and tools
