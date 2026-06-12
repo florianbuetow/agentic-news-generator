@@ -247,6 +247,7 @@ data/
 
 # Debug scripts (temporary)
 debug/
+scratch/
 .guardfile
 
 # Local utility scripts and tools
