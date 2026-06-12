@@ -1,10 +1,10 @@
 """Configuration loader for the Agentic News Generator."""
 
 from pathlib import Path
-from typing import Annotated, Any, cast
+from typing import Annotated, Any, Literal, cast
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 
 class ParagraphConfig(BaseModel):
@@ -262,6 +262,33 @@ class IntegrationsConfig(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class AnalyticsConfig(BaseModel):
+    """Configuration for the isolated transcript/summary analytics feature."""
+
+    lookback_days: int = Field(..., gt=0, description="Days of upload history included in theme and timeline reports")
+    timeline_bucket: Literal["week", "month"] = Field(..., description="Timeline grouping granularity")
+    channel_filter: str | None = Field(..., description="Restrict reports to one channel name; null means all channels")
+    top_n_themes: int = Field(..., gt=0, description="Maximum number of themes in reports")
+    top_n_terms: int = Field(..., gt=0, description="Maximum number of TF-IDF terms in reports")
+    top_n_videos_per_theme: int = Field(..., gt=0, description="Maximum contributing videos listed per theme")
+    min_theme_document_frequency: int = Field(..., gt=0, description="Minimum videos a phrase theme must appear in")
+    tfidf_ngram_range_min: int = Field(..., gt=0, description="Lower bound of the TF-IDF n-gram range")
+    tfidf_ngram_range_max: int = Field(..., gt=0, description="Upper bound of the TF-IDF n-gram range")
+    include_cleaned_txt_in_tfidf: bool = Field(..., description="Append normalized cleaned transcript text to each TF-IDF document")
+    previous_run_cache: Path = Field(..., description="Snapshot file used for week-over-week emerging-term diffs")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_ngram_range(self) -> "AnalyticsConfig":
+        """Reject inverted n-gram ranges at config load time."""
+        if self.tfidf_ngram_range_max < self.tfidf_ngram_range_min:
+            raise ValueError(
+                f"tfidf_ngram_range_max ({self.tfidf_ngram_range_max}) must be >= tfidf_ngram_range_min ({self.tfidf_ngram_range_min})"
+            )
+        return self
+
+
 class PathsConfig(BaseModel):
     """Configuration for all project directory paths."""
 
@@ -284,6 +311,10 @@ class PathsConfig(BaseModel):
     data_archive_videos_dir: str = Field(..., description="Archived videos directory path", min_length=1)
     data_logs_dir: str = Field(..., description="Log files directory path", min_length=1)
     reports_dir: str = Field(..., description="Model benchmark reports directory path", min_length=1)
+    data_output_analytics_dir: Annotated[
+        str | None,
+        Field(min_length=1, description="Analytics output directory path; required only when analytics runs"),
+    ] = None
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -323,6 +354,8 @@ class Config:
             self._url_clean_content = self._validate_url_clean_content()
         if "url_processing" in self._data:
             self._url_processing = self._validate_url_processing()
+        if "analytics" in self._data:
+            self._analytics = self._validate_analytics()
 
     def _validate_tool_sections(self) -> None:
         """Validate optional tool-related config sections."""
@@ -479,6 +512,14 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"URL processing configuration validation failed: {error_messages}") from e
 
+    def _validate_analytics(self) -> AnalyticsConfig:
+        """Validate analytics configuration."""
+        try:
+            return AnalyticsConfig.model_validate(self._data["analytics"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Analytics configuration validation failed: {error_messages}") from e
+
     def _validate_agentic_review(self, key: str) -> AgenticReviewConfig:
         """Validate an agentic review configuration section."""
         try:
@@ -535,6 +576,12 @@ class Config:
         if not hasattr(self, "_url_processing"):
             raise KeyError("Missing required key 'url_processing' in config file")
         return self._url_processing
+
+    def get_analytics_config(self) -> AnalyticsConfig:
+        """Get analytics configuration."""
+        if not hasattr(self, "_analytics"):
+            raise KeyError("Missing required key 'analytics' in config file")
+        return self._analytics
 
     def get_agentic_unit_test_reviews_config(self) -> AgenticReviewConfig:
         """Get agentic unit test reviews configuration."""
@@ -678,6 +725,20 @@ class Config:
             Path object pointing to the data/output directory.
         """
         return Path(self._paths.data_output_dir)
+
+    def get_data_output_analytics_dir(self) -> Path:
+        """Get the analytics output directory path.
+
+        Returns:
+            Path object pointing to the analytics output directory.
+
+        Raises:
+            KeyError: If paths.data_output_analytics_dir is not configured.
+        """
+        analytics_dir = self._paths.data_output_analytics_dir
+        if analytics_dir is None:
+            raise KeyError("Missing required key 'paths.data_output_analytics_dir' in config file")
+        return Path(analytics_dir)
 
     def get_data_input_dir(self) -> Path:
         """Get the data input directory path.

@@ -34,6 +34,7 @@ agentic-news-generator/
 │   └── semgrep/           # Semgrep rules
 ├── src/                    # Source code
 │   ├── config.py          # Config loading
+│   ├── analytics/         # Corpus index, TF-IDF themes, timeline, research digest
 │   ├── processing/
 │   │   └── repetition_detector.py  # Hallucination detection
 │   ├── url_ingestion/     # URL pipeline: normalize, classify, download, clean
@@ -53,7 +54,8 @@ agentic-news-generator/
 │   ├── fetch-video-metadata.py  # Backfill missing info.json
 │   ├── find-empty-transcripts.sh  # List silently-failed transcripts
 │   ├── urls-download.py    # URL pipeline: inbox → raw content
-│   └── urls-cleancontent.py  # URL pipeline: raw → cleaned Markdown
+│   ├── urls-cleancontent.py  # URL pipeline: raw → cleaned Markdown
+│   └── analytics/         # Analytics CLIs: index, themes, timeline, digest
 ├── integrations/
 │   └── raindrop_io/
 │       └── fetchurls-raindrop.py  # Fetch Raindrop.io bookmarks → URL inbox
@@ -82,6 +84,7 @@ agentic-news-generator/
     ├── temp/              # Temporary processing files
     └── output/
         ├── hallucination_digest.md  # Hallucination report
+        ├── analytics/     # Corpus index, themes, timeline, research digest
         └── newspaper/     # Generated static site
 ```
 
@@ -182,6 +185,12 @@ just help
 - `just urls-download` - Read the inbox queue, then normalize, deduplicate, classify, and download raw content (writes metadata and archives consumed inbox entries)
 - `just urls-cleancontent` - Convert downloaded raw content into cleaned Markdown using an LLM formatting agent (live per-item progress with percentage and ETA)
 - `just pipelines-all` - Run the URL pipeline (`url-all`) followed by the video pipeline (`video-all`)
+
+#### Transcript Summary Analytics
+- `just analytics` - Full research digest (corpus index + themes + timeline + emerging diff; no LLM)
+- `just analytics-index` - Build the corpus index from cleaned transcripts, summaries, and metadata
+- `just analytics-themes` - Theme report: TF-IDF terms + multi-word phrases over summaries
+- `just analytics-timeline` - Timeline report bucketed by upload date
 
 #### Tools
 - `just find-files <video-id>` - Find all files for a video ID across all data directories
@@ -289,6 +298,26 @@ just urls-cleancontent
 - All operations are idempotent and safe to re-run; finished items are skipped on the next run.
 - Failures never halt the batch — each stage processes every remaining item, then prints a failure summary and exits non-zero if anything failed.
 - The LLM formatting agent uses the same local LLM (LM Studio) configuration and retry/skip discipline as transcript summarization; make sure the model is loaded (`just status`).
+
+### Transcript Summary Analytics
+
+A read-only analytics layer over the cleaned transcripts and their summaries. It needs no LLM at runtime: reports are computed with plain text statistics (TF-IDF, document frequency) and written as JSON + Markdown artifacts into the analytics output directory (`paths.data_output_analytics_dir`).
+
+```bash
+just analytics            # full digest: index → themes → timeline → research_digest.md
+just analytics-index      # corpus_index.json only
+just analytics-themes     # themes.json + themes_report.md
+just analytics-timeline   # timeline.json + timeline_report.md
+```
+
+- **Corpus index** joins every cleaned transcript with its summary and `info.json` metadata into `corpus_index.json`.
+- **Themes** ranks top terms (TF-IDF) and multi-word phrases (document frequency) over summaries within a configurable lookback window.
+- **Timeline** buckets videos by upload date (week or month) with per-bucket top terms and phrases.
+- **Research digest** combines all of the above into `research_digest.md`, including an "emerging" diff of terms and phrases that are new since the previous run (tracked via a snapshot cache at `analytics.previous_run_cache`; delete the file to reset).
+
+Configuration lives in the `analytics:` block of `config/config.yaml` (lookback window, bucket type, channel filter, top-N limits, n-gram range).
+
+**Note:** unlike the resilient batch pipelines, analytics **fails fast** — any unreadable summary, malformed metadata, or corrupt snapshot cache aborts the run before any artifact is written, because a partial index would produce misleading research reports. The one exception is coverage, not failure: a transcript without a summary (or with an empty one) is indexed with a `null` summary, excluded from ranking, and reported in the coverage stats.
 
 ### Anti-Hallucination Transcription Features
 
@@ -1022,6 +1051,7 @@ This project is in active development. Current implementation status:
 - ✅ Video archiving and cleanup (`scripts/archive-videos.sh`)
 - ✅ URL ingestion pipeline — fetch → download → clean to Markdown (`src/url_ingestion/`, `just url-all`)
 - ✅ Transcript summarization with local LLM (`scripts/summarize-transcripts.py`, `just summarize-transcripts`)
+- ✅ Transcript summary analytics — corpus index, TF-IDF themes, timeline, research digest (`src/analytics/`, `just analytics`)
 - ✅ HTML newspaper frontend (Nuxt + `@nuxt/content`, `frontend/newspaper/`)
 - ✅ Python-to-frontend data pipeline — `scripts/preprocess_articles.py` copies article frontmatter into `frontend/newspaper/content/articles/`, rendered by the Nuxt frontend via `@nuxt/content` (`just newspaper-generate`)
 - 🚧 Article generation — the automated authoring of newspaper article markdown from transcript summaries is not yet wired up. Summarization (`just summarize-transcripts`) works, and hand-authored article markdown in `data/input/newspaper/articles/` is rendered by the frontend, but the transcripts→articles synthesis step in between is not automated.

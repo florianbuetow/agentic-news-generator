@@ -20,6 +20,9 @@ paths:
   # Model benchmark and visualization paths
   reports_dir: reports
 
+  # Analytics output (isolated; written only by scripts/analytics/)
+  data_output_analytics_dir: ./data/output/analytics
+
 url_processing:
   base_dir: urls
   inbox_dir: inbox_urls
@@ -175,6 +178,20 @@ agentic_shell_script_reviews:
     model: qwen2.5-7b-instruct-mlx
     base_url: http://localhost:1234/v1
     api_key: local
+
+# Analytics Configuration (isolated transcript/summary analytics; no LLM)
+analytics:
+  lookback_days: 30              # Days of upload history included in theme/timeline reports
+  timeline_bucket: week          # week | month
+  channel_filter: null           # null = all channels; or a channels[].name value
+  top_n_themes: 30               # Maximum number of themes in reports
+  top_n_terms: 50                # Maximum number of TF-IDF terms in reports
+  top_n_videos_per_theme: 10     # Maximum contributing videos listed per theme
+  min_theme_document_frequency: 2  # Minimum videos a phrase theme must appear in
+  tfidf_ngram_range_min: 1         # Lower bound of the TF-IDF n-gram range
+  tfidf_ngram_range_max: 2         # Upper bound of the TF-IDF n-gram range (>= min)
+  include_cleaned_txt_in_tfidf: false  # Also feed normalized cleaned .txt into TF-IDF documents
+  previous_run_cache: ./.cache/analytics_previous.json  # Snapshot for emerging-term diffs
 
 # Integrations Configuration
 integrations:

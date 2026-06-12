@@ -95,6 +95,12 @@ help:
     @printf "  %-38s %s\n" "newspaper-serve" "Run newspaper development server"
     @printf "  %-38s %s\n" "newspaper-destroy" "Clean up generated newspaper files"
     @echo ""
+    @printf "\033[0;33mAnalytics:\033[0m\n"
+    @printf "  %-38s %s\n" "analytics" "Full research digest (index + themes + timeline; no LLM)"
+    @printf "  %-38s %s\n" "analytics-index" "Build corpus index from cleaned transcripts + summaries"
+    @printf "  %-38s %s\n" "analytics-themes" "Theme frequency + TF-IDF term report"
+    @printf "  %-38s %s\n" "analytics-timeline" "Timeline report bucketed by upload date"
+    @echo ""
     @printf "\033[0;33mCode Quality:\033[0m\n"
     @printf "  %-38s %s\n" "code-format" "Auto-fix code style and formatting"
     @printf "  %-38s %s\n" "code-style" "Check code style and formatting (read-only)"
@@ -788,7 +794,7 @@ check-config-syntax:
     set -e
     echo ""
     printf "\033[0;34m=== Validating YAML Syntax ===\033[0m\n"
-    find . \( -path ./frontend/newspaper/node_modules -o -path ./.git -o -path ./.venv \) -prune \
+    find . \( -path ./frontend/newspaper/node_modules -o -path ./.git -o -path ./.venv -o -path ./.playwright-cli \) -prune \
         -o \( -name "*.yml" -o -name "*.yaml" \) -print \
         | xargs uv run yamllint -d "{extends: relaxed, rules: {line-length: disable, empty-lines: disable}}"
     echo ""
@@ -800,7 +806,8 @@ code-audit:
     @echo ""
     @printf "\033[0;34m=== Scanning Dependencies for Vulnerabilities ===\033[0m\n"
     @uv run pip-audit --skip-editable \
-        --ignore-vuln PYSEC-2026-139  # torch: local-only deserialization; no fix released yet; torch is unused at runtime (mlx-whisper declares it but never imports torch_whisper.py)
+        --ignore-vuln PYSEC-2026-139 \
+        --ignore-vuln GHSA-rrmf-rvhw-rf47  # torch: no fix released; torch is unused at runtime (mlx-whisper declares it but never imports torch_whisper.py)
     @echo ""
     @printf "\033[0;32m✓ No known vulnerabilities found\033[0m\n"
     @echo ""
@@ -1189,3 +1196,23 @@ ci-ai-quiet:
     echo ""
     printf "\033[0;32m✓ All AI-based CI checks passed\033[0m\n"
     echo ""
+
+# =============================================================================
+# Analytics (isolated; reads cleaned transcripts + summaries + metadata; no LLM)
+# =============================================================================
+
+# Build corpus index from cleaned transcripts + summaries + metadata
+analytics-index:
+    @uv run python scripts/analytics/index.py
+
+# Theme frequency report (filters from the analytics: config block)
+analytics-themes:
+    @uv run python scripts/analytics/themes.py
+
+# Timeline report by upload_date
+analytics-timeline:
+    @uv run python scripts/analytics/timeline.py
+
+# Full research digest: index + themes + timeline + emerging diff
+analytics:
+    @uv run python scripts/analytics/digest.py
