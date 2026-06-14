@@ -255,6 +255,16 @@ def _fmt_cell(value: int, prev: int | None, num_width: int) -> str:
     return num + f"\033[0;31m{tag:<3}\033[0m"
 
 
+def _completion_denominator(transcripts: int, videos_active: int, audio: int) -> int:
+    """Total work units for the completion %: transcribed items plus the raw queue.
+
+    Downloaded videos and extracted audio that have not been transcribed yet are
+    pending work for the channel, so they count toward the total. ``max`` avoids
+    double-counting a single item present as both a video and its extracted audio.
+    """
+    return transcripts + max(videos_active, audio)
+
+
 def _print_stat_row(
     label: str,
     stats: dict[str, int | float],
@@ -343,8 +353,11 @@ def main() -> int:  # noqa: C901
     print()
 
     total_transcripts = int(totals["transcripts"])
-    if total_transcripts > 0:
-        overall_pct = (totals["summaries"] / total_transcripts) * 100
+    total_denom = sum(
+        _completion_denominator(int(s["transcripts"]), int(s["videos_active"]), int(s["audio"])) for s in channel_stats.values()
+    )
+    if total_denom > 0:
+        overall_pct = (totals["summaries"] / total_denom) * 100
         print(f"Overall Pipeline Completion: {overall_pct:.1f}%")
         print()
 
@@ -404,8 +417,8 @@ def main() -> int:  # noqa: C901
 
     for channel_name in sorted(channel_stats.keys()):
         s = channel_stats[channel_name]
-        transcripts_total = int(s["transcripts"])
-        completion_pct = (s["summaries"] / transcripts_total * 100) if transcripts_total > 0 else 0.0
+        denom = _completion_denominator(int(s["transcripts"]), int(s["videos_active"]), int(s["audio"]))
+        completion_pct = (s["summaries"] / denom * 100) if denom > 0 else 0.0
         size_gb = float(s["total_size_bytes"]) / (1024**3)
         display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
         prev_ch: dict[str, int] | None = prev_channels.get(channel_name)
@@ -425,7 +438,7 @@ def main() -> int:  # noqa: C901
 
     # Print totals row
     print("-" * line_width)
-    overall_pct = (totals["summaries"] / total_transcripts * 100) if total_transcripts > 0 else 0.0
+    overall_pct = (totals["summaries"] / total_denom * 100) if total_denom > 0 else 0.0
     total_size_gb = float(totals["total_size_bytes"]) / (1024**3)
     prev_totals: dict[str, int] | None = previous.get("totals") if previous else None
     _print_stat_row(

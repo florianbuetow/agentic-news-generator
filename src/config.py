@@ -788,6 +788,14 @@ class Config:
         """
         return Path(self._paths.reports_dir)
 
+    def get_filefilter_path(self) -> Path:
+        """Get the path to the video-ID filter file (sibling of config.yaml).
+
+        Returns:
+            Path object pointing to the filter JSON listing filtered video IDs.
+        """
+        return self.config_path.parent / "filefilter.json"
+
     def get_url_base_dir(self) -> Path:
         """Get the URL ingestion base directory under data_dir."""
         return self.get_data_dir() / self.get_url_processing_config().base_dir

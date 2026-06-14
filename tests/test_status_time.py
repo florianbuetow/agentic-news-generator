@@ -48,6 +48,15 @@ def test_extract_last_timestamp_seconds_from_srt(tmp_path: Path) -> None:
     assert status._extract_last_timestamp_seconds_from_srt(srt_file) == 15
 
 
+def test_completion_denominator_adds_raw_queue_to_transcripts() -> None:
+    # Transcribed items plus the larger of the two raw-queue stages (videos vs audio).
+    assert status._completion_denominator(97, 17, 16) == 97 + 17
+    # Audio can exceed videos when a video was already removed after extraction.
+    assert status._completion_denominator(0, 2, 5) == 5
+    # No raw queue on disk: denominator is just the transcript count.
+    assert status._completion_denominator(708, 0, 0) == 708
+
+
 def test_sum_channel_cleaned_srt_seconds_skips_missing_timestamps(tmp_path: Path) -> None:
     channel_dir = tmp_path / "channel"
     channel_dir.mkdir(parents=True)
