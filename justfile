@@ -136,6 +136,7 @@ help:
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
+    @printf "  %-46s %s\n" "disk-free" "Show free disk space for each drive used by config.yaml paths"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
@@ -416,6 +417,14 @@ clean-video-files VIDEO_ID:
     fi
     echo ""
 
+# Show free disk space for each drive used by config.yaml paths
+disk-free:
+    @echo ""
+    @printf "\033[0;34m=== Disk Free Space ===\033[0m\n"
+    @uv run scripts/disk-free.py
+    @printf "\033[0;32m✓ disk-free completed successfully\033[0m\n"
+    @echo ""
+
 # Analyze transcripts for hallucinations
 analyze-transcripts-hallucinations:
     @echo ""
@@ -526,12 +535,14 @@ stats period="":
     if [[ -n "$stats_from" ]]; then
         printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"
     fi
+    uv run scripts/disk-free.py
 
 # Show condensed processing status: only channels with non-zero video archive or audio
 stats-mini:
     #!/usr/bin/env bash
     clear
     just stats | perl -pe 's/\x1b\[[0-9;]*[A-Za-z]//g' | awk 'NF < 5 || /TOTAL/ || ($3 != "-" && $4 != "-")' | grep -v '\-\-\-' | awk '{lines[NR]=$0} /===/{last=NR} END{for(i=last+1;i<=NR;i++) print lines[i]}'
+    uv run scripts/disk-free.py
 
 # Show processing status of downloads with transcript time totals enabled
 totals period="":
