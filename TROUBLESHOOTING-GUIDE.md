@@ -51,6 +51,9 @@ For each channel, flags files with no audio stream or duration below `transcript
 ### `scripts/remove-filtered-files.py` — `just filter-videos` (step 2 of 2)
 Sweeps files listed in `config/filefilter.json` plus upstream copies (transcripts → audio → videos) by `[<video_id>]` substring. Always deletes; no CLI args, no dry-run mode.
 
+### `scripts/find-files-with-filtered-video-ids.py` — `just find-files-with-filtered-video-ids`
+Read-only audit. Builds a set of every video ID in `config/filefilter.json`, then walks each ID-convention data folder channel-by-channel and flags any file whose `[<video_id>]` is in that set. Because `remove-filtered-files.py` only sweeps the `videos → audio → transcripts` chain, downstream artifacts (hallucination JSON, cleaned transcripts, summaries, metadata) of a filtered video can survive — this surfaces them. Prints one `ERROR:` line per offender; exits `1` if any are found, else `0`. No CLI args.
+
 ### `scripts/clean-video-files.py` — `just clean-video-files VIDEO_ID=<id>`
 Interactive: lists every file containing `[<video_id>]`, asks which to delete, optionally removes the ID from yt-dlp `downloaded.txt` archive. Every destructive action confirmed.
 

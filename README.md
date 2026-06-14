@@ -379,6 +379,12 @@ This single target chains two scripts:
 
 The target is wired into `just video-all` immediately after `just check-video-integrity`. Both scripts read everything from `config/config.yaml` and operate on `config/filefilter.json`; they take no CLI arguments and there is no dry-run mode.
 
+**Audit for leftover files of filtered videos:**
+```bash
+just find-files-with-filtered-video-ids
+```
+`scripts/find-files-with-filtered-video-ids.py` builds a set of every video ID in `config/filefilter.json`, then walks each ID-convention data folder channel-by-channel and flags any file whose `[<video_id>]` is in that set. Because `remove-filtered-files.py` only sweeps the `videos → audio → transcripts` chain, downstream artifacts (hallucination JSON, cleaned transcripts, summaries, metadata) of a filtered video can survive — this read-only check surfaces them. It prints one `ERROR:` line per offending file and exits `1` if any are found, `0` otherwise.
+
 **Probe a single video for audio health:**
 ```bash
 just check-audio-track <Channel> <video-id>

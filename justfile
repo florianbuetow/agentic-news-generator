@@ -131,6 +131,7 @@ help:
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @printf "  %-46s %s\n" "find-files-without-youtube-id" "Report data files missing a YouTube ID (writes to reports/)"
+    @printf "  %-46s %s\n" "find-files-with-filtered-video-ids" "Flag data files whose video ID is in the filter file (read-only)"
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
@@ -1082,6 +1083,13 @@ find-empty-transcripts:
     @echo ""
     @bash scripts/find-empty-transcripts.sh
     @echo ""
+
+# Flag data files whose video ID is in the filter file but were never removed (read-only)
+find-files-with-filtered-video-ids:
+    @echo ""
+    @printf "\033[0;34m=== Finding Files With Filtered Video IDs ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/find-files-with-filtered-video-ids.py
 
 # Run ALL validation checks (verbose)
 ci-verbose:
