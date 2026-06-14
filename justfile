@@ -542,7 +542,6 @@ stats-mini:
     #!/usr/bin/env bash
     clear
     just stats | perl -pe 's/\x1b\[[0-9;]*[A-Za-z]//g' | awk 'NF < 5 || /TOTAL/ || ($3 != "-" && $4 != "-")' | grep -v '\-\-\-' | awk '{lines[NR]=$0} /===/{last=NR} END{for(i=last+1;i<=NR;i++) print lines[i]}'
-    uv run scripts/disk-free.py
 
 # Show processing status of downloads with transcript time totals enabled
 totals period="":
