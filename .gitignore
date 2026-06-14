@@ -226,6 +226,7 @@ config/filefilter.json
 
 # Documentation files
 docs/superpowers/
+docs/plans/
 
 # Frontend / Nuxt.js
 frontend/newspaper/node_modules/
