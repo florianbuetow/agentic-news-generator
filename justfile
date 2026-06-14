@@ -67,7 +67,7 @@ help:
     @printf "  %-38s %s\n" "checks-all" "Run all checks and CI"
     @printf "  %-38s %s\n" "maintenance" "Run all read-only data pipeline health checks"
     @printf "  %-38s %s\n" "stats [hour|day]" "Show processing status (throttle: once per hour/day)"
-    @printf "  %-38s %s\n" "stats-mini" "Show condensed processing status (channels with video archive or audio only)"
+    @printf "  %-38s %s\n" "stats-mini" "Show condensed processing status (channels with videos or audio only)"
     @printf "  %-38s %s\n" "totals [hour|day]" "Show processing status with transcript time totals"
     @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
     @printf "  %-38s %s\n" "status" "Check if LM Studio is running and models are loaded"
@@ -537,11 +537,11 @@ stats period="":
     fi
     uv run scripts/disk-free.py
 
-# Show condensed processing status: only channels with non-zero video archive or audio
+# Show condensed processing status: only channels with non-zero videos or audio
 stats-mini:
     #!/usr/bin/env bash
     clear
-    just stats | perl -pe 's/\x1b\[[0-9;]*[A-Za-z]//g' | awk 'NF < 5 || /TOTAL/ || ($3 != "-" && $4 != "-")' | grep -v '\-\-\-' | awk '{lines[NR]=$0} /===/{last=NR} END{for(i=last+1;i<=NR;i++) print lines[i]}'
+    just stats | perl -pe 's/\x1b\[[0-9;]*[A-Za-z]//g' | awk '!($2 ~ /^-/ && $4 ~ /^-/ && NF >= 8)' | grep -v '\-\-\-' | awk '{lines[NR]=$0} /===/{last=NR} END{for(i=last+1;i<=NR;i++) print lines[i]}'
 
 # Show processing status of downloads with transcript time totals enabled
 totals period="":
