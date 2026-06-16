@@ -57,6 +57,7 @@ def collect_config_paths(config: Config) -> list[Path]:
 
 
 def main() -> int:
+    """Print free disk space for each mount point referenced by config.yaml."""
     project_root = Path(__file__).parent.parent
     config = Config(project_root / "config" / "config.yaml")
 
