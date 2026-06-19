@@ -137,9 +137,10 @@ help:
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
     @printf "  %-46s %s\n" "disk-free" "Show free disk space for each drive used by config.yaml paths"
+    @printf "  %-46s %s\n" "histogram-transcript-sizes" "Render a terminal histogram of pending transcript sizes in tokens"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
-    @printf "  %-38s %s\n" "test" "Run unit tests only (fast)"
+    @printf "  %-38s %s\n" "test [<target>]" "Run Python unit tests; optional pytest file/class/function target"
     @printf "  %-38s %s\n" "test-url-ingestion" "Run URL ingestion integration/e2e tests"
     @printf "  %-38s %s\n" "test-coverage" "Run unit tests with coverage report"
     @printf "  %-38s %s\n" "ci" "Run ALL validation checks silently"
@@ -423,6 +424,14 @@ disk-free:
     @printf "\033[0;34m=== Disk Free Space ===\033[0m\n"
     @uv run scripts/disk-free.py
     @printf "\033[0;32m✓ disk-free completed successfully\033[0m\n"
+    @echo ""
+
+# Render a terminal histogram of pending transcript sizes in tokens
+histogram-transcript-sizes:
+    @echo ""
+    @printf "\033[0;34m=== Transcript Size Histogram ===\033[0m\n"
+    @uv run scripts/summarize-transcripts-token-histogram.py
+    @printf "\033[0;32m✓ histogram-transcript-sizes completed successfully\033[0m\n"
     @echo ""
 
 # Analyze transcripts for hallucinations
@@ -871,13 +880,13 @@ ai-review-shell-scripts-nocache:
     @uv run python tools/shellscript_analyzer/shellscript_analyzer.py --no-cache
     @echo ""
 
-# Run unit tests only (fast)
-test:
+# Run Python unit tests, optionally for a specific pytest target
+test target="tests/":
     #!/usr/bin/env bash
     set +e
     echo ""
-    printf "\033[0;34m=== Running Unit Tests ===\033[0m\n"
-    uv run pytest tests/ -v
+    printf "\033[0;34m=== Running Python Tests: {{target}} ===\033[0m\n"
+    uv run pytest "{{target}}" -v
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 5 ]; then
         printf "\033[0;33m⚠ No tests found (this is OK)\033[0m\n"

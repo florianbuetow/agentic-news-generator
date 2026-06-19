@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import logging
 from pathlib import Path
 from typing import Any, Literal
 
@@ -120,7 +121,7 @@ def test_numeric_context_window_warns_and_uses_config_when_metadata_unavailable(
     monkeypatch.setattr(module, "get_loaded_context_length", fail)
 
     assert module.resolve_effective_context_window(make_llm(context_window=4096)) == 4096
-    assert "Could not verify loaded LM Studio context length" in caplog.text
+    assert "LM Studio ctx unavailable; using config ctx=4,096" in caplog.text
 
 
 def test_auto_context_window_rejects_missing_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,7 +132,7 @@ def test_auto_context_window_rejects_missing_loaded_context(monkeypatch: pytest.
 
     monkeypatch.setattr(module, "get_loaded_context_length", fail)
 
-    with pytest.raises(RuntimeError, match="context_window is auto"):
+    with pytest.raises(RuntimeError, match="context_window=auto"):
         module.resolve_effective_context_window(make_llm(context_window="auto"))
 
 
@@ -166,7 +167,7 @@ def test_process_single_file_uses_effective_context_window_for_skip_decision(tmp
 
     assert status == "skip (oversized)"
     assert note is not None
-    assert "context window 10" in note
+    assert note == "prompt=6 > limit=5"
 
 
 def test_process_single_file_counts_prompt_tokens_for_skip_decision(tmp_path: Path) -> None:
@@ -193,7 +194,7 @@ def test_process_single_file_counts_prompt_tokens_for_skip_decision(tmp_path: Pa
 
     assert status == "skip (oversized)"
     assert note is not None
-    assert "prompt contains 9 tokens" in note
+    assert note == "prompt=9 > limit=8"
 
 
 def test_process_single_file_caps_max_tokens_to_remaining_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -231,7 +232,7 @@ def test_process_single_file_caps_max_tokens_to_remaining_context(tmp_path: Path
     assert output_file.read_text(encoding="utf-8") == "summary"
 
 
-def test_process_single_file_does_not_retry_context_size_exceeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_process_single_file_does_not_swallow_context_size_exceeded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_summarize_transcripts_module()
     txt_file = tmp_path / "transcript.txt"
     output_file = tmp_path / "summary.md"
@@ -249,17 +250,134 @@ def test_process_single_file_does_not_retry_context_size_exceeded(tmp_path: Path
 
     monkeypatch.setattr(module, "call_llm", fail_with_context_error)
 
-    status, note = module.process_single_file(
-        txt_file,
-        output_file,
-        "{transcript}",
-        make_llm(context_window=1000),
-        FakeEncoder(),
-        100,
-        80,
-    )
+    with pytest.raises(module.ContextSizeExceededError) as exc_info:
+        module.process_single_file(
+            txt_file,
+            output_file,
+            "{transcript}",
+            make_llm(context_window=1000),
+            FakeEncoder(),
+            100,
+            80,
+        )
 
-    assert status == "skip (context exceeded)"
-    assert note == "Context size has been exceeded"
+    assert "prompt=3, ctx=100" in str(exc_info.value)
     assert calls == 1
     assert not output_file.exists()
+
+
+def test_processing_start_log_includes_worker_prefix_when_parallel(caplog: pytest.LogCaptureFixture) -> None:
+    module = load_summarize_transcripts_module()
+
+    caplog.set_level(logging.INFO)
+
+    module.log_processing_start(
+        2,
+        2855,
+        "Greg_Isenberg/Tutorial on how to write tweets with man who gets 1B+ impressions per year [ovB8nX_hUe8].txt",
+        module.time.monotonic() - 60,
+        1,
+        "worker-01",
+        4,
+    )
+
+    assert "WORKER-1/4 Processing [2/2855 0.1%] [ETA " in caplog.text
+    assert "... Greg_Isenberg/Tutorial on how to write tweets with man who gets 1B+ impressions per year [ovB8nX_hUe8].txt" in caplog.text
+
+
+def test_processing_start_log_omits_worker_prefix_when_single_worker(caplog: pytest.LogCaptureFixture) -> None:
+    module = load_summarize_transcripts_module()
+
+    caplog.set_level(logging.INFO)
+
+    module.log_processing_start(
+        1,
+        3,
+        "channel/first.txt",
+        module.time.monotonic(),
+        0,
+        "worker-01",
+        1,
+    )
+
+    assert "Processing [1/3 33.3%] [ETA calculating] ... channel/first.txt" in caplog.text
+    assert "WORKER-1/1" not in caplog.text
+
+
+def test_record_process_result_only_updates_counts_and_collections(caplog: pytest.LogCaptureFixture) -> None:
+    module = load_summarize_transcripts_module()
+    oversized_files: list[str] = []
+    failures: list[tuple[str, str]] = []
+
+    caplog.set_level(logging.INFO)
+
+    assert module.record_process_result(
+        "channel/ok.txt",
+        ("", "ok", None),
+        oversized_files,
+        failures,
+    ) == (1, 0)
+    assert module.record_process_result(
+        "channel/large.txt",
+        ("", "skip (oversized)", "prompt=9 > limit=8"),
+        oversized_files,
+        failures,
+    ) == (0, 1)
+    assert module.record_process_result(
+        "channel/fail.txt",
+        ("", "context exceeded", "prompt=9, ctx=10"),
+        oversized_files,
+        failures,
+    ) == (0, 0)
+
+    assert oversized_files == ["channel/large.txt"]
+    assert failures == [("channel/fail.txt", "prompt=9, ctx=10")]
+    assert caplog.records == []
+
+
+def test_final_summary_counts_do_not_repeat_filenames(
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = load_summarize_transcripts_module()
+
+    caplog.set_level(logging.INFO)
+
+    def fake_process_single_file(
+        txt_file: Path,
+        output_file: Path,
+        prompt_template: str,
+        llm: object,
+        encoder: object,
+        effective_context_window: int,
+        skip_threshold_pct: int,
+    ) -> tuple[str, str | None]:
+        if txt_file.name == "large.txt":
+            return "skip (oversized)", "prompt=9 > limit=8"
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(module, "process_single_file", fake_process_single_file)
+
+    rc = module.process_pending(
+        [
+            (Path("channel/large.txt"), Path("out/large.md")),
+            (Path("channel/fail.txt"), Path("out/fail.md")),
+        ],
+        "",
+        None,
+        None,
+        10,
+        80,
+        1,
+    )
+
+    assert rc == 1
+
+    summary_messages = [
+        record.message for record in caplog.records if record.message.startswith(("Summary:", "Oversized skipped:", "Failures:"))
+    ]
+    assert summary_messages == [
+        "Summary: pending=2, summarized=0, skipped=1, failed=1",
+        "Oversized skipped: 1 file(s); limit=80% of worker context",
+        "Failures: 1 file(s)",
+    ]

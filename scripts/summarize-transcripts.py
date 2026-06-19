@@ -54,6 +54,7 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
     logging.getLogger("LiteLLM").setLevel(logging.WARNING)
     logging.getLogger("litellm").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    litellm.suppress_debug_info = True
 
     try:
         summarize_cfg = config.get_summarize_transcripts_config()
@@ -76,16 +77,18 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
     prompt_template = FSUtil.read_text_file(prompt_path)
     encoding_name = config.get_encoding_name()
 
-    logger.info(f"Cleaned transcripts directory: {cleaned_dir}")
-    logger.info(f"Summaries output directory: {summaries_dir}")
-    logger.info(f"Model: {summarize_cfg.llm.model}")
     configured_context_window = summarize_cfg.llm.context_window
-    if configured_context_window == "auto":
-        logger.info("Configured context window: auto")
-    else:
-        logger.info(f"Configured context window: {configured_context_window:,} tokens")
-    logger.info(f"Skip threshold: {summarize_cfg.skip_transcripts_above_context_window_pct}%")
-    logger.info(f"Parallelism: {summarize_cfg.parallelism}")
+    context_label = "auto" if configured_context_window == "auto" else f"{configured_context_window:,} tokens"
+
+    logger.info(f"Input: {cleaned_dir}")
+    logger.info(f"Output: {summaries_dir}")
+    logger.info(
+        "Model: %s (ctx=%s, skip>%s%%, workers=%s)",
+        summarize_cfg.llm.model,
+        context_label,
+        summarize_cfg.skip_transcripts_above_context_window_pct,
+        summarize_cfg.parallelism,
+    )
 
     return summarize_cfg, cleaned_dir, summaries_dir, prompt_template, encoding_name
 
@@ -206,15 +209,13 @@ def resolve_effective_context_window(llm: LLMConfig) -> int:
         loaded_context_window = get_loaded_context_length(llm)
     except RuntimeError as exc:
         if configured_context_window == "auto":
-            raise RuntimeError(f"context_window is auto, but loaded LM Studio context length could not be determined: {exc}") from exc
+            raise RuntimeError(f"context_window=auto but LM Studio ctx is unavailable: {exc}") from exc
         logger.warning(
-            "Could not verify loaded LM Studio context length; using configured context_window=%s tokens. Reason: %s",
+            "LM Studio ctx unavailable; using config ctx=%s (%s)",
             f"{configured_context_window:,}",
             exc,
         )
         return configured_context_window
-
-    logger.info(f"Loaded context window: {loaded_context_window:,} tokens")
 
     if configured_context_window == "auto":
         return loaded_context_window
@@ -226,7 +227,7 @@ def resolve_effective_context_window(llm: LLMConfig) -> int:
 
     if loaded_context_window > configured_context_window:
         logger.info(
-            "Loaded context window (%s tokens) is larger than configured context_window (%s tokens); using loaded value",
+            "Using loaded ctx=%s (config=%s)",
             f"{loaded_context_window:,}",
             f"{configured_context_window:,}",
         )
@@ -247,7 +248,6 @@ def process_single_file(
     encoder: tiktoken.Encoding,
     effective_context_window: int,
     skip_threshold_pct: int,
-    worker_id: str = "main",
 ) -> tuple[str, str | None]:
     """Process a single transcript file.
 
@@ -261,42 +261,39 @@ def process_single_file(
         return "skip (empty)", None
 
     prompt = prompt_template.replace("{transcript}", transcript)
-    transcript_tokens = len(encoder.encode(transcript, disallowed_special=()))
     prompt_tokens = len(encoder.encode(prompt, disallowed_special=()))
     token_limit = int(effective_context_window * skip_threshold_pct / 100)
     if prompt_tokens > token_limit:
-        usage_pct = prompt_tokens / effective_context_window * 100.0
         return (
             "skip (oversized)",
-            f"prompt contains {prompt_tokens:,} tokens including {transcript_tokens:,} transcript tokens"
-            f" ({usage_pct:.1f}% of context window"
-            f" {effective_context_window:,}; threshold: {skip_threshold_pct}%/{token_limit:,} tokens)",
+            f"prompt={prompt_tokens:,} > limit={token_limit:,}",
         )
 
     available_output_tokens = effective_context_window - prompt_tokens
     if available_output_tokens <= 0:
         return (
-            "skip (context exceeded)",
-            f"prompt contains {prompt_tokens:,} tokens, exceeding context window {effective_context_window:,}",
+            "skip (oversized)",
+            f"prompt={prompt_tokens:,} > ctx={effective_context_window:,}",
         )
     request_max_tokens = min(llm.max_tokens, available_output_tokens)
 
-    attempt = 1
-    while attempt <= llm.max_retries:
+    result: tuple[str, str | None] | None = None
+    for attempt in range(1, llm.max_retries + 1):
         try:
             summary = call_llm(prompt, llm, request_max_tokens)
             FSUtil.write_text_file(output_file, summary, create_parents=True)
-            return "ok", None
+            result = "ok", None
+            break
         except ContextSizeExceededError as e:
-            return "skip (context exceeded)", str(e)
-        except Exception as e:
-            logger.warning(f"[{worker_id}] Attempt {attempt}/{llm.max_retries} failed for {txt_file.parent.name}/{txt_file.name}: {e}")
+            raise ContextSizeExceededError(f"context exceeded; prompt={prompt_tokens:,}, ctx={effective_context_window:,}") from e
+        except Exception:
             if attempt == llm.max_retries:
                 raise
             time.sleep(llm.retry_delay)
-        attempt += 1
 
-    raise RuntimeError("unreachable")
+    if result is None:
+        raise RuntimeError("unreachable")
+    return result
 
 
 def format_eta(seconds_remaining: float) -> str:
@@ -305,6 +302,42 @@ def format_eta(seconds_remaining: float) -> str:
     hours = total_minutes // 60
     minutes = total_minutes % 60
     return f"{hours}h{minutes}m"
+
+
+def format_processing_eta(start_time: float, completed_count: int, total: int) -> str:
+    """Format ETA for a file that is about to start processing."""
+    if completed_count == 0:
+        return "calculating"
+
+    elapsed = time.monotonic() - start_time
+    avg = elapsed / completed_count
+    eta_seconds = avg * (total - completed_count)
+    return format_eta(eta_seconds)
+
+
+def format_worker_progress_label(worker_id: str, worker_count: int) -> str:
+    """Format the worker label used by pre-work progress logs."""
+    match = re.fullmatch(r"worker-(\d+)", worker_id)
+    if match is None:
+        raise ValueError(f"Invalid worker id: {worker_id}")
+
+    worker_number = int(match.group(1))
+    return f"WORKER-{worker_number}/{worker_count}"
+
+
+def log_processing_start(
+    item_number: int,
+    total: int,
+    rel_path: str,
+    start_time: float,
+    completed_count: int,
+    worker_id: str,
+    worker_count: int,
+) -> None:
+    """Log the item being processed before slow work starts."""
+    eta_label = format_processing_eta(start_time, completed_count, total)
+    worker_prefix = f"{format_worker_progress_label(worker_id, worker_count)} " if worker_count > 1 else ""
+    logger.info(f"{worker_prefix}Processing [{item_number}/{total} {item_number / total * 100:.1f}%] [ETA {eta_label}] ... {rel_path}")
 
 
 def collect_pending_files(
@@ -347,36 +380,29 @@ def collect_pending_files(
 
 
 def record_process_result(
-    completed: int,
-    total: int,
     rel_path: str,
-    start_time: float,
-    result: tuple[str, str, str | None, str | None],
-    oversized_files: list[tuple[str, str]],
+    result: tuple[str, str, str | None],
+    oversized_files: list[str],
     failures: list[tuple[str, str]],
-    skip_threshold_pct: int,
 ) -> tuple[int, int]:
     """Record one completed worker result. Return (success_delta, skipped_delta)."""
-    worker_id, status, note, error = result
-    if error is not None:
-        failures.append((rel_path, error))
-        logger.error(f"[{completed}/{total}] {worker_id} {rel_path} -> failed: {error}")
+    _, status, note = result
+
+    if status == "context exceeded":
+        detail = note or ""
+        failures.append((rel_path, detail))
         return 0, 0
 
-    elapsed = time.monotonic() - start_time
-    avg = elapsed / completed
-    eta_seconds = avg * (total - completed)
-    logger.info(f"[{completed}/{total}] {completed / total * 100:5.1f}% ETA {format_eta(eta_seconds)}  {worker_id} {rel_path} -> {status}")
+    if status == "failed":
+        detail = note or ""
+        failures.append((rel_path, detail))
+        return 0, 0
 
     if status == "ok":
         return 1, 0
 
     if status == "skip (oversized)":
-        detail = note or ""
-        oversized_files.append((rel_path, detail))
-        logger.warning(f"WARNING skipping file {rel_path}: {detail}")
-    elif note:
-        logger.info(f"  {note}")
+        oversized_files.append(rel_path)
 
     return 0, 1
 
@@ -390,8 +416,10 @@ def run_process_single_file(
     effective_context_window: int,
     skip_threshold_pct: int,
     worker_id: str,
-) -> tuple[str, str, str | None, str | None]:
+    worker_count: int,
+) -> tuple[str, str, str | None]:
     """Run one pending item and convert exceptions to worker results."""
+    display_worker_id = worker_id if worker_count > 1 else ""
     try:
         status, note = process_single_file(
             txt_file,
@@ -401,11 +429,12 @@ def run_process_single_file(
             encoder,
             effective_context_window,
             skip_threshold_pct,
-            worker_id,
         )
+    except ContextSizeExceededError as exc:
+        return display_worker_id, "context exceeded", str(exc)
     except Exception as exc:
-        return worker_id, "failed", None, str(exc)
-    return worker_id, status, note, None
+        return display_worker_id, "failed", str(exc)
+    return display_worker_id, status, note
 
 
 def process_pending(
@@ -420,7 +449,7 @@ def process_pending(
     """Process all pending files. Return 1 if any file fails after retries."""
     success_count = 0
     skipped_count = 0
-    oversized_files: list[tuple[str, str]] = []
+    oversized_files: list[str] = []
     failures: list[tuple[str, str]] = []
     total = len(pending)
     start_time = time.monotonic()
@@ -428,16 +457,34 @@ def process_pending(
     worker_numbers = itertools.count(1)
     worker_number_lock = threading.Lock()
     worker_local = threading.local()
+    eta_completed_count = 0
+    eta_completed_count_lock = threading.Lock()
 
     def initialize_worker() -> None:
         with worker_number_lock:
             worker_local.worker_id = f"worker-{next(worker_numbers):02d}"
 
     def current_worker_id() -> str:
-        return str(getattr(worker_local, "worker_id", threading.current_thread().name))
+        return str(worker_local.worker_id)
 
-    def run_pending_item(txt_file: Path, output_file: Path) -> tuple[str, str, str | None, str | None]:
-        return run_process_single_file(
+    def run_pending_item(item_number: int, txt_file: Path, output_file: Path) -> tuple[str, str, str | None]:
+        nonlocal eta_completed_count
+        worker_id = current_worker_id()
+        rel_path = f"{txt_file.parent.name}/{txt_file.name}"
+        with eta_completed_count_lock:
+            completed_count_snapshot = eta_completed_count
+
+        log_processing_start(
+            item_number,
+            total,
+            rel_path,
+            start_time,
+            completed_count_snapshot,
+            worker_id,
+            parallelism,
+        )
+
+        result = run_process_single_file(
             txt_file,
             output_file,
             prompt_template,
@@ -445,8 +492,12 @@ def process_pending(
             encoder,
             effective_context_window,
             skip_threshold_pct,
-            current_worker_id(),
+            worker_id,
+            parallelism,
         )
+        with eta_completed_count_lock:
+            eta_completed_count += 1
+        return result
 
     with ThreadPoolExecutor(
         max_workers=parallelism,
@@ -454,56 +505,29 @@ def process_pending(
         thread_name_prefix="summarizer",
     ) as executor:
         future_to_path = {
-            executor.submit(run_pending_item, txt_file, output_file): f"{txt_file.parent.name}/{txt_file.name}"
-            for txt_file, output_file in pending
+            executor.submit(run_pending_item, item_number, txt_file, output_file): f"{txt_file.parent.name}/{txt_file.name}"
+            for item_number, (txt_file, output_file) in enumerate(pending, start=1)
         }
-        for completed, future in enumerate(as_completed(future_to_path), start=1):
+        for future in as_completed(future_to_path):
             rel_path = future_to_path[future]
-
-            try:
-                result = future.result()
-            except Exception as exc:
-                failures.append((rel_path, str(exc)))
-                logger.error(f"[{completed}/{total}] worker-unknown {rel_path} -> failed: {exc}")
-                continue
+            result = future.result()
 
             success_delta, skipped_delta = record_process_result(
-                completed,
-                total,
                 rel_path,
-                start_time,
                 result,
                 oversized_files,
                 failures,
-                skip_threshold_pct,
             )
             success_count += success_delta
             skipped_count += skipped_delta
 
-    logger.info("---")
-    logger.info("=" * 50)
-    logger.info("Summary")
-    logger.info("=" * 50)
-    logger.info(f"Total pending: {total}")
-    logger.info(f"Summarized: {success_count}")
-    logger.info(f"Skipped: {skipped_count}")
-    logger.info(f"Failed: {len(failures)}")
+    logger.info(f"Summary: pending={total}, summarized={success_count}, skipped={skipped_count}, failed={len(failures)}")
 
     if oversized_files:
-        logger.warning("=" * 50)
-        logger.warning(
-            f"Skipped {len(oversized_files)} oversized transcript(s) — transcript tokens exceed {skip_threshold_pct}% of context window:"
-        )
-        for path, detail in oversized_files:
-            logger.warning(f"  - {path}: {detail}")
-        logger.warning("=" * 50)
+        logger.warning(f"Oversized skipped: {len(oversized_files)} file(s); limit={skip_threshold_pct}% of worker context")
 
     if failures:
-        logger.error("=" * 50)
-        logger.error("Failure Summary")
-        logger.error("=" * 50)
-        for path, reason in failures:
-            logger.error(f"❌ {path}: {reason}")
+        logger.error(f"Failures: {len(failures)} file(s)")
         return 1
 
     return 0
@@ -532,8 +556,7 @@ def main() -> int:
         logger.error(f"No .txt files found in: {cleaned_dir}")
         return 1
 
-    logger.info(f"Found {total} transcript(s), {already_done} already summarized, {empty_files} empty, {len(pending)} pending")
-    logger.info("---")
+    logger.info(f"Queue: {len(pending):,} pending / {total:,} total (done {already_done:,}, empty {empty_files:,})")
 
     if not pending:
         logger.info("Nothing to do — all files already processed.")
@@ -545,16 +568,11 @@ def main() -> int:
         logger.error(f"Error: {exc}")
         return 1
 
-    logger.info(f"Effective context window for transcript skipping: {effective_context_window:,} tokens")
+    logger.info(f"Context: {effective_context_window:,} tokens")
     parallel_context_window = resolve_parallel_context_window(effective_context_window, summarize_cfg.parallelism)
-    logger.info(
-        "Per-worker context window for transcript skipping: %s tokens (%s / %s = %s)",
-        f"{parallel_context_window:,}",
-        f"{effective_context_window:,}",
-        summarize_cfg.parallelism,
-        f"{parallel_context_window:,}",
-    )
-    logger.info(f"Max output tokens: {llm.max_tokens:,}")
+    if summarize_cfg.parallelism > 1:
+        logger.info(f"Worker context: {parallel_context_window:,} tokens each")
+    logger.info(f"Output cap: {llm.max_tokens:,} tokens")
 
     return process_pending(
         pending,

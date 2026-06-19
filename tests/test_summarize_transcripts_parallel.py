@@ -26,7 +26,7 @@ def pending_files(tmp_path: Path, count: int) -> list[tuple[Path, Path]]:
 
 def test_process_pending_runs_with_parallelism_one(tmp_path: Path, monkeypatch: Any) -> None:
     module = load_summarize_module()
-    processed: list[tuple[str, str]] = []
+    processed: list[str] = []
 
     def fake_process_single_file(
         txt_file: Path,
@@ -36,11 +36,10 @@ def test_process_pending_runs_with_parallelism_one(tmp_path: Path, monkeypatch: 
         encoder: object,
         effective_context_window: int,
         skip_threshold_pct: int,
-        worker_id: str = "main",
     ) -> tuple[str, None]:
         assert effective_context_window == 8192
         assert skip_threshold_pct == 80
-        processed.append((worker_id, txt_file.name))
+        processed.append(txt_file.name)
         return "ok", None
 
     monkeypatch.setattr(module, "process_single_file", fake_process_single_file)
@@ -48,7 +47,7 @@ def test_process_pending_runs_with_parallelism_one(tmp_path: Path, monkeypatch: 
     rc = module.process_pending(pending_files(tmp_path, 3), "", None, None, 8192, 80, 1)
 
     assert rc == 0
-    assert processed == [("worker-01", "0.txt"), ("worker-01", "1.txt"), ("worker-01", "2.txt")]
+    assert processed == ["0.txt", "1.txt", "2.txt"]
 
 
 def test_process_pending_parallelism_one_collects_failures(tmp_path: Path, monkeypatch: Any) -> None:
@@ -63,9 +62,7 @@ def test_process_pending_parallelism_one_collects_failures(tmp_path: Path, monke
         encoder: object,
         effective_context_window: int,
         skip_threshold_pct: int,
-        worker_id: str = "main",
     ) -> tuple[str, None]:
-        assert worker_id == "worker-01"
         processed.append(txt_file.name)
         if txt_file.name == "1.txt":
             raise RuntimeError("boom")

@@ -13,7 +13,7 @@ dependencies = [
     "pandas>=2.0.0",
     "playwright>=1.60.0",
     "pydantic>=2.0.0",
-    "pypdf>=6.12.2",
+    "pypdf>=6.13.3",
     "python-frontmatter>=1.0.0",
     "python-multipart>=0.0.27",
     "pyyaml>=6.0",
@@ -70,8 +70,8 @@ dev = [
 
     # Security pins for transitive dependencies
     "gitpython>=3.1.50",
-    "jupyter-server>=2.18.0",
-    "jupyterlab>=4.5.7",
+    "jupyter-server>=2.20.0",
+    "jupyterlab>=4.5.9",
     "notebook>=7.5.6",
 ]
 
@@ -272,3 +272,8 @@ skip = ".git,.venv,venv,build,dist,reports,*.lock,uv.lock"
 
 # Use external ignore file for maintainability
 ignore-words = "config/codespell/ignore.txt"
+
+[dependency-groups]
+dev = [
+    "pydantic-settings>=2.14.2",
+]
