@@ -114,7 +114,10 @@ class LLMConfig(BaseModel):
     )
     api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
     api_key: str = Field(..., description="API key for the LLM service")
-    context_window: int = Field(..., description="Model context window size in tokens")
+    context_window: int | Literal["auto"] = Field(
+        ...,
+        description="Model context window size in tokens, or 'auto' to use the loaded LM Studio context length",
+    )
     max_tokens: int = Field(..., description="Maximum tokens for response/completion")
     temperature: float = Field(..., description="Sampling temperature (0.0-1.0)")
     context_window_threshold: int = Field(
@@ -130,6 +133,16 @@ class LLMConfig(BaseModel):
         Field(gt=0, description="Optional LLM request timeout in seconds; None lets the client/provider decide"),
     ] = None
 
+    @field_validator("context_window")
+    @classmethod
+    def validate_context_window(cls, context_window: int | str) -> int | Literal["auto"]:
+        """Allow positive explicit windows or the LM Studio auto-discovery marker."""
+        if context_window == "auto":
+            return "auto"
+        if isinstance(context_window, int) and context_window > 0:
+            return context_window
+        raise ValueError("context_window must be a positive integer or 'auto'")
+
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
@@ -142,6 +155,11 @@ class SummarizeTranscriptsConfig(BaseModel):
         ge=0,
         le=100,
         description="Skip summarization when transcript token count exceeds this percentage of the model context window",
+    )
+    parallelism: int = Field(
+        ...,
+        gt=0,
+        description="Number of concurrent summarization requests to dispatch",
     )
 
     model_config = ConfigDict(frozen=True, extra="forbid")

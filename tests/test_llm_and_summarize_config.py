@@ -50,6 +50,21 @@ class TestLLMConfig:
         assert config.api_key == "ANTHROPIC_API_KEY"
         assert config.context_window_threshold == 85
 
+    def test_valid_llm_config_with_auto_context_window(self) -> None:
+        """Test valid LLM configuration with auto context window."""
+        config = LLMConfig(
+            model="openai/qwen/qwen3.6-35b-a3b",
+            api_base="http://127.0.0.1:1234/v1",
+            api_key="LMSTUDIO_API_KEY",
+            context_window="auto",
+            max_tokens=32768,
+            temperature=0.3,
+            context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+        assert config.context_window == "auto"
+
     def test_missing_model_field(self) -> None:
         """Test LLM config with missing model field."""
         with pytest.raises(ValidationError) as exc_info:
@@ -154,7 +169,26 @@ class TestLLMConfig:
                 }
             )
         errors = exc_info.value.errors()
-        assert any(err["loc"] == ("context_window",) for err in errors)
+        assert any(err["loc"][0] == "context_window" for err in errors)
+
+    def test_non_positive_context_window_rejected(self) -> None:
+        """Test LLM config with non-positive context_window."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "model": "test-model",
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 0,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
+                }
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("context_window",) and err["type"] == "value_error" for err in errors)
 
     def test_wrong_type_for_max_tokens(self) -> None:
         """Test LLM config with wrong type for max_tokens."""
@@ -323,12 +357,14 @@ class TestSummarizeTranscriptsConfig:
         config = SummarizeTranscriptsConfig(
             llm=_make_llm(),
             skip_transcripts_above_context_window_pct=75,
+            parallelism=1,
         )
         assert config.skip_transcripts_above_context_window_pct == 75
+        assert config.parallelism == 1
 
     def test_threshold_is_required(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
-            SummarizeTranscriptsConfig.model_validate({"llm": _make_llm().model_dump()})
+            SummarizeTranscriptsConfig.model_validate({"llm": _make_llm().model_dump(), "parallelism": 1})
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "missing" for err in errors)
 
@@ -336,6 +372,7 @@ class TestSummarizeTranscriptsConfig:
         config = SummarizeTranscriptsConfig(
             llm=_make_llm(),
             skip_transcripts_above_context_window_pct=0,
+            parallelism=1,
         )
         assert config.skip_transcripts_above_context_window_pct == 0
 
@@ -343,6 +380,7 @@ class TestSummarizeTranscriptsConfig:
         config = SummarizeTranscriptsConfig(
             llm=_make_llm(),
             skip_transcripts_above_context_window_pct=100,
+            parallelism=1,
         )
         assert config.skip_transcripts_above_context_window_pct == 100
 
@@ -351,6 +389,7 @@ class TestSummarizeTranscriptsConfig:
             SummarizeTranscriptsConfig(
                 llm=_make_llm(),
                 skip_transcripts_above_context_window_pct=-1,
+                parallelism=1,
             )
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "greater_than_equal" for err in errors)
@@ -360,6 +399,23 @@ class TestSummarizeTranscriptsConfig:
             SummarizeTranscriptsConfig(
                 llm=_make_llm(),
                 skip_transcripts_above_context_window_pct=101,
+                parallelism=1,
             )
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("skip_transcripts_above_context_window_pct",) and err["type"] == "less_than_equal" for err in errors)
+
+    def test_parallelism_is_required(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig.model_validate({"llm": _make_llm().model_dump(), "skip_transcripts_above_context_window_pct": 75})
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("parallelism",) and err["type"] == "missing" for err in errors)
+
+    def test_parallelism_must_be_positive(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            SummarizeTranscriptsConfig(
+                llm=_make_llm(),
+                skip_transcripts_above_context_window_pct=75,
+                parallelism=0,
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("parallelism",) and err["type"] == "greater_than" for err in errors)

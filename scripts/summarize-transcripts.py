@@ -3,11 +3,19 @@
 
 from __future__ import annotations
 
+import itertools
+import json
 import logging
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any, cast
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse, urlunparse
+from urllib.request import urlopen
 
 import litellm
 import tiktoken
@@ -20,6 +28,12 @@ from src.util.fs_util import FSUtil
 from src.util.log_util import configure_root_logger, get_logger
 
 logger = get_logger(__name__)
+
+LM_STUDIO_MODELS_PATH = "/api/v0/models"
+
+
+class ContextSizeExceededError(RuntimeError):
+    """The LLM server rejected the request because it exceeded the active context."""
 
 
 def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, str] | int:
@@ -65,8 +79,13 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
     logger.info(f"Cleaned transcripts directory: {cleaned_dir}")
     logger.info(f"Summaries output directory: {summaries_dir}")
     logger.info(f"Model: {summarize_cfg.llm.model}")
-    logger.info(f"Context window: {summarize_cfg.llm.context_window:,} tokens")
+    configured_context_window = summarize_cfg.llm.context_window
+    if configured_context_window == "auto":
+        logger.info("Configured context window: auto")
+    else:
+        logger.info(f"Configured context window: {configured_context_window:,} tokens")
     logger.info(f"Skip threshold: {summarize_cfg.skip_transcripts_above_context_window_pct}%")
+    logger.info(f"Parallelism: {summarize_cfg.parallelism}")
 
     return summarize_cfg, cleaned_dir, summaries_dir, prompt_template, encoding_name
 
@@ -79,7 +98,7 @@ def strip_think_tags(text: str) -> str:
     return text
 
 
-def call_llm(prompt: str, llm: LLMConfig) -> str:
+def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
     """Call the LLM and return the response text."""
     messages = [{"role": "user", "content": prompt}]
 
@@ -89,7 +108,7 @@ def call_llm(prompt: str, llm: LLMConfig) -> str:
             messages=messages,
             api_base=llm.api_base,
             api_key=llm.api_key,
-            max_tokens=llm.max_tokens,
+            max_tokens=max_tokens,
             temperature=llm.temperature,
         )
     except BadRequestError as e:
@@ -98,6 +117,8 @@ def call_llm(prompt: str, llm: LLMConfig) -> str:
             raise RuntimeError(
                 f"No models loaded in LM Studio. Expected model: {llm.model}. Load it with: lms load {llm.model.split('/')[-1]}"
             ) from e
+        if "Context size has been exceeded" in error_msg:
+            raise ContextSizeExceededError("Context size has been exceeded") from e
         raise
 
     response_text = response.choices[0].message.content
@@ -107,13 +128,126 @@ def call_llm(prompt: str, llm: LLMConfig) -> str:
     return strip_think_tags(response_text.strip())
 
 
+def get_lm_studio_models_url(api_base: str | None) -> str:
+    """Return the native LM Studio models endpoint for an OpenAI-compatible API base."""
+    if api_base is None:
+        raise ValueError("api_base is required to query LM Studio model metadata")
+
+    parsed = urlparse(api_base)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError(f"Invalid LM Studio api_base: {api_base}")
+
+    return urlunparse((parsed.scheme, parsed.netloc, LM_STUDIO_MODELS_PATH, "", "", ""))
+
+
+def get_model_id_candidates(model: str) -> list[str]:
+    """Return model IDs to try against LM Studio metadata."""
+    candidates = [model]
+    if model.startswith("openai/"):
+        candidates.append(model.removeprefix("openai/"))
+    return candidates
+
+
+def fetch_lm_studio_models(models_url: str) -> list[object]:
+    """Fetch LM Studio model metadata."""
+    try:
+        with urlopen(models_url, timeout=10) as response:
+            payload = cast(dict[str, Any], json.loads(response.read().decode("utf-8")))
+    except HTTPError as exc:
+        raise RuntimeError(f"LM Studio metadata request failed with HTTP {exc.code}: {models_url}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"LM Studio metadata endpoint is unreachable: {models_url} ({exc.reason})") from exc
+    except TimeoutError as exc:
+        raise RuntimeError(f"LM Studio metadata request timed out: {models_url}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"LM Studio metadata response was not valid JSON: {models_url}") from exc
+
+    data_raw = payload.get("data")
+    if not isinstance(data_raw, list):
+        raise RuntimeError("LM Studio metadata response did not contain a data list")
+
+    return cast(list[object], data_raw)
+
+
+def extract_loaded_context_length(model_info: dict[str, Any], model: str) -> int:
+    """Extract the loaded context length from one LM Studio model record."""
+    if model_info.get("state") != "loaded":
+        raise RuntimeError(f"Configured model is not loaded in LM Studio: {model}")
+    loaded_context_length = model_info.get("loaded_context_length")
+    if not isinstance(loaded_context_length, int) or loaded_context_length <= 0:
+        raise RuntimeError(f"Loaded LM Studio model does not report loaded_context_length: {model}")
+    return loaded_context_length
+
+
+def get_loaded_context_length(llm: LLMConfig) -> int:
+    """Fetch the loaded context length for the configured LM Studio model."""
+    data = fetch_lm_studio_models(get_lm_studio_models_url(llm.api_base))
+    candidates = set(get_model_id_candidates(llm.model))
+    loaded_context_length: int | None = None
+    for model_info_raw in data:
+        if not isinstance(model_info_raw, dict):
+            continue
+        model_info = cast(dict[str, Any], model_info_raw)
+        if model_info.get("id") not in candidates:
+            continue
+        loaded_context_length = extract_loaded_context_length(model_info, llm.model)
+        break
+
+    if loaded_context_length is not None:
+        return loaded_context_length
+
+    raise RuntimeError(f"Configured model was not found in LM Studio metadata: {llm.model}")
+
+
+def resolve_effective_context_window(llm: LLMConfig) -> int:
+    """Resolve the context window used for transcript-size gating."""
+    configured_context_window = llm.context_window
+    try:
+        loaded_context_window = get_loaded_context_length(llm)
+    except RuntimeError as exc:
+        if configured_context_window == "auto":
+            raise RuntimeError(f"context_window is auto, but loaded LM Studio context length could not be determined: {exc}") from exc
+        logger.warning(
+            "Could not verify loaded LM Studio context length; using configured context_window=%s tokens. Reason: %s",
+            f"{configured_context_window:,}",
+            exc,
+        )
+        return configured_context_window
+
+    logger.info(f"Loaded context window: {loaded_context_window:,} tokens")
+
+    if configured_context_window == "auto":
+        return loaded_context_window
+
+    if configured_context_window > loaded_context_window:
+        raise RuntimeError(
+            f"Configured context_window ({configured_context_window:,}) exceeds loaded LM Studio context length ({loaded_context_window:,})"
+        )
+
+    if loaded_context_window > configured_context_window:
+        logger.info(
+            "Loaded context window (%s tokens) is larger than configured context_window (%s tokens); using loaded value",
+            f"{loaded_context_window:,}",
+            f"{configured_context_window:,}",
+        )
+
+    return loaded_context_window
+
+
+def resolve_parallel_context_window(effective_context_window: int, parallelism: int) -> int:
+    """Return the conservative per-worker context window for local skip checks."""
+    return max(1, effective_context_window // parallelism)
+
+
 def process_single_file(
     txt_file: Path,
     output_file: Path,
     prompt_template: str,
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
+    effective_context_window: int,
     skip_threshold_pct: int,
+    worker_id: str = "main",
 ) -> tuple[str, str | None]:
     """Process a single transcript file.
 
@@ -126,26 +260,37 @@ def process_single_file(
     if not transcript.strip():
         return "skip (empty)", None
 
+    prompt = prompt_template.replace("{transcript}", transcript)
     transcript_tokens = len(encoder.encode(transcript, disallowed_special=()))
-    token_limit = int(llm.context_window * skip_threshold_pct / 100)
-    if transcript_tokens > token_limit:
-        usage_pct = (transcript_tokens / llm.context_window * 100.0) if llm.context_window > 0 else 0.0
+    prompt_tokens = len(encoder.encode(prompt, disallowed_special=()))
+    token_limit = int(effective_context_window * skip_threshold_pct / 100)
+    if prompt_tokens > token_limit:
+        usage_pct = prompt_tokens / effective_context_window * 100.0
         return (
             "skip (oversized)",
-            f"contains {transcript_tokens:,} tokens ({usage_pct:.1f}% of context window"
-            f" {llm.context_window:,}; threshold: {skip_threshold_pct}%/{token_limit:,} tokens)",
+            f"prompt contains {prompt_tokens:,} tokens including {transcript_tokens:,} transcript tokens"
+            f" ({usage_pct:.1f}% of context window"
+            f" {effective_context_window:,}; threshold: {skip_threshold_pct}%/{token_limit:,} tokens)",
         )
 
-    prompt = prompt_template.replace("{transcript}", transcript)
+    available_output_tokens = effective_context_window - prompt_tokens
+    if available_output_tokens <= 0:
+        return (
+            "skip (context exceeded)",
+            f"prompt contains {prompt_tokens:,} tokens, exceeding context window {effective_context_window:,}",
+        )
+    request_max_tokens = min(llm.max_tokens, available_output_tokens)
 
     attempt = 1
     while attempt <= llm.max_retries:
         try:
-            summary = call_llm(prompt, llm)
+            summary = call_llm(prompt, llm, request_max_tokens)
             FSUtil.write_text_file(output_file, summary, create_parents=True)
             return "ok", None
+        except ContextSizeExceededError as e:
+            return "skip (context exceeded)", str(e)
         except Exception as e:
-            logger.warning(f"  Attempt {attempt}/{llm.max_retries} failed: {e}")
+            logger.warning(f"[{worker_id}] Attempt {attempt}/{llm.max_retries} failed for {txt_file.parent.name}/{txt_file.name}: {e}")
             if attempt == llm.max_retries:
                 raise
             time.sleep(llm.retry_delay)
@@ -201,53 +346,145 @@ def collect_pending_files(
     return pending, len(txt_files), already_done, empty_files
 
 
+def record_process_result(
+    completed: int,
+    total: int,
+    rel_path: str,
+    start_time: float,
+    result: tuple[str, str, str | None, str | None],
+    oversized_files: list[tuple[str, str]],
+    failures: list[tuple[str, str]],
+    skip_threshold_pct: int,
+) -> tuple[int, int]:
+    """Record one completed worker result. Return (success_delta, skipped_delta)."""
+    worker_id, status, note, error = result
+    if error is not None:
+        failures.append((rel_path, error))
+        logger.error(f"[{completed}/{total}] {worker_id} {rel_path} -> failed: {error}")
+        return 0, 0
+
+    elapsed = time.monotonic() - start_time
+    avg = elapsed / completed
+    eta_seconds = avg * (total - completed)
+    logger.info(f"[{completed}/{total}] {completed / total * 100:5.1f}% ETA {format_eta(eta_seconds)}  {worker_id} {rel_path} -> {status}")
+
+    if status == "ok":
+        return 1, 0
+
+    if status == "skip (oversized)":
+        detail = note or ""
+        oversized_files.append((rel_path, detail))
+        logger.warning(f"WARNING skipping file {rel_path}: {detail}")
+    elif note:
+        logger.info(f"  {note}")
+
+    return 0, 1
+
+
+def run_process_single_file(
+    txt_file: Path,
+    output_file: Path,
+    prompt_template: str,
+    llm: LLMConfig,
+    encoder: tiktoken.Encoding,
+    effective_context_window: int,
+    skip_threshold_pct: int,
+    worker_id: str,
+) -> tuple[str, str, str | None, str | None]:
+    """Run one pending item and convert exceptions to worker results."""
+    try:
+        status, note = process_single_file(
+            txt_file,
+            output_file,
+            prompt_template,
+            llm,
+            encoder,
+            effective_context_window,
+            skip_threshold_pct,
+            worker_id,
+        )
+    except Exception as exc:
+        return worker_id, "failed", None, str(exc)
+    return worker_id, status, note, None
+
+
 def process_pending(
     pending: list[tuple[Path, Path]],
     prompt_template: str,
     llm: LLMConfig,
     encoder: tiktoken.Encoding,
+    effective_context_window: int,
     skip_threshold_pct: int,
+    parallelism: int,
 ) -> int:
     """Process all pending files. Return 1 if any file fails after retries."""
     success_count = 0
     skipped_count = 0
     oversized_files: list[tuple[str, str]] = []
     failures: list[tuple[str, str]] = []
+    total = len(pending)
     start_time = time.monotonic()
 
-    for idx, (txt_file, output_file) in enumerate(pending, start=1):
-        completed = idx - 1
-        elapsed = time.monotonic() - start_time
-        avg = (elapsed / completed) if completed > 0 else 0.0
-        eta_seconds = avg * (len(pending) - completed)
+    worker_numbers = itertools.count(1)
+    worker_number_lock = threading.Lock()
+    worker_local = threading.local()
 
-        rel_path = f"{txt_file.parent.name}/{txt_file.name}"
-        logger.info(f"[{idx}/{len(pending)}] {idx / len(pending) * 100:5.1f}% ETA {format_eta(eta_seconds)}  {rel_path}")
+    def initialize_worker() -> None:
+        with worker_number_lock:
+            worker_local.worker_id = f"worker-{next(worker_numbers):02d}"
 
-        try:
-            status, note = process_single_file(txt_file, output_file, prompt_template, llm, encoder, skip_threshold_pct)
-        except Exception as exc:
-            failures.append((rel_path, str(exc)))
-            logger.error(f"  -> failed: {exc}")
-            continue
-        if status != "ok":
-            skipped_count += 1
-            if status == "skip (oversized)":
-                detail = note or ""
-                oversized_files.append((rel_path, detail))
-                logger.warning(f"WARNING skipping file {rel_path}: {detail}")
-            else:
-                logger.info(f"  -> {status}")
-                if note:
-                    logger.info(f"  {note}")
-        else:
-            success_count += 1
+    def current_worker_id() -> str:
+        return str(getattr(worker_local, "worker_id", threading.current_thread().name))
+
+    def run_pending_item(txt_file: Path, output_file: Path) -> tuple[str, str, str | None, str | None]:
+        return run_process_single_file(
+            txt_file,
+            output_file,
+            prompt_template,
+            llm,
+            encoder,
+            effective_context_window,
+            skip_threshold_pct,
+            current_worker_id(),
+        )
+
+    with ThreadPoolExecutor(
+        max_workers=parallelism,
+        initializer=initialize_worker,
+        thread_name_prefix="summarizer",
+    ) as executor:
+        future_to_path = {
+            executor.submit(run_pending_item, txt_file, output_file): f"{txt_file.parent.name}/{txt_file.name}"
+            for txt_file, output_file in pending
+        }
+        for completed, future in enumerate(as_completed(future_to_path), start=1):
+            rel_path = future_to_path[future]
+
+            try:
+                result = future.result()
+            except Exception as exc:
+                failures.append((rel_path, str(exc)))
+                logger.error(f"[{completed}/{total}] worker-unknown {rel_path} -> failed: {exc}")
+                continue
+
+            success_delta, skipped_delta = record_process_result(
+                completed,
+                total,
+                rel_path,
+                start_time,
+                result,
+                oversized_files,
+                failures,
+                skip_threshold_pct,
+            )
+            success_count += success_delta
+            skipped_count += skipped_delta
 
     logger.info("---")
     logger.info("=" * 50)
     logger.info("Summary")
     logger.info("=" * 50)
-    logger.info(f"Total pending: {len(pending)}")
+    logger.info(f"Total pending: {total}")
     logger.info(f"Summarized: {success_count}")
     logger.info(f"Skipped: {skipped_count}")
     logger.info(f"Failed: {len(failures)}")
@@ -302,7 +539,32 @@ def main() -> int:
         logger.info("Nothing to do — all files already processed.")
         return 0
 
-    return process_pending(pending, prompt_template, llm, encoder, summarize_cfg.skip_transcripts_above_context_window_pct)
+    try:
+        effective_context_window = resolve_effective_context_window(llm)
+    except RuntimeError as exc:
+        logger.error(f"Error: {exc}")
+        return 1
+
+    logger.info(f"Effective context window for transcript skipping: {effective_context_window:,} tokens")
+    parallel_context_window = resolve_parallel_context_window(effective_context_window, summarize_cfg.parallelism)
+    logger.info(
+        "Per-worker context window for transcript skipping: %s tokens (%s / %s = %s)",
+        f"{parallel_context_window:,}",
+        f"{effective_context_window:,}",
+        summarize_cfg.parallelism,
+        f"{parallel_context_window:,}",
+    )
+    logger.info(f"Max output tokens: {llm.max_tokens:,}")
+
+    return process_pending(
+        pending,
+        prompt_template,
+        llm,
+        encoder,
+        parallel_context_window,
+        summarize_cfg.skip_transcripts_above_context_window_pct,
+        summarize_cfg.parallelism,
+    )
 
 
 if __name__ == "__main__":

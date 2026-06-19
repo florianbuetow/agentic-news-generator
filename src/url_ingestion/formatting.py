@@ -167,6 +167,8 @@ class FormattingAgent:
 
     def _context_token_limit(self) -> int:
         """Return the prompt token limit imposed by the context-window threshold."""
+        if self.llm.context_window == "auto":
+            raise ValueError("url_clean_content.llm.context_window must be an explicit integer")
         return int(self.llm.context_window * self.skip_threshold_pct / 100)
 
     def _token_limit(self) -> int:
