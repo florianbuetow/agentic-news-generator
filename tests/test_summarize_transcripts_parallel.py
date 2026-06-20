@@ -109,6 +109,19 @@ def _think_only_completion(**_: object) -> MagicMock:
     return _fake_litellm_response(_THINK_ONLY_RESPONSE)
 
 
+def _empty_completion(**_: object) -> MagicMock:
+    return _fake_litellm_response("")
+
+
+def test_call_llm_raises_when_llm_returns_empty_response(monkeypatch: Any) -> None:
+    """call_llm must raise ValueError when the LLM returns an empty string."""
+    module = load_summarize_module()
+    monkeypatch.setattr(module.litellm, "completion", _empty_completion)
+
+    with pytest.raises(ValueError, match="LLM returned empty response"):
+        module.call_llm("test prompt", _make_llm_config(), 512)
+
+
 def test_call_llm_raises_when_think_tags_produce_empty_response(monkeypatch: Any) -> None:
     """call_llm must raise ValueError when the LLM returns only a <think> block."""
     module = load_summarize_module()
