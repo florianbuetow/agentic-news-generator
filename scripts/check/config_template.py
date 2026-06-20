@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from src.config import Config
+
 
 def extract_keys(data: dict | None, prefix: str = "") -> set[str]:
     """Recursively extract all key paths from nested dict."""
@@ -33,7 +35,7 @@ def main() -> int:
     template_keys = extract_keys(template_data)
 
     # Load config (optional)
-    config_path = Path("config/config.yaml")
+    config_path = Config.repo_config_path()
     if not config_path.exists():
         print("⚠ WARNING: config.yaml does not exist")
         return 0

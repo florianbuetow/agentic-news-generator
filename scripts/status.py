@@ -10,9 +10,6 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 
 TIMESTAMP_RE = re.compile(r"(?P<hours>\d+):(?P<minutes>[0-5]\d):(?P<seconds>[0-5]\d)[,.](?P<millis>\d{3})")
@@ -297,8 +294,7 @@ def main() -> int:  # noqa: C901
 
     # Load configuration
     project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
-    config = Config(config_path)
+    config = Config.load_default()
 
     # Get directories from Config
     downloads_dir = config.get_data_downloads_dir()

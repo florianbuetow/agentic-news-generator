@@ -587,6 +587,13 @@ class TestConfig:
         finally:
             Path(temp_path_str).unlink()
 
+    def test_load_default_uses_canonical_repo_config_path(self) -> None:
+        """Test that the canonical config entry point resolves one repo path."""
+        config = Config.load_default()
+
+        assert config.get_config_path() == Config.repo_config_path()
+        assert config.get_config_path().name == "config.yaml"
+
     def test_empty_yaml_file(self) -> None:
         """Test that empty YAML file raises KeyError for missing channels."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:

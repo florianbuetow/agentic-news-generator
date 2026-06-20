@@ -11,9 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config  # noqa: E402
+from src.config import Config
 
 YOUTUBE_ID_BEFORE_EXTENSION_RE = re.compile(r"\s*\[([A-Za-z0-9_-]+)\](?=\.[^/]+$)")
 
@@ -202,8 +200,7 @@ def write_report(config: Config, content: str) -> Path:
 
 def main() -> int:
     """Load config, scan ID-convention folders, write a report, and print a summary."""
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     if len(sys.argv) != 1:
         print(f"Usage: uv run python {Path(__file__)}", file=sys.stderr)
         return 2

@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
 """Build the upload-date timeline report over the summarized corpus."""
 
-import sys
 from datetime import date
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from src.analytics.index_builder import build_index
 from src.analytics.report_writer import render_timeline_markdown, write_model_json, write_text_file
@@ -15,7 +11,7 @@ from src.config import Config
 
 def main() -> int:
     """Build the index in-process, bucket the timeline, write the artifacts."""
-    config = Config(Path("config/config.yaml"))
+    config = Config.load_default()
     analytics_config = config.get_analytics_config()
     output_dir = config.get_data_output_analytics_dir()
     index = build_index(config)

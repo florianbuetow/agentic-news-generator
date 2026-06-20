@@ -11,9 +11,7 @@ import logging
 import sys
 from pathlib import Path
 
-# Add src to path to import Config
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from config import Config
+from src.config import Config
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -93,8 +91,7 @@ def main() -> None:
     """Main entry point for article preprocessing."""
     # Load config to get data directory paths (single source of truth)
     project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
-    config = Config(config_path=str(config_path))
+    config = Config.load_default()
 
     # Define paths from config
     input_dir = config.get_data_input_dir() / "newspaper" / "articles"

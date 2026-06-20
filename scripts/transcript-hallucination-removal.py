@@ -10,9 +10,6 @@ from pathlib import Path
 
 import srt
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 from src.processing.srt_converter import srt_to_plain_text
@@ -68,7 +65,7 @@ def setup_environment() -> tuple[Config, Path, Path, Path, Path, RepetitionDetec
         Tuple of (config, data_dir, transcripts_dir, hallucinations_dir, output_dir, detector)
         or error code if setup fails.
     """
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     if not config_path.exists():
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1

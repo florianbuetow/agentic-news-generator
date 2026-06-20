@@ -3,7 +3,6 @@
 
 import sys
 from datetime import date
-from pathlib import Path
 
 from src.config import Config
 from src.url_ingestion.classifier import UrlClassifier
@@ -16,8 +15,7 @@ from src.url_ingestion.reachability import CurlReachabilityProbe
 
 def main() -> int:
     """Load production config, read the URL inbox queue, and print summary counts."""
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
 
     try:
         print(f"Loading config: {config_path}", flush=True)

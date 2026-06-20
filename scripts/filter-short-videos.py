@@ -30,12 +30,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config
+from src.config import Config
 
 _PROJECT_ROOT = Path(__file__).parent.parent
-_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
 _FILTER_PATH = _PROJECT_ROOT / "config" / "filefilter.json"
 _ID_RE = re.compile(r"\[([A-Za-z0-9_-]{11})\]\.[^.]+$")
 _VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".m4v"}
@@ -318,7 +315,7 @@ def _print_report(
 
 def main() -> int:
     """Scan every channel and merge any new short / no-audio entries into filefilter.json."""
-    config = Config(_CONFIG_PATH)
+    config = Config.load_default()
     videos_dir = config.get_data_downloads_videos_dir()
     audio_dir = config.get_data_downloads_audio_dir()
     metadata_dir = config.get_data_downloads_metadata_dir()

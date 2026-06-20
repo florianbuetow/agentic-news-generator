@@ -10,9 +10,6 @@ from typing import Any
 import srt
 import yaml
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 from src.processing.repetition_detector import RepetitionDetector
 from src.util.fs_util import FSUtil
@@ -226,7 +223,7 @@ def log_file_result(filename: str, hallucination_count: int, example: dict[str, 
 def main() -> int:  # noqa: C901
     """Main entry point."""
     # Load configuration
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     if not config_path.exists():
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1

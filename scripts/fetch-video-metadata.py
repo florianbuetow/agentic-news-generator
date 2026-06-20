@@ -25,9 +25,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config  # noqa: E402
+from src.config import Config
 
 # YouTube video IDs: exactly 11 chars of [A-Za-z0-9_-]
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -156,10 +154,9 @@ def main() -> int:
     args = parser.parse_args()
 
     project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
 
     try:
-        config = Config(config_path)
+        config = Config.load_default()
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

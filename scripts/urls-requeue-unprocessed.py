@@ -4,7 +4,6 @@
 import argparse
 import sys
 from datetime import date
-from pathlib import Path
 
 from src.config import Config
 from src.url_ingestion.classifier import UrlClassifier
@@ -21,8 +20,7 @@ def main() -> int:
     parser.add_argument("--offset", type=non_negative_int, default=0, help="skip this many recoverable URLs before showing or writing")
     args = parser.parse_args()
 
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
 
     try:
         print(f"Loading config: {config_path}", flush=True)

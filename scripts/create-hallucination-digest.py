@@ -6,9 +6,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 from src.util.log_util import configure_root_logger, get_logger
 
@@ -18,7 +15,7 @@ logger = get_logger(__name__)
 def main() -> int:  # noqa: C901
     """Generate hallucination digest grouped by file."""
     # Load configuration
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     if not config_path.exists():
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1

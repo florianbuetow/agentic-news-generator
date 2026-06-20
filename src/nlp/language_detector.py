@@ -27,9 +27,8 @@ class LanguageDetector:
     """FastText-based language detector supporting 176 languages.
 
     Example:
-        >>> from pathlib import Path
         >>> from src.config import Config
-        >>> config = Config(Path("config/config.yaml"))
+        >>> config = Config.load_default()
         >>> model_path = config.get_data_models_dir() / "fasttext" / "lid.176.ftz"
         >>> detector = LanguageDetector(model_path=model_path)
         >>> detector.detect_language("Hello, how are you?")

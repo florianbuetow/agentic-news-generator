@@ -340,6 +340,16 @@ class PathsConfig(BaseModel):
 class Config:
     """Configuration class that loads and provides access to config.yaml."""
 
+    @classmethod
+    def repo_config_path(cls) -> Path:
+        """Return the canonical repository config path."""
+        return Path(__file__).parent.parent / "config" / "config.yaml"
+
+    @classmethod
+    def load_default(cls) -> "Config":
+        """Load the canonical repository config file."""
+        return cls(cls.repo_config_path())
+
     def __init__(self, config_path: str | Path) -> None:
         """Initialize the Config by loading the YAML file.
 

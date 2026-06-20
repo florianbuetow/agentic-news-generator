@@ -23,7 +23,6 @@ import os
 import sys
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
 
 import requests
 from autogen_core.models import UserMessage
@@ -877,8 +876,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    project_root = Path(__file__).resolve().parents[2]
-    config = Config(project_root / "config" / "config.yaml")
+    config = Config.load_default()
     review_cfg = config.get_agentic_shell_script_reviews_config()
     model = review_cfg.llm.model
     base_url = review_cfg.llm.base_url

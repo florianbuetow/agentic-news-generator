@@ -273,8 +273,7 @@ def main() -> int:
         Exit code (0 for success, 1 for error).
     """
     # Load configuration
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
-    config = Config(config_path)
+    config = Config.load_default()
     configure_root_logger(config.get_data_logs_dir())
 
     # Get paths

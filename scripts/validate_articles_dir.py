@@ -10,19 +10,14 @@ Exit codes:
 """
 
 import sys
-from pathlib import Path
 
-# Add src to path to import Config
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from config import Config
+from src.config import Config
 
 
 def main() -> None:
     """Validate articles directory from config."""
     # Load config
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
-    config = Config(config_path=str(config_path))
+    config = Config.load_default()
 
     # Get articles directory from config
     articles_dir = config.get_data_input_dir() / "newspaper" / "articles"

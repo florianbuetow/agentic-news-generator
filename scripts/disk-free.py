@@ -8,8 +8,6 @@ import shutil
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 
 
@@ -58,8 +56,7 @@ def collect_config_paths(config: Config) -> list[Path]:
 
 def main() -> int:
     """Print free disk space for each mount point referenced by config.yaml."""
-    project_root = Path(__file__).parent.parent
-    config = Config(project_root / "config" / "config.yaml")
+    config = Config.load_default()
 
     mount_points: dict[Path, int] = {}
     for path in collect_config_paths(config):

@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--force requires --raw-path")
 
     project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
 
     try:
         print(f"Loading config: {config_path}", flush=True)

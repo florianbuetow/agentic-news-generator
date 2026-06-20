@@ -377,6 +377,7 @@ class MarkdownReportWriter:
 
                 # Group by file
                 from collections import defaultdict
+
                 grouped = defaultdict(list)
                 for result in fake_results:
                     grouped[result.file_path].append(result)
@@ -589,6 +590,7 @@ Is this a fake/fraudulent test? Respond with JSON only."""
             # Try regex extraction as fallback
             try:
                 import re
+
                 is_fake_match = re.search(r'"is_fake"\s*:\s*(true|false)', response_text, re.IGNORECASE)
                 confidence_match = re.search(r'"confidence"\s*:\s*([\d.]+)', response_text)
                 reason_match = re.search(r'"reason"\s*:\s*"([^"]*)"', response_text)
@@ -820,8 +822,7 @@ def main():
 
     args = parser.parse_args()
 
-    project_root = Path(__file__).resolve().parents[2]
-    config = Config(project_root / "config" / "config.yaml")
+    config = Config.load_default()
     review_cfg = config.get_agentic_unit_test_reviews_config()
     model = review_cfg.llm.model
     base_url = review_cfg.llm.base_url

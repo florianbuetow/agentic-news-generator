@@ -27,12 +27,9 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config
+from src.config import Config
 
 _PROJECT_ROOT = Path(__file__).parent.parent
-_CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
 _FILTER_PATH = _PROJECT_ROOT / "config" / "filefilter.json"
 
 # Ordered upstream → downstream. A filter entry found under key K also
@@ -145,7 +142,7 @@ def _delete_targets(targets: list[tuple[str, str, str, Path]]) -> tuple[int, int
 
 def main() -> int:
     """Resolve filter entries to on-disk files and delete them."""
-    config = Config(_CONFIG_PATH)
+    config = Config.load_default()
 
     if not _FILTER_PATH.is_file():
         print(f"ERROR: filter file not found: {_FILTER_PATH}", file=sys.stderr)

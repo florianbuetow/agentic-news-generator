@@ -12,10 +12,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# Add src to path to import config module
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import ChannelConfig, Config
+from src.config import ChannelConfig, Config
 from src.util.log_util import configure_root_logger, get_logger
 
 logger = get_logger(__name__)
@@ -273,8 +270,7 @@ def print_summary(total_archived: int, total_duplicates: int, unknown_urls: list
 
 def main() -> None:
     """Parse download log and archive members-only video IDs."""
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     download_log_path = Path("reports/video-download.log")
 
     config = load_config(config_path)

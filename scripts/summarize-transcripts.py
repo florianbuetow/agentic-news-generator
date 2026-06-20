@@ -16,8 +16,6 @@ import litellm
 import tiktoken
 from litellm.exceptions import BadRequestError
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config, LLMConfig, SummarizeTranscriptsConfig
 from src.summarize.lm_studio_client import get_loaded_context_length
 from src.summarize.transcripts import collect_pending_files, strip_think_tags
@@ -38,7 +36,7 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
         Tuple of (summarize_cfg, cleaned_dir, summaries_dir, prompt_template, encoding_name)
         or error code if setup fails.
     """
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     if not config_path.exists():
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1

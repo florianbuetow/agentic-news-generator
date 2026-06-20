@@ -16,9 +16,7 @@ import sys
 from collections.abc import Iterable
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config  # noqa: E402
+from src.config import Config
 
 YOUTUBE_ID_BEFORE_EXTENSION_RE = re.compile(r"\[([A-Za-z0-9_-]+)\](?=\.[^/]+$)")
 
@@ -92,11 +90,8 @@ def relative_to_data_dir(path: Path, data_dir: Path) -> Path:
 
 def main() -> int:
     """Load config + filter set, scan data folders, and flag files that escaped filtering."""
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
-
     try:
-        config = Config(config_path)
+        config = Config.load_default()
     except (FileNotFoundError, KeyError, ValueError) as exc:
         print(f"Error loading config: {exc}", file=sys.stderr)
         return 1

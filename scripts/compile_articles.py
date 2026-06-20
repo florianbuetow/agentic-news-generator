@@ -42,8 +42,7 @@ def main() -> None:
     """Main entry point for article compilation."""
     try:
         # Load configuration
-        config_path = Path(__file__).parent.parent / "config" / "config.yaml"
-        config = Config(config_path)
+        config = Config.load_default()
         compiler_config = config.get_article_compiler_config()
 
         logger.info("Starting article compilation")

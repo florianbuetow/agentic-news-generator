@@ -124,10 +124,7 @@ def main() -> None:
 
     from src.config import Config
 
-    # Load configuration
-    project_root = Path(__file__).parent.parent.parent
-    config_path = project_root / "config" / "config.yaml"
-    config = Config(config_path)
+    config = Config.load_default()
 
     # Get paths from Config
     transcripts_dir = config.get_data_downloads_transcripts_dir()

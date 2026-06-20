@@ -79,7 +79,7 @@ def main() -> None:
     channel_filter = parse_channel_filter(sys.argv)
 
     project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     shell_script_path = project_root / "scripts" / "yt-downloader.sh"
 
     try:

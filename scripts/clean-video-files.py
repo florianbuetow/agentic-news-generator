@@ -17,9 +17,7 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config
+from src.config import Config
 
 # YouTube video IDs: exactly 11 chars of [A-Za-z0-9_-]
 _VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
@@ -376,7 +374,7 @@ def main() -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     try:
         config = Config(config_path)
     except FileNotFoundError as e:

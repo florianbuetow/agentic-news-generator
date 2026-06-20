@@ -7,8 +7,6 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 
 TIMESTAMP_RE = re.compile(r"(\d{2}):(\d{2}):(\d{2}),\d{3}\s*-->\s*(\d{2}):(\d{2}):(\d{2}),\d{3}")
@@ -26,8 +24,7 @@ def last_end_seconds(srt_path: Path) -> float:
 
 def main() -> int:
     """Sum transcript durations and print total audio hours."""
-    project_root = Path(__file__).parent.parent
-    config = Config(project_root / "config" / "config.yaml")
+    config = Config.load_default()
 
     transcripts_dir = config.get_data_downloads_transcripts_dir()
     if not transcripts_dir.exists():

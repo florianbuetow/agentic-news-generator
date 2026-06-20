@@ -24,15 +24,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from src.config import Config  # noqa: E402
-from src.file_processing_filter import FileProcessingFilter, add_no_speech_to_filefilter  # noqa: E402
-from src.transcription.argument_helper import TranscriptionArgumentHelper  # noqa: E402
-from src.util.fs_util import FSUtil  # noqa: E402
-from src.util.log_util import configure_root_logger, get_logger  # noqa: E402
-from src.util.whisper_languages import WhisperLanguages  # noqa: E402
+from src.config import Config
+from src.file_processing_filter import FileProcessingFilter, add_no_speech_to_filefilter
+from src.transcription.argument_helper import TranscriptionArgumentHelper
+from src.util.fs_util import FSUtil
+from src.util.log_util import configure_root_logger, get_logger
+from src.util.whisper_languages import WhisperLanguages
 
 logger = get_logger(__name__)
 
@@ -337,10 +334,9 @@ def main() -> int:  # noqa: C901
 
     # Load configuration
     project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
 
     try:
-        config = Config(config_path)
+        config = Config.load_default()
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1

@@ -187,9 +187,7 @@ def main() -> int:
         return 1
 
     timeout_cmd = _detect_timeout_cmd()
-
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
-    config = Config(config_path)
+    config = Config.load_default()
     configure_root_logger(config.get_data_logs_dir())
 
     data_dir = config.get_data_dir()

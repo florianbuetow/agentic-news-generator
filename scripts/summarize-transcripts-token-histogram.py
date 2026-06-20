@@ -10,8 +10,6 @@ from pathlib import Path
 
 import tiktoken
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from src.config import Config
 from src.summarize.transcripts import collect_pending_files
 from src.util.fs_util import FSUtil
@@ -265,8 +263,7 @@ def resolve_histogram_range(
 def main(argv: list[str] | None = None) -> int:
     """Run the token histogram report."""
     args = parse_args(sys.argv[1:] if argv is None else argv)
-    project_root = Path(__file__).parent.parent
-    config_path = project_root / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     if not config_path.exists():
         print(f"Error: Config file not found: {config_path}", file=sys.stderr)
         return 1

@@ -7,12 +7,13 @@ import sys
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, cast
 
 import yaml
 
-CONFIG_PATH = Path(__file__).parent.parent / "config" / "config.yaml"
+from src.config import Config
+
+CONFIG_PATH = Config.repo_config_path()
 
 _TIMEOUT_SECONDS = 5
 

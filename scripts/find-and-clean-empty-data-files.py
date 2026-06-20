@@ -6,9 +6,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from config import Config
+from src.config import Config
 
 
 def find_empty_files(data_dir: Path) -> list[Path]:
@@ -96,7 +94,7 @@ def main() -> int:
         Exit code (0 for success, 1 for error).
     """
     # Load configuration
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
+    config_path = Config.repo_config_path()
     try:
         config = Config(config_path)
     except FileNotFoundError as e:

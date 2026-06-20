@@ -344,9 +344,7 @@ def main() -> int:
         help="Force re-export even if output directory already has leaf_*.txt files",
     )
     args = parser.parse_args()
-
-    config_path = Path(__file__).parent.parent / "config" / "config.yaml"
-    config = Config(config_path)
+    config = Config.load_default()
 
     td_config = config.get_topic_detection_config()
     topics_dir = config.get_data_dir() / td_config.output_dir
