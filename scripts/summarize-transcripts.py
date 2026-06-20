@@ -116,7 +116,10 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
     if response_text is None or response_text.strip() == "":
         raise ValueError("LLM returned empty response")
 
-    return strip_think_tags(response_text.strip())
+    result = strip_think_tags(response_text.strip())
+    if not result:
+        raise ValueError("LLM returned empty response after stripping think tags")
+    return result
 
 
 def resolve_effective_context_window(llm: LLMConfig) -> int:

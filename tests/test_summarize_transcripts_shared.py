@@ -22,6 +22,11 @@ def test_strip_think_tags_leaves_plain_text_unchanged() -> None:
     assert strip_think_tags("Visible summary") == "Visible summary"
 
 
+def test_strip_think_tags_returns_empty_when_response_is_only_a_think_block() -> None:
+    """A response with only a <think> block and no trailing content yields an empty string."""
+    assert strip_think_tags("<think>internal reasoning with no answer</think>") == ""
+
+
 def test_collect_pending_files_partitions_and_sorts_by_channel_backlog(tmp_path: Path) -> None:
     """Pending files are counted, filtered, and ordered by smallest channel backlog."""
     cleaned_dir = tmp_path / "cleaned"
