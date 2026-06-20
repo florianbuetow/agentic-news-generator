@@ -1,9 +1,8 @@
-"""Tests for the stall-robust ETA estimator in summarize-transcripts.py."""
+"""Tests for the progress-rate ETA estimator in summarize-transcripts.py."""
 
 from __future__ import annotations
 
 import importlib.util
-import itertools
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,54 +20,49 @@ def load_summarize_module() -> Any:
     return module
 
 
-def timestamps_from_intervals(intervals: list[float]) -> list[float]:
-    """Build cumulative monotonic timestamps that reproduce the given intervals."""
-    return [0.0, *itertools.accumulate(intervals)]
-
-
-def test_estimate_eta_rejects_stall_outlier() -> None:
-    """A single huge interval (a stall) must not inflate the estimate.
-
-    Intervals are thirty normal 45s files plus one 3000s stall. The median is 45,
-    so ETA == 45 * remaining. The old lifetime-mean formula would use
-    mean == 4350/31 ≈ 140.3, a ~3.1x inflation — that was the bug.
-    """
-    module = load_summarize_module()
-    times = timestamps_from_intervals([45.0] * 30 + [3000.0])
-
-    assert module.estimate_eta_seconds(times, 100) == 45.0 * 100
-
-
-def test_estimate_eta_median_ignores_lone_spike() -> None:
-    module = load_summarize_module()
-    times = timestamps_from_intervals([10.0, 10.0, 10.0, 10.0, 10.0, 9999.0])
-
-    assert module.estimate_eta_seconds(times, 7) == 10.0 * 7
-
-
-def test_estimate_eta_returns_none_with_too_few_samples() -> None:
+def test_estimate_eta_uses_completed_fraction_and_elapsed_time() -> None:
     module = load_summarize_module()
 
-    assert module.estimate_eta_seconds([1.0, 2.0, 3.0], 10) is None
-    assert module.estimate_eta_seconds([], 10) is None
+    assert module.estimate_eta_seconds(completed=25, total=100, elapsed_seconds=3600.0) == 10800.0
 
 
-def test_estimate_eta_with_minimum_samples() -> None:
-    module = load_summarize_module()
-    times = timestamps_from_intervals([20.0, 20.0, 20.0])
-
-    assert module.estimate_eta_seconds(times, 5) == 20.0 * 5
-
-
-def test_format_processing_eta_calculating_until_enough_samples() -> None:
+def test_estimate_eta_returns_zero_when_complete() -> None:
     module = load_summarize_module()
 
-    assert module.format_processing_eta([1.0, 2.0], 10) == "calculating"
+    assert module.estimate_eta_seconds(completed=100, total=100, elapsed_seconds=3600.0) == 0.0
+
+
+def test_estimate_eta_returns_none_until_progress_exists() -> None:
+    module = load_summarize_module()
+
+    assert module.estimate_eta_seconds(completed=0, total=100, elapsed_seconds=3600.0) is None
+    assert module.estimate_eta_seconds(completed=25, total=100, elapsed_seconds=0.0) is None
+
+
+def test_estimate_eta_rejects_invalid_counts() -> None:
+    module = load_summarize_module()
+
+    for completed, total, elapsed, message in [
+        (0, 0, 1.0, "total must be positive"),
+        (-1, 100, 1.0, "completed must not be negative"),
+        (101, 100, 1.0, "completed must not exceed total"),
+        (1, 100, -1.0, "elapsed_seconds must not be negative"),
+    ]:
+        try:
+            module.estimate_eta_seconds(completed=completed, total=total, elapsed_seconds=elapsed)
+        except ValueError as exc:
+            assert message in str(exc)
+        else:
+            raise AssertionError(f"expected ValueError containing {message!r}")
+
+
+def test_format_processing_eta_calculating_until_progress_exists() -> None:
+    module = load_summarize_module()
+
+    assert module.format_processing_eta(completed=0, total=10, elapsed_seconds=60.0) == "calculating"
 
 
 def test_format_processing_eta_formats_remaining() -> None:
     module = load_summarize_module()
-    # Median interval 60s, 130 remaining -> 7800s -> 2h10m.
-    times = timestamps_from_intervals([60.0, 60.0, 60.0])
 
-    assert module.format_processing_eta(times, 130) == "2h10m"
+    assert module.format_processing_eta(completed=25, total=100, elapsed_seconds=3600.0) == "3h0m"
