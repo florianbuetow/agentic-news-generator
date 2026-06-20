@@ -11,6 +11,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 2026-06
 
+### 2026-06-20
+
+#### Changed
+
+- `summarize-transcripts` now respects LM Studio concurrency limits and processes channels without exceeding the configured API rate.
+- Separated transcript summarization context boundaries to prevent stale state across API calls.
+
+#### Fixed
+
+- `summarize-transcripts` ETA display now recovers gracefully from processing stalls.
+
+---
+
+### 2026-06-14
+
+#### Added
+
+- Added `disk-free` justfile target displaying available disk space for configured data volumes.
+- Added `stats-mini` target for a condensed, single-line pipeline status overview.
+- Added `find-files-with-filtered-video-ids` audit tool to identify video files excluded by active filters.
+
+#### Changed
+
+- Pipeline completion metrics now use the correct denominator for accurate percentage calculations.
+
+#### Fixed
+
+- Fixed `stats-mini` to show only active channels.
+
+---
+
+### 2026-06-10
+
+#### Added
+
+- `yt-downloader` now accepts an optional `--channel` parameter to restrict downloads to a single channel.
+
+#### Fixed
+
+- Transcription metadata lookup now correctly skips macOS AppleDouble (`._*`) sidecar files.
+
+---
+
 ### 2026-06-07
 
 #### Added
