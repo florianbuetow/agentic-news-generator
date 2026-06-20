@@ -238,8 +238,8 @@ def test_processing_start_log_includes_worker_prefix_when_parallel(caplog: pytes
         2,
         2855,
         "Greg_Isenberg/Tutorial on how to write tweets with man who gets 1B+ impressions per year [ovB8nX_hUe8].txt",
-        module.time.monotonic() - 60,
-        1,
+        [0.0, 60.0, 120.0, 180.0],
+        2854,
         "worker-01",
         4,
     )
@@ -257,8 +257,8 @@ def test_processing_start_log_omits_worker_prefix_when_single_worker(caplog: pyt
         1,
         3,
         "channel/first.txt",
-        module.time.monotonic(),
-        0,
+        [],
+        3,
         "worker-01",
         1,
     )

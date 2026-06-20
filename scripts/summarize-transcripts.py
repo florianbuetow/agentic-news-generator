@@ -6,9 +6,12 @@ from __future__ import annotations
 import itertools
 import logging
 import re
+import statistics
 import sys
 import threading
 import time
+from collections import deque
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -218,15 +221,24 @@ def format_eta(seconds_remaining: float) -> str:
     return f"{hours}h{minutes}m"
 
 
-def format_processing_eta(start_time: float, completed_count: int, total: int) -> str:
-    """Format ETA for a file that is about to start processing."""
-    if completed_count == 0:
-        return "calculating"
+def estimate_eta_seconds(recent_completion_times: Sequence[float], remaining: int) -> float | None:
+    """Estimate seconds remaining from recent completion timestamps (monotonic).
 
-    elapsed = time.monotonic() - start_time
-    avg = elapsed / completed_count
-    eta_seconds = avg * (total - completed_count)
-    return format_eta(eta_seconds)
+    Uses the median interval between consecutive completions so that occasional
+    stalls (a hung request, a giant outlier file) do not inflate the estimate.
+    Returns None when there are too few completions to estimate.
+    """
+    times = list(recent_completion_times)
+    if len(times) < 4:  # need a few intervals for a meaningful median
+        return None
+    intervals = [times[i + 1] - times[i] for i in range(len(times) - 1)]
+    return statistics.median(intervals) * remaining
+
+
+def format_processing_eta(recent_completion_times: Sequence[float], remaining: int) -> str:
+    """Format ETA for a file that is about to start processing."""
+    eta_seconds = estimate_eta_seconds(recent_completion_times, remaining)
+    return "calculating" if eta_seconds is None else format_eta(eta_seconds)
 
 
 def format_worker_progress_label(worker_id: str, worker_count: int) -> str:
@@ -243,13 +255,13 @@ def log_processing_start(
     item_number: int,
     total: int,
     rel_path: str,
-    start_time: float,
-    completed_count: int,
+    recent_completion_times: Sequence[float],
+    remaining: int,
     worker_id: str,
     worker_count: int,
 ) -> None:
     """Log the item being processed before slow work starts."""
-    eta_label = format_processing_eta(start_time, completed_count, total)
+    eta_label = format_processing_eta(recent_completion_times, remaining)
     worker_prefix = f"{format_worker_progress_label(worker_id, worker_count)} " if worker_count > 1 else ""
     logger.info(f"{worker_prefix}Processing [{item_number}/{total} {item_number / total * 100:.1f}%] [ETA {eta_label}] ... {rel_path}")
 
@@ -327,13 +339,13 @@ def process_pending(
     oversized_files: list[str] = []
     failures: list[tuple[str, str]] = []
     total = len(pending)
-    start_time = time.monotonic()
 
     worker_numbers = itertools.count(1)
     worker_number_lock = threading.Lock()
     worker_local = threading.local()
-    eta_completed_count = 0
-    eta_completed_count_lock = threading.Lock()
+    completed_count = 0
+    recent_completion_times: deque[float] = deque(maxlen=50)
+    progress_lock = threading.Lock()
 
     def initialize_worker() -> None:
         with worker_number_lock:
@@ -343,18 +355,19 @@ def process_pending(
         return str(worker_local.worker_id)
 
     def run_pending_item(item_number: int, txt_file: Path, output_file: Path) -> tuple[str, str, str | None]:
-        nonlocal eta_completed_count
+        nonlocal completed_count
         worker_id = current_worker_id()
         rel_path = f"{txt_file.parent.name}/{txt_file.name}"
-        with eta_completed_count_lock:
-            completed_count_snapshot = eta_completed_count
+        with progress_lock:
+            remaining = total - completed_count
+            recent_times_snapshot = list(recent_completion_times)
 
         log_processing_start(
             item_number,
             total,
             rel_path,
-            start_time,
-            completed_count_snapshot,
+            recent_times_snapshot,
+            remaining,
             worker_id,
             parallelism,
         )
@@ -370,8 +383,9 @@ def process_pending(
             worker_id,
             parallelism,
         )
-        with eta_completed_count_lock:
-            eta_completed_count += 1
+        with progress_lock:
+            completed_count += 1
+            recent_completion_times.append(time.monotonic())
         return result
 
     with ThreadPoolExecutor(
