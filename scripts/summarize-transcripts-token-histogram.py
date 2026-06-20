@@ -4,17 +4,16 @@
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from types import ModuleType
 
 import tiktoken
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config
+from src.summarize.transcripts import collect_pending_files
 from src.util.fs_util import FSUtil
 
 DEFAULT_BUCKET_WIDTH_TOKENS = 8_000
@@ -36,19 +35,6 @@ class HistogramResult:
     overflow_count: int
     total_tokens: int
     max_observed_tokens: int
-
-
-def load_summarize_transcripts_module() -> ModuleType:
-    """Load the existing summarize-transcripts script as a module."""
-    script_path = Path(__file__).with_name("summarize-transcripts.py")
-    spec = importlib.util.spec_from_file_location("summarize_transcripts_module", script_path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load module spec for {script_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
 
 
 def bucket_count(max_tokens: int, bucket_width: int) -> int:
@@ -293,8 +279,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: Cleaned transcripts directory not found: {cleaned_dir}", file=sys.stderr)
         return 1
 
-    summarize_module = load_summarize_transcripts_module()
-    pending, total, already_done, empty_files = summarize_module.collect_pending_files(
+    pending, total, already_done, empty_files = collect_pending_files(
         cleaned_dir,
         summaries_dir,
         args.channel.strip(),

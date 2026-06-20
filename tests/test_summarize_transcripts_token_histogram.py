@@ -94,3 +94,10 @@ def test_render_histogram_uses_half_block_for_top_partial_row() -> None:
     rendered = module.render_histogram(result, 10, 1, 10, 1)
 
     assert "▄" in rendered
+
+
+def test_histogram_script_does_not_load_summarizer_script() -> None:
+    """The histogram script depends on the shared source helper, not the CLI script."""
+    module = load_histogram_module()
+
+    assert not hasattr(module, "load_summarize_transcripts_module")

@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import itertools
-import json
 import logging
 import re
 import sys
@@ -12,10 +11,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, cast
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse, urlunparse
-from urllib.request import urlopen
 
 import litellm
 import tiktoken
@@ -24,12 +19,12 @@ from litellm.exceptions import BadRequestError
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from src.config import Config, LLMConfig, SummarizeTranscriptsConfig
+from src.summarize.lm_studio_client import get_loaded_context_length
+from src.summarize.transcripts import collect_pending_files, strip_think_tags
 from src.util.fs_util import FSUtil
 from src.util.log_util import configure_root_logger, get_logger
 
 logger = get_logger(__name__)
-
-LM_STUDIO_MODELS_PATH = "/api/v0/models"
 
 
 class ContextSizeExceededError(RuntimeError):
@@ -93,14 +88,6 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
     return summarize_cfg, cleaned_dir, summaries_dir, prompt_template, encoding_name
 
 
-def strip_think_tags(text: str) -> str:
-    """Strip <think> reasoning tags from model responses."""
-    think_match = re.search(r"</think>\s*(.*)$", text, re.DOTALL)
-    if think_match:
-        return think_match.group(1).strip()
-    return text
-
-
 def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
     """Call the LLM and return the response text."""
     messages = [{"role": "user", "content": prompt}]
@@ -131,82 +118,11 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
     return strip_think_tags(response_text.strip())
 
 
-def get_lm_studio_models_url(api_base: str | None) -> str:
-    """Return the native LM Studio models endpoint for an OpenAI-compatible API base."""
-    if api_base is None:
-        raise ValueError("api_base is required to query LM Studio model metadata")
-
-    parsed = urlparse(api_base)
-    if not parsed.scheme or not parsed.netloc:
-        raise ValueError(f"Invalid LM Studio api_base: {api_base}")
-
-    return urlunparse((parsed.scheme, parsed.netloc, LM_STUDIO_MODELS_PATH, "", "", ""))
-
-
-def get_model_id_candidates(model: str) -> list[str]:
-    """Return model IDs to try against LM Studio metadata."""
-    candidates = [model]
-    if model.startswith("openai/"):
-        candidates.append(model.removeprefix("openai/"))
-    return candidates
-
-
-def fetch_lm_studio_models(models_url: str) -> list[object]:
-    """Fetch LM Studio model metadata."""
-    try:
-        with urlopen(models_url, timeout=10) as response:
-            payload = cast(dict[str, Any], json.loads(response.read().decode("utf-8")))
-    except HTTPError as exc:
-        raise RuntimeError(f"LM Studio metadata request failed with HTTP {exc.code}: {models_url}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"LM Studio metadata endpoint is unreachable: {models_url} ({exc.reason})") from exc
-    except TimeoutError as exc:
-        raise RuntimeError(f"LM Studio metadata request timed out: {models_url}") from exc
-    except json.JSONDecodeError as exc:
-        raise RuntimeError(f"LM Studio metadata response was not valid JSON: {models_url}") from exc
-
-    data_raw = payload.get("data")
-    if not isinstance(data_raw, list):
-        raise RuntimeError("LM Studio metadata response did not contain a data list")
-
-    return cast(list[object], data_raw)
-
-
-def extract_loaded_context_length(model_info: dict[str, Any], model: str) -> int:
-    """Extract the loaded context length from one LM Studio model record."""
-    if model_info.get("state") != "loaded":
-        raise RuntimeError(f"Configured model is not loaded in LM Studio: {model}")
-    loaded_context_length = model_info.get("loaded_context_length")
-    if not isinstance(loaded_context_length, int) or loaded_context_length <= 0:
-        raise RuntimeError(f"Loaded LM Studio model does not report loaded_context_length: {model}")
-    return loaded_context_length
-
-
-def get_loaded_context_length(llm: LLMConfig) -> int:
-    """Fetch the loaded context length for the configured LM Studio model."""
-    data = fetch_lm_studio_models(get_lm_studio_models_url(llm.api_base))
-    candidates = set(get_model_id_candidates(llm.model))
-    loaded_context_length: int | None = None
-    for model_info_raw in data:
-        if not isinstance(model_info_raw, dict):
-            continue
-        model_info = cast(dict[str, Any], model_info_raw)
-        if model_info.get("id") not in candidates:
-            continue
-        loaded_context_length = extract_loaded_context_length(model_info, llm.model)
-        break
-
-    if loaded_context_length is not None:
-        return loaded_context_length
-
-    raise RuntimeError(f"Configured model was not found in LM Studio metadata: {llm.model}")
-
-
 def resolve_effective_context_window(llm: LLMConfig) -> int:
     """Resolve the context window used for transcript-size gating."""
     configured_context_window = llm.context_window
     try:
-        loaded_context_window = get_loaded_context_length(llm)
+        loaded_context_window = get_loaded_context_length(llm.api_base, llm.model)
     except RuntimeError as exc:
         if configured_context_window == "auto":
             raise RuntimeError(f"context_window=auto but LM Studio ctx is unavailable: {exc}") from exc
@@ -338,45 +254,6 @@ def log_processing_start(
     eta_label = format_processing_eta(start_time, completed_count, total)
     worker_prefix = f"{format_worker_progress_label(worker_id, worker_count)} " if worker_count > 1 else ""
     logger.info(f"{worker_prefix}Processing [{item_number}/{total} {item_number / total * 100:.1f}%] [ETA {eta_label}] ... {rel_path}")
-
-
-def collect_pending_files(
-    cleaned_dir: Path,
-    summaries_dir: Path,
-    channel_filter: str,
-) -> tuple[list[tuple[Path, Path]], int, int, int]:
-    """Scan for transcript files and partition into pending/done/empty."""
-    txt_files = FSUtil.find_files_by_extension(cleaned_dir, ".txt", recursive=True)
-    txt_files = [f for f in txt_files if not f.name.startswith("._")]
-    if channel_filter:
-        txt_files = [f for f in txt_files if f.parent.name == channel_filter]
-
-    pending: list[tuple[Path, Path]] = []
-    already_done = 0
-    empty_files = 0
-
-    for txt_file in txt_files:
-        channel_name = txt_file.parent.name
-        output_file = summaries_dir / channel_name / (txt_file.stem + ".md")
-
-        if output_file.exists():
-            already_done += 1
-            continue
-
-        content = FSUtil.read_text_file(txt_file)
-        if not content.strip():
-            empty_files += 1
-            continue
-
-        pending.append((txt_file, output_file))
-
-    pending_per_channel: dict[str, int] = {}
-    for txt_file, _ in pending:
-        pending_per_channel[txt_file.parent.name] = pending_per_channel.get(txt_file.parent.name, 0) + 1
-
-    pending.sort(key=lambda pair: (pending_per_channel[pair[0].parent.name], pair[0].parent.name, pair[0].name))
-
-    return pending, len(txt_files), already_done, empty_files
 
 
 def record_process_result(

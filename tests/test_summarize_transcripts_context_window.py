@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import logging
 from pathlib import Path
 from typing import Any, Literal
@@ -37,48 +36,12 @@ def make_llm(*, context_window: int | Literal["auto"] = "auto") -> LLMConfig:
     )
 
 
-class FakeResponse:
-    def __init__(self, payload: dict[str, Any]) -> None:
-        self._payload = payload
-
-    def __enter__(self) -> FakeResponse:
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        return None
-
-    def read(self) -> bytes:
-        return json.dumps(self._payload).encode("utf-8")
-
-
-def test_get_loaded_context_length_reads_lm_studio_loaded_context() -> None:
-    module = load_summarize_transcripts_module()
-
-    def fake_urlopen(url: str, timeout: int) -> FakeResponse:
-        assert url == "http://127.0.0.1:1234/api/v0/models"
-        assert timeout == 10
-        return FakeResponse(
-            {
-                "data": [
-                    {
-                        "id": "qwen/qwen3.6-35b-a3b",
-                        "state": "loaded",
-                        "max_context_length": 262144,
-                        "loaded_context_length": 8618,
-                    }
-                ]
-            }
-        )
-
-    module.urlopen = fake_urlopen
-
-    assert module.get_loaded_context_length(make_llm()) == 8618
-
-
 def test_auto_context_window_uses_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_summarize_transcripts_module()
 
-    def loaded(_: LLMConfig) -> int:
+    def loaded(api_base: str | None, model: str) -> int:
+        assert api_base == "http://127.0.0.1:1234/v1"
+        assert model == "openai/qwen/qwen3.6-35b-a3b"
         return 8618
 
     monkeypatch.setattr(module, "get_loaded_context_length", loaded)
@@ -89,7 +52,7 @@ def test_auto_context_window_uses_loaded_context(monkeypatch: pytest.MonkeyPatch
 def test_numeric_context_window_uses_larger_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_summarize_transcripts_module()
 
-    def loaded(_: LLMConfig) -> int:
+    def loaded(api_base: str | None, model: str) -> int:
         return 8618
 
     monkeypatch.setattr(module, "get_loaded_context_length", loaded)
@@ -100,7 +63,7 @@ def test_numeric_context_window_uses_larger_loaded_context(monkeypatch: pytest.M
 def test_numeric_context_window_rejects_loaded_context_that_is_smaller(monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_summarize_transcripts_module()
 
-    def loaded(_: LLMConfig) -> int:
+    def loaded(api_base: str | None, model: str) -> int:
         return 4096
 
     monkeypatch.setattr(module, "get_loaded_context_length", loaded)
@@ -115,7 +78,7 @@ def test_numeric_context_window_warns_and_uses_config_when_metadata_unavailable(
 ) -> None:
     module = load_summarize_transcripts_module()
 
-    def fail(_: LLMConfig) -> int:
+    def fail(api_base: str | None, model: str) -> int:
         raise RuntimeError("metadata unavailable")
 
     monkeypatch.setattr(module, "get_loaded_context_length", fail)
@@ -127,7 +90,7 @@ def test_numeric_context_window_warns_and_uses_config_when_metadata_unavailable(
 def test_auto_context_window_rejects_missing_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
     module = load_summarize_transcripts_module()
 
-    def fail(_: LLMConfig) -> int:
+    def fail(api_base: str | None, model: str) -> int:
         raise RuntimeError("metadata unavailable")
 
     monkeypatch.setattr(module, "get_loaded_context_length", fail)
