@@ -11,6 +11,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 2026-06
 
+### 2026-06-21
+
+#### Added
+
+- Added `articles-compile` justfile target to stage source Markdown into Nuxt content for the newspaper frontend.
+
+#### Changed
+
+- `summarize-transcripts` ETA now uses overall run progress instead of a sliding median for more stable estimates.
+
+#### Fixed
+
+- `summarize-transcripts` now raises an error when the LLM response is empty after stripping think tags.
+
+---
+
 ### 2026-06-20
 
 #### Changed
