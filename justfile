@@ -90,13 +90,14 @@ help:
     @printf "  %-38s %s\n" "urls-cleancontent" "Convert downloaded raw URL content into cleaned Markdown"
     @echo ""
     @printf "\033[0;33mNewspaper-Pipeline:\033[0m\n"
-    @printf "  %-38s %s\n" "notebooks" "Launch Jupyter notebook server"
-    @printf "  %-38s %s\n" "compile-articles" "Compile markdown articles into articles.js"
+    @printf "  %-38s %s\n" "articles-generate" "Generate articles from the document base"
+    @printf "  %-38s %s\n" "articles-compile" "Validate and stage newspaper articles for Nuxt"
     @printf "  %-38s %s\n" "newspaper-generate" "Generate static newspaper website"
     @printf "  %-38s %s\n" "newspaper-serve" "Run newspaper development server"
     @printf "  %-38s %s\n" "newspaper-destroy" "Clean up generated newspaper files"
     @echo ""
     @printf "\033[0;33mAnalytics:\033[0m\n"
+    @printf "  %-38s %s\n" "notebooks" "Launch Jupyter notebook server (analysis notebooks)"
     @printf "  %-38s %s\n" "analytics" "Full research digest (index + themes + timeline; no LLM)"
     @printf "  %-38s %s\n" "analytics-index" "Build corpus index from cleaned transcripts + summaries"
     @printf "  %-38s %s\n" "analytics-themes" "Theme frequency + TF-IDF term report"
@@ -592,6 +593,12 @@ audio-hours:
     @uv run scripts/audio-hours.py
     @echo ""
 
+# Generate articles from the document base
+articles-generate:
+    @echo ""
+    @echo "TODO generate articles from document base"
+    @echo ""
+
 # Launch Jupyter notebook server
 notebooks:
     #!/usr/bin/env bash
@@ -616,11 +623,12 @@ notebooks:
     uv run jupyter notebook --no-browser --NotebookApp.token='' --NotebookApp.password='' notebooks/
     echo ""
 
-# Compile markdown articles into articles.js
-compile-articles:
+# Validate and stage newspaper articles for Nuxt
+articles-compile:
     @echo ""
-    @printf "\033[0;34m=== Compiling Articles ===\033[0m\n"
+    @printf "\033[0;34m=== Compiling Newspaper Articles ===\033[0m\n"
     @uv run scripts/compile_articles.py
+    @printf "\033[0;32m✓ Newspaper articles staged successfully\033[0m\n"
     @echo ""
 
 # Generate static newspaper website
@@ -630,12 +638,8 @@ newspaper-generate:
     echo ""
     printf "\033[0;34m=== Generating Newspaper Website ===\033[0m\n"
 
-    # Validate articles directory using config
-    uv run scripts/validate_articles_dir.py
-
-    # Preprocess markdown articles (extract YAML frontmatter only)
-    echo "Preprocessing markdown articles..."
-    uv run scripts/preprocess_articles.py
+    # Validate and stage markdown articles for Nuxt
+    just articles-compile
 
     # Install npm dependencies if needed
     if [ ! -d "frontend/newspaper/node_modules" ]; then
@@ -663,8 +667,8 @@ newspaper-serve:
     echo ""
     printf "\033[0;34m=== Starting Newspaper Development Server ===\033[0m\n"
 
-    # Validate articles directory using config
-    uv run scripts/validate_articles_dir.py
+    # Validate and stage markdown articles for Nuxt
+    just articles-compile
 
     # Check if port 12000 is available
     if lsof -Pi :12000 -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -673,10 +677,6 @@ newspaper-serve:
         echo "  You can find the process with: lsof -i :12000"
         exit 1
     fi
-
-    # Preprocess markdown articles (extract YAML frontmatter only)
-    echo "Preprocessing markdown articles..."
-    uv run scripts/preprocess_articles.py
 
     # Install npm dependencies if needed
     if [ ! -d "frontend/newspaper/node_modules" ]; then

@@ -200,6 +200,7 @@ just help
 #### Development
 - `just init` - Initialize development environment
 - `just pipelines-all` - Run the full URL and video pipelines end to end
+- `just articles-compile` - Validate and stage newspaper articles for Nuxt
 - `just newspaper-generate` - Generate static newspaper website from articles data
 - `just newspaper-serve` - Run newspaper development server at http://localhost:12000
 - `just test` - Run unit tests
@@ -1018,11 +1019,10 @@ just newspaper-generate
 ```
 
 This command will:
-1. Validate the article markdown directory (`scripts/validate_articles_dir.py`)
-2. Preprocess the article markdown into `frontend/newspaper/content/articles/` (`scripts/preprocess_articles.py`)
-3. Install npm dependencies (if not already installed)
-4. Run `npm run generate` to build the static site
-5. Copy the generated files from `frontend/newspaper/.output/public/` to `data/output/newspaper/`
+1. Run `just articles-compile` to validate source Markdown, stage Nuxt articles, and write `content/layout.json`
+2. Install npm dependencies (if not already installed)
+3. Run `npm run generate` to build the static site
+4. Copy the generated files from `frontend/newspaper/.output/public/` to `data/output/newspaper/`
 
 The final static website will be available at `data/output/newspaper/` and can be deployed to any static hosting service.
 
@@ -1059,7 +1059,7 @@ This project is in active development. Current implementation status:
 - ✅ Transcript summarization with local LLM (`scripts/summarize-transcripts.py`, `just summarize-transcripts`)
 - ✅ Transcript summary analytics — corpus index, TF-IDF themes, timeline, research digest (`src/analytics/`, `just analytics`)
 - ✅ HTML newspaper frontend (Nuxt + `@nuxt/content`, `frontend/newspaper/`)
-- ✅ Python-to-frontend data pipeline — `scripts/preprocess_articles.py` copies article frontmatter into `frontend/newspaper/content/articles/`, rendered by the Nuxt frontend via `@nuxt/content` (`just newspaper-generate`)
+- ✅ Python-to-frontend data pipeline — `just articles-compile` validates source Markdown, stages generated Nuxt articles, and writes `frontend/newspaper/content/layout.json`
 - 🚧 Article generation — the automated authoring of newspaper article markdown from transcript summaries is not yet wired up. Summarization (`just summarize-transcripts`) works, and hand-authored article markdown in `data/input/newspaper/articles/` is rendered by the frontend, but the transcripts→articles synthesis step in between is not automated.
 
 __Known Issues / TODO__
