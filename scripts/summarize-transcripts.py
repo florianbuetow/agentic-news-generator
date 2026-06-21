@@ -99,6 +99,11 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
             max_tokens=max_tokens,
             temperature=llm.temperature,
             timeout=llm.request_timeout_seconds,
+            # Disable the OpenAI SDK's silent internal retries (default 2). They log
+            # "Retrying request ..." at INFO but the failure reason only at DEBUG, so
+            # each failure surfaces with no cause. With 0, every failure propagates to
+            # our retry loop below, which logs the reason on each attempt.
+            max_retries=0,
         )
     except Timeout as e:
         raise RuntimeError(f"LLM request timed out after {llm.request_timeout_seconds}s") from e
@@ -207,8 +212,10 @@ def process_single_file(
         except ContextSizeExceededError as e:
             raise ContextSizeExceededError(f"context exceeded; prompt={prompt_tokens:,}, ctx={effective_context_window:,}") from e
         except Exception as exc:
-            logger.error(f"{txt_file.name}: attempt {attempt}/{llm.max_retries} failed: {exc}")
-            if attempt == llm.max_retries:
+            will_retry = attempt < llm.max_retries
+            retry_note = f"; retrying in {llm.retry_delay}s" if will_retry else ""
+            logger.error(f"{txt_file.name}: attempt {attempt}/{llm.max_retries} failed: {exc}{retry_note}")
+            if not will_retry:
                 raise
             time.sleep(llm.retry_delay)
 

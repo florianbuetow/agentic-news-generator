@@ -172,6 +172,23 @@ def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
     assert captured["timeout"] == 30.0
 
 
+def test_call_llm_disables_client_internal_retries(monkeypatch: Any) -> None:
+    """call_llm must disable the OpenAI client's silent internal retries so each failure reaches our retry loop and is logged."""
+    module = load_summarize_module()
+
+    captured: dict[str, Any] = {}
+
+    def fake_completion(**kwargs: Any) -> MagicMock:
+        captured.update(kwargs)
+        return _fake_litellm_response("a summary")
+
+    monkeypatch.setattr(module.litellm, "completion", fake_completion)
+
+    module.call_llm("test prompt", _make_llm_config(), 512)
+
+    assert captured["max_retries"] == 0
+
+
 def test_call_llm_raises_descriptive_error_on_timeout(monkeypatch: Any) -> None:
     """call_llm must surface a clear timeout error instead of an opaque client exception."""
     module = load_summarize_module()
@@ -220,3 +237,44 @@ def test_process_single_file_does_not_write_empty_file_when_llm_returns_only_thi
         module.process_single_file(txt_file, output_file, "{transcript}", _make_llm_config(), encoder, 8192, 80)
 
     assert not output_file.exists()
+
+
+def test_process_single_file_logs_reason_when_retrying(tmp_path: Path, monkeypatch: Any, caplog: Any) -> None:
+    """A failed attempt that will be retried must log the failure reason and the retry, not retry silently."""
+    module = load_summarize_module()
+
+    txt_file = tmp_path / "channel" / "video.txt"
+    txt_file.parent.mkdir(parents=True)
+    txt_file.write_text("Full transcript text here.", encoding="utf-8")
+    output_file = tmp_path / "out" / "video.md"
+
+    calls = {"count": 0}
+
+    def flaky_completion(**_: object) -> MagicMock:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("connection refused by LM Studio")
+        return _fake_litellm_response("a summary")
+
+    monkeypatch.setattr(module.litellm, "completion", flaky_completion)
+
+    encoder = tiktoken.get_encoding("cl100k_base")
+
+    llm = LLMConfig(
+        model="test/model",
+        api_base=None,
+        api_key="test",
+        context_window=8192,
+        max_tokens=512,
+        temperature=0.0,
+        context_window_threshold=80,
+        max_retries=2,
+        retry_delay=0.01,
+    )
+
+    with caplog.at_level(logging.ERROR):
+        status, _ = module.process_single_file(txt_file, output_file, "{transcript}", llm, encoder, 8192, 80)
+
+    assert status == "ok"
+    assert "connection refused by LM Studio" in caplog.text
+    assert "retrying in" in caplog.text
