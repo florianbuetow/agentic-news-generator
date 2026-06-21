@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -82,6 +83,33 @@ def test_process_pending_parallelism_one_collects_failures(tmp_path: Path, monke
     assert processed == ["0.txt", "1.txt", "2.txt"]
 
 
+def test_process_pending_logs_each_failure_with_its_reason(tmp_path: Path, monkeypatch: Any, caplog: Any) -> None:
+    """The end-of-run summary must name each failed file and its reason, not just a count."""
+    module = load_summarize_module()
+
+    def fake_process_single_file(
+        txt_file: Path,
+        output_file: Path,
+        prompt_template: str,
+        llm: object,
+        encoder: object,
+        effective_context_window: int,
+        skip_threshold_pct: int,
+    ) -> tuple[str, None]:
+        if txt_file.name == "1.txt":
+            raise RuntimeError("APITimeoutError: request to /chat/completions timed out")
+        return "ok", None
+
+    monkeypatch.setattr(module, "process_single_file", fake_process_single_file)
+
+    with caplog.at_level(logging.ERROR):
+        rc = module.process_pending(pending_files(tmp_path, 3), "", None, None, 8192, 80, 1)
+
+    assert rc == 1
+    assert "channel/1.txt" in caplog.text
+    assert "APITimeoutError: request to /chat/completions timed out" in caplog.text
+
+
 def _make_llm_config() -> LLMConfig:
     return LLMConfig(
         model="test/model",
@@ -111,6 +139,36 @@ def _think_only_completion(**_: object) -> MagicMock:
 
 def _empty_completion(**_: object) -> MagicMock:
     return _fake_litellm_response("")
+
+
+def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
+    """call_llm must forward the configured request timeout so requests don't hang on litellm's default."""
+    module = load_summarize_module()
+
+    captured: dict[str, Any] = {}
+
+    def fake_completion(**kwargs: Any) -> MagicMock:
+        captured.update(kwargs)
+        return _fake_litellm_response("a summary")
+
+    monkeypatch.setattr(module.litellm, "completion", fake_completion)
+
+    llm = LLMConfig(
+        model="test/model",
+        api_base=None,
+        api_key="test",
+        context_window=8192,
+        max_tokens=512,
+        temperature=0.0,
+        context_window_threshold=80,
+        max_retries=1,
+        retry_delay=0.01,
+        request_timeout_seconds=30.0,
+    )
+
+    module.call_llm("test prompt", llm, 512)
+
+    assert captured["timeout"] == 30.0
 
 
 def test_call_llm_raises_when_llm_returns_empty_response(monkeypatch: Any) -> None:

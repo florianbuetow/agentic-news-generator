@@ -98,6 +98,7 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
             api_key=llm.api_key,
             max_tokens=max_tokens,
             temperature=llm.temperature,
+            timeout=llm.request_timeout_seconds,
         )
     except BadRequestError as e:
         error_msg = str(e)
@@ -421,7 +422,10 @@ def process_pending(
         logger.warning(f"Oversized skipped: {len(oversized_files)} file(s); limit={skip_threshold_pct}% of worker context")
 
     if failures:
-        logger.error(f"Failures: {len(failures)} file(s)")
+        logger.error("")
+        logger.error("--- Failure Summary ---")
+        for failed_path, reason in failures:
+            logger.error(f"❌ {failed_path}: {reason}")
         return 1
 
     return 0

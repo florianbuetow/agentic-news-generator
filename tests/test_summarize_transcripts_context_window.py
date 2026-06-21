@@ -298,10 +298,11 @@ def test_record_process_result_only_updates_counts_and_collections(caplog: pytes
     assert caplog.records == []
 
 
-def test_final_summary_counts_do_not_repeat_filenames(
+def test_final_summary_details_failures_but_counts_oversized_skips(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Failures must be listed with file and reason; oversized skips stay an aggregate count."""
     module = load_summarize_transcripts_module()
 
     caplog.set_level(logging.INFO)
@@ -336,11 +337,16 @@ def test_final_summary_counts_do_not_repeat_filenames(
 
     assert rc == 1
 
-    summary_messages = [
-        record.message for record in caplog.records if record.message.startswith(("Summary:", "Oversized skipped:", "Failures:"))
-    ]
-    assert summary_messages == [
-        "Summary: pending=2, summarized=0, skipped=1, failed=1",
-        "Oversized skipped: 1 file(s); limit=80% of worker context",
-        "Failures: 1 file(s)",
-    ]
+    messages = [record.message for record in caplog.records]
+
+    # Aggregate counts and the oversized skip stay as counts.
+    assert "Summary: pending=2, summarized=0, skipped=1, failed=1" in messages
+    assert "Oversized skipped: 1 file(s); limit=80% of worker context" in messages
+
+    # Failures are listed individually with the file path and the reason.
+    assert "--- Failure Summary ---" in messages
+    assert "❌ channel/fail.txt: boom" in messages
+
+    # The oversized skip is summarized as a count, not relisted by filename in the end-of-run summary.
+    summary_section = messages[messages.index("Summary: pending=2, summarized=0, skipped=1, failed=1") :]
+    assert not any("large.txt" in message for message in summary_section)
