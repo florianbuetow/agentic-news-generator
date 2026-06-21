@@ -143,7 +143,7 @@ summarize_transcripts:
     context_window_threshold: 90
     max_retries: 3
     retry_delay: 2.0
-    request_timeout_seconds: 900.0
+    request_timeout_seconds: 1800.0
 
 # URL Clean Content Configuration
 url_clean_content:
