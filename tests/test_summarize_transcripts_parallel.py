@@ -11,6 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import tiktoken
+from litellm.exceptions import Timeout
 
 from src.config import LLMConfig
 
@@ -169,6 +170,19 @@ def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
     module.call_llm("test prompt", llm, 512)
 
     assert captured["timeout"] == 30.0
+
+
+def test_call_llm_raises_descriptive_error_on_timeout(monkeypatch: Any) -> None:
+    """call_llm must surface a clear timeout error instead of an opaque client exception."""
+    module = load_summarize_module()
+
+    def timing_out_completion(**_: object) -> MagicMock:
+        raise Timeout(message="request timed out", model="test/model", llm_provider="openai")
+
+    monkeypatch.setattr(module.litellm, "completion", timing_out_completion)
+
+    with pytest.raises(RuntimeError, match="timed out after"):
+        module.call_llm("test prompt", _make_llm_config(), 512)
 
 
 def test_call_llm_raises_when_llm_returns_empty_response(monkeypatch: Any) -> None:

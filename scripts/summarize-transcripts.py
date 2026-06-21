@@ -14,7 +14,7 @@ from pathlib import Path
 
 import litellm
 import tiktoken
-from litellm.exceptions import BadRequestError
+from litellm.exceptions import BadRequestError, Timeout
 
 from src.config import Config, LLMConfig, SummarizeTranscriptsConfig
 from src.summarize.lm_studio_client import get_loaded_context_length
@@ -100,6 +100,8 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
             temperature=llm.temperature,
             timeout=llm.request_timeout_seconds,
         )
+    except Timeout as e:
+        raise RuntimeError(f"LLM request timed out after {llm.request_timeout_seconds}s") from e
     except BadRequestError as e:
         error_msg = str(e)
         if "No models loaded" in error_msg:
@@ -204,7 +206,8 @@ def process_single_file(
             break
         except ContextSizeExceededError as e:
             raise ContextSizeExceededError(f"context exceeded; prompt={prompt_tokens:,}, ctx={effective_context_window:,}") from e
-        except Exception:
+        except Exception as exc:
+            logger.error(f"{txt_file.name}: attempt {attempt}/{llm.max_retries} failed: {exc}")
             if attempt == llm.max_retries:
                 raise
             time.sleep(llm.retry_delay)
