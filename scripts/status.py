@@ -287,10 +287,24 @@ def _print_stat_row(
     print(" ".join(parts))
 
 
+def _channel_display_label(channel_name: str, category_by_channel: dict[str, str] | None) -> str:
+    """Return the label to show for a channel row.
+
+    When ``category_by_channel`` is provided (privacy mode), the channel's
+    category is shown in upper case instead of its name. Channels without a
+    category mapping render as ``UNKNOWN`` so channel names never leak.
+    """
+    if category_by_channel is None:
+        return channel_name
+    category = category_by_channel.get(channel_name)
+    return category.upper() if category else "UNKNOWN"
+
+
 def main() -> int:  # noqa: C901
     """Main entry point."""
     update_cache = "--no-update-cache" not in sys.argv
     show_time = "--show-time" in sys.argv
+    privacy = "--privacy" in sys.argv
 
     # Load configuration
     project_root = Path(__file__).parent.parent
@@ -404,19 +418,23 @@ def main() -> int:  # noqa: C901
     print("=" * line_width)
     print()
 
+    # In privacy mode, label rows by uppercase category instead of channel name.
+    category_by_channel = {channel.name: channel.category for channel in config.get_channels()} if privacy else None
+
     # Print two-row header
     print(f"{'':>{channel_width}} {header_row1}")
-    print(f"{'Channel':<{channel_width}} {header_row2}")
+    print(f"{('Category' if privacy else 'Channel'):<{channel_width}} {header_row2}")
     print("-" * line_width)
 
     prev_channels: dict[str, dict[str, int]] = previous.get("channels", {}) if previous else {}
 
-    for channel_name in sorted(channel_stats.keys()):
+    for channel_name in sorted(channel_stats.keys(), key=lambda name: (_channel_display_label(name, category_by_channel), name)):
         s = channel_stats[channel_name]
         denom = _completion_denominator(int(s["transcripts"]), int(s["videos_active"]), int(s["audio"]))
         completion_pct = (s["summaries"] / denom * 100) if denom > 0 else 0.0
         size_gb = float(s["total_size_bytes"]) / (1024**3)
-        display_name = channel_name[:channel_width] if len(channel_name) > channel_width else channel_name
+        label = _channel_display_label(channel_name, category_by_channel)
+        display_name = label[:channel_width] if len(label) > channel_width else label
         prev_ch: dict[str, int] | None = prev_channels.get(channel_name)
         channel_time_label = _format_seconds_as_dhm(channel_time_seconds.get(channel_name, 0)) if show_time else ""
         _print_stat_row(

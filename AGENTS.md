@@ -23,6 +23,7 @@ For coding conventions, git rules, and project standards, see [`CONVENTIONS.md`]
 - For the shell script classification model performance analysis, see [`reports/analysis/shellscript_analyzer/shellscript_analyzer.md`](reports/analysis/shellscript_analyzer/shellscript_analyzer.md)
 
 ### Operations
+- For searching the transcript corpora with the find/search/research targets, see [`HOW-TO-SEARCH.md`](HOW-TO-SEARCH.md)
 - For diagnostic scripts and failure playbooks, see [`TROUBLESHOOTING-GUIDE.md`](TROUBLESHOOTING-GUIDE.md)
 - For the procedure to archive stale code and its data artifacts, see [`ARCHIVE-GUIDE.md`](ARCHIVE-GUIDE.md)
 
