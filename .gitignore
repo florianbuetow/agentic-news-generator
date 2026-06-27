@@ -225,6 +225,7 @@ config/filefilter.json
 **/settings.local.json
 
 # Documentation files
+docs/
 docs/superpowers/
 docs/plans/
 
