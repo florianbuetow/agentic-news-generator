@@ -19,6 +19,7 @@ _TIMEOUT_SECONDS = 5
 
 _GREEN = "\033[32m"
 _RED = "\033[31m"
+_YELLOW = "\033[33m"
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
 
@@ -97,22 +98,25 @@ def _canonical_base(api_base: str) -> str:
 
 @dataclass(frozen=True)
 class ModelIndex:
-    """Available and loaded model sets from /api/v0/models."""
+    """Per-instance state from /api/v0/models, keyed by full model id.
 
-    available: set[str]
-    loaded: set[str]
+    The keys are the verbatim LM Studio ids, so duplicate instances of the same
+    model (which LM Studio suffixes with ':N', e.g. 'qwen/qwen3.6-35b-a3b:2')
+    are kept distinct rather than collapsed together.
+    """
+
+    states: dict[str, str]
 
 
 def get_model_index(api_base: str) -> ModelIndex | None:
-    """GET /api/v0/models — available = all downloaded, loaded = state=='loaded'. None if unreachable."""
+    """GET /api/v0/models — map each model id (incl. ':N' duplicate instances) to its state. None if unreachable."""
     base = _strip_v1(api_base)
     data = _fetch_json(f"{base}/api/v0/models")
     if data is None:
         return None
     items = data.get("data", [])
-    available = {m["id"] for m in items}
-    loaded = {m["id"] for m in items if m.get("state") == "loaded"}
-    return ModelIndex(available=available, loaded=loaded)
+    states = {m["id"]: str(m.get("state", "unknown")) for m in items}
+    return ModelIndex(states=states)
 
 
 def _model_matches(model: str, model_set: set[str]) -> bool:
@@ -120,6 +124,18 @@ def _model_matches(model: str, model_set: set[str]) -> bool:
         return True
     short = model.split("/")[-1] if "/" in model else model
     return any(short in mid for mid in model_set)
+
+
+def _matching_instances(model: str, states: dict[str, str]) -> list[str]:
+    """Every LM Studio instance id that corresponds to a configured model id.
+
+    Reuses the prefix-tolerant matching of ``_model_matches`` (an exact id, or the
+    model's short name as a substring — which is how the configured ``openai/``
+    prefix is matched against LM Studio's prefix-free id), but returns each
+    matching instance separately so duplicate ':N' instances are surfaced rather
+    than collapsed into a single yes/no.
+    """
+    return sorted(mid for mid in states if _model_matches(model, {mid}))
 
 
 def _vlen(s: str) -> int:
@@ -141,31 +157,53 @@ def _yn(flag: bool) -> str:
     return f"{_GREEN}yes{_RESET}" if flag else f"{_RED}-{_RESET}"
 
 
-def _print_table(rows: list[tuple[str, str, bool, bool]]) -> None:
-    """Print ASCII table. rows = (section, model, available, loaded)."""
-    c0 = max((len(s) for s, _, _, _ in rows), default=10)
-    c0 = max(c0, 10)  # "Config Key"
-    c1 = max((len(m) for _, m, _, _ in rows), default=5)
-    c1 = max(c1, 5)  # "Model"
-    c2 = 9  # "Available"
-    c3 = 6  # "Loaded"
+def _state_cell(state: str | None) -> str:
+    """Colourise an LM Studio per-instance state. None means no matching instance."""
+    if state is None:
+        return f"{_RED}-{_RESET}"
+    if state == "loaded":
+        return f"{_GREEN}loaded{_RESET}"
+    if state == "loading":
+        return f"{_YELLOW}loading{_RESET}"
+    return f"{_RED}{state}{_RESET}"
 
-    top = f"┌{'─' * (c0 + 2)}┬{'─' * (c1 + 2)}┬{'─' * (c2 + 2)}┬{'─' * (c3 + 2)}┐"
-    sep = f"├{'─' * (c0 + 2)}┼{'─' * (c1 + 2)}┼{'─' * (c2 + 2)}┼{'─' * (c3 + 2)}┤"
-    bottom = f"└{'─' * (c0 + 2)}┴{'─' * (c1 + 2)}┴{'─' * (c2 + 2)}┴{'─' * (c3 + 2)}┘"
 
-    def row(sec: str, m: str, a: str, ld: str) -> str:
-        return f"│ {_cell(sec, c0)} │ {_cell(m, c1)} │ {_cell(a, c2, '^')} │ {_cell(ld, c3, '^')} │"
+def _print_table(rows: list[tuple[str, str, str, bool, str | None]]) -> None:
+    """Print ASCII table. rows = (section, config model, instance id, available, state)."""
+    c0 = max(max((len(s) for s, _, _, _, _ in rows), default=10), 10)  # "Config Key"
+    c1 = max(max((len(m) for _, m, _, _, _ in rows), default=5), 5)  # "Model"
+    c2 = max(max((len(i) for _, _, i, _, _ in rows), default=8), 8)  # "Instance"
+    c3 = 9  # "Available"
+    c4 = max(max((len(st) for _, _, _, _, st in rows if st), default=5), 5)  # "State"
+
+    top = f"┌{'─' * (c0 + 2)}┬{'─' * (c1 + 2)}┬{'─' * (c2 + 2)}┬{'─' * (c3 + 2)}┬{'─' * (c4 + 2)}┐"
+    sep = f"├{'─' * (c0 + 2)}┼{'─' * (c1 + 2)}┼{'─' * (c2 + 2)}┼{'─' * (c3 + 2)}┼{'─' * (c4 + 2)}┤"
+    bottom = f"└{'─' * (c0 + 2)}┴{'─' * (c1 + 2)}┴{'─' * (c2 + 2)}┴{'─' * (c3 + 2)}┴{'─' * (c4 + 2)}┘"
+
+    def row(sec: str, m: str, inst: str, a: str, st: str) -> str:
+        return f"│ {_cell(sec, c0)} │ {_cell(m, c1)} │ {_cell(inst, c2)} │ {_cell(a, c3, '^')} │ {_cell(st, c4, '^')} │"
 
     print(top)
-    print(row(f"{_BOLD}Config Key{_RESET}", f"{_BOLD}Model{_RESET}", f"{_BOLD}Available{_RESET}", f"{_BOLD}Loaded{_RESET}"))
+    print(
+        row(
+            f"{_BOLD}Config Key{_RESET}",
+            f"{_BOLD}Model{_RESET}",
+            f"{_BOLD}Instance{_RESET}",
+            f"{_BOLD}Available{_RESET}",
+            f"{_BOLD}State{_RESET}",
+        )
+    )
     print(sep)
-    for section, model, avail, loaded in rows:
-        print(row(section, model, _yn(avail), _yn(loaded)))
+    prev_key: tuple[str, str] | None = None
+    for section, model, instance, avail, state in rows:
+        key = (section, model)
+        first = key != prev_key
+        print(row(section if first else "", model if first else "", instance, _yn(avail), _state_cell(state)))
+        prev_key = key
     print(bottom)
 
 
-def _check_base(api_base: str, entries: list[RequiredModel]) -> tuple[bool, list[tuple[str, str, bool, bool]]]:
+def _check_base(api_base: str, entries: list[RequiredModel]) -> tuple[bool, list[tuple[str, str, str, bool, str | None]]]:
     print(f"\n  LM Studio: {api_base}")
 
     index = get_model_index(api_base)
@@ -175,13 +213,17 @@ def _check_base(api_base: str, entries: list[RequiredModel]) -> tuple[bool, list
 
     print(f"  {_GREEN}OK{_RESET}    Server is running")
 
-    rows: list[tuple[str, str, bool, bool]] = []
+    rows: list[tuple[str, str, str, bool, str | None]] = []
+    all_available = True
     for entry in sorted(entries, key=lambda e: e.section):
-        avail = _model_matches(entry.model, index.available)
-        loaded = _model_matches(entry.model, index.loaded)
-        rows.append((entry.section, entry.model, avail, loaded))
+        instances = _matching_instances(entry.model, index.states)
+        if not instances:
+            all_available = False
+            rows.append((entry.section, entry.model, "-", False, None))
+            continue
+        rows.extend((entry.section, entry.model, instance, True, index.states[instance]) for instance in instances)
 
-    return all(avail for _, _, avail, _ in rows), rows
+    return all_available, rows
 
 
 def main() -> int:
@@ -203,7 +245,7 @@ def main() -> int:
         bases.setdefault(_canonical_base(rm.api_base), []).append(rm)
 
     all_ok = True
-    all_rows: list[tuple[str, str, bool, bool]] = []
+    all_rows: list[tuple[str, str, str, bool, str | None]] = []
     for api_base, entries in sorted(bases.items()):
         ok, rows = _check_base(api_base, entries)
         if not ok:
