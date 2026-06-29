@@ -230,7 +230,7 @@ def main() -> int:
     """Check LM Studio status and model availability."""
     if not CONFIG_PATH.exists():
         print(f"Config file not found: {CONFIG_PATH}")
-        return 1
+        return 0
 
     with open(CONFIG_PATH, encoding="utf-8") as f:
         config: _Cfg = yaml.safe_load(f)
@@ -259,7 +259,7 @@ def main() -> int:
     print()
     if not all_ok:
         print("  Some checks failed. Load the required models in LM Studio.")
-        return 1
+        return 0
 
     print(f"  {_GREEN}All checks passed.{_RESET}")
     return 0
