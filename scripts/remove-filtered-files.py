@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 from src.config import Config
@@ -126,13 +127,31 @@ def _print_targets(targets: list[tuple[str, str, str, Path]], mode_label: str) -
     return total_bytes
 
 
+def _unlink_either_norm(path: Path) -> None:
+    """Unlink ``path``, retrying with the NFC form of its name on ``ENOENT``.
+
+    The data drive is exFAT via macOS FSKit, which does no filename
+    normalization. ``iterdir()`` hands back directory entries in NFD, but
+    ``unlink`` matches only the exact bytes the file was created with — NFD for
+    ffmpeg-written ``.wav`` files, NFC for yt-dlp-written videos. ``stat``
+    resolves either form (so the listing always succeeds), so try the
+    discovered (NFD) path first and fall back to the NFC form. On a
+    normalization-insensitive filesystem (APFS/HFS+) the first attempt always
+    succeeds and the fallback never runs.
+    """
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        path.with_name(unicodedata.normalize("NFC", path.name)).unlink()
+
+
 def _delete_targets(targets: list[tuple[str, str, str, Path]]) -> tuple[int, int]:
     """Unlink every target path, returning ``(deleted, failed)`` counts."""
     deleted = 0
     failed = 0
     for _, _, _, path in targets:
         try:
-            path.unlink()
+            _unlink_either_norm(path)
             deleted += 1
         except OSError as exc:
             print(f"FAIL: {path}: {exc}", file=sys.stderr)
