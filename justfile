@@ -66,7 +66,7 @@ help:
     @printf "  %-38s %s\n" "url-all" "Run the full URL pipeline (fetch, download, clean)"
     @printf "  %-38s %s\n" "checks-all" "Run all checks and CI"
     @printf "  %-38s %s\n" "maintenance" "Run all read-only data pipeline health checks"
-    @printf "  %-38s %s\n" "stats [hour|day] [private]" "Show processing status (throttle: hour/day; 'private' hides channel names behind category)"
+    @printf "  %-38s %s\n" "stats [hour|day] [private] [mismatch]" "Show processing status (throttle: hour/day; 'private' hides channel names; 'mismatch' shows only rows where transcript counts differ)"
     @printf "  %-38s %s\n" "stats-mini" "Show condensed processing status (channels with videos or audio only)"
     @printf "  %-38s %s\n" "totals [hour|day]" "Show processing status with transcript time totals"
     @printf "  %-38s %s\n" "audio-hours" "Count total audio hours from transcripts"
@@ -513,16 +513,27 @@ status:
     @echo ""
 
 # Show processing status of downloads (channel names by default; pass 'private' to show category instead)
-stats period="" privacy="":
+stats period="" privacy="" filter="":
     #!/usr/bin/env bash
     cache_flag=""
     privacy_flag=""
-    if [[ "{{period}}" == "private" || "{{privacy}}" == "private" ]]; then
+    mismatch_flag=""
+    if [[ "{{period}}" == "private" || "{{privacy}}" == "private" || "{{filter}}" == "private" ]]; then
         privacy_flag="--privacy"
     fi
-    # "private" is a privacy switch, not a throttle period
+    if [[ "{{period}}" == "mismatch" || "{{privacy}}" == "mismatch" || "{{filter}}" == "mismatch" ]]; then
+        mismatch_flag="--mismatch"
+    fi
+    # Validate switch-only slots
+    for arg in "{{privacy}}" "{{filter}}"; do
+        if [[ -n "$arg" && "$arg" != "private" && "$arg" != "mismatch" ]]; then
+            echo "Unknown argument: '$arg'. Valid switches: 'private', 'mismatch'."
+            exit 1
+        fi
+    done
+    # "private" and "mismatch" are switches, not throttle periods
     period="{{period}}"
-    if [[ "$period" == "private" ]]; then
+    if [[ "$period" == "private" || "$period" == "mismatch" ]]; then
         period=""
     fi
     stats_from=""
@@ -549,7 +560,7 @@ stats period="" privacy="":
     fi
     clear
     echo ""
-    uv run scripts/status.py $cache_flag $privacy_flag
+    uv run scripts/status.py $cache_flag $privacy_flag $mismatch_flag
     echo ""
     if [[ -n "$stats_from" ]]; then
         printf "\033[0;90mStats from %s — diff until now (%s)\033[0m\n\n" "$stats_from" "$(date "+%Y-%m-%d %H:%M:%S")"

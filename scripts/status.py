@@ -305,6 +305,7 @@ def main() -> int:  # noqa: C901
     update_cache = "--no-update-cache" not in sys.argv
     show_time = "--show-time" in sys.argv
     privacy = "--privacy" in sys.argv
+    mismatch_only = "--mismatch" in sys.argv
 
     # Load configuration
     project_root = Path(__file__).parent.parent
@@ -430,6 +431,10 @@ def main() -> int:  # noqa: C901
 
     for channel_name in sorted(channel_stats.keys(), key=lambda name: (_channel_display_label(name, category_by_channel), name)):
         s = channel_stats[channel_name]
+        if mismatch_only:
+            t, h, c, u = int(s["transcripts"]), int(s["hall_analysis"]), int(s["cleaned_transcripts"]), int(s["summaries"])
+            if t == h == c == u:
+                continue
         denom = _completion_denominator(int(s["transcripts"]), int(s["videos_active"]), int(s["audio"]))
         completion_pct = (s["summaries"] / denom * 100) if denom > 0 else 0.0
         size_gb = float(s["total_size_bytes"]) / (1024**3)
