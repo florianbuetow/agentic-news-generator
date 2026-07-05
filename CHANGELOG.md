@@ -9,13 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## 2026-07
+
+### 2026-07-05
+
+#### Added
+
+- Added `export-files` justfile target to copy all files for a video ID into one folder.
+
+---
+
+### 2026-07-01
+
+#### Added
+
+- `just stats` now supports a `mismatch` filter showing only channels with inconsistent counts.
+
+#### Fixed
+
+- `remove-filtered-files` now deletes exFAT files whose on-disk name uses a different Unicode form.
+
+---
+
 ## 2026-06
+
+### 2026-06-29
+
+#### Changed
+
+- `just status` now lists each LM Studio model instance individually with its live state.
+- `just status` no longer exits non-zero when checks fail or the config is missing.
+
+---
+
+### 2026-06-27
+
+#### Added
+
+- Added a privacy mode to `just stats` that shows channel categories instead of names.
+
+---
 
 ### 2026-06-21
 
 #### Added
 
 - Added `articles-compile` justfile target to stage source Markdown into Nuxt content for the newspaper frontend.
+- Added a configurable LLM request timeout (default 30 minutes) for `summarize-transcripts`.
 
 #### Changed
 
@@ -24,6 +64,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Fixed
 
 - `summarize-transcripts` now raises an error when the LLM response is empty after stripping think tags.
+- `summarize-transcripts` no longer masks LLM retry and timeout failures; reasons now surface immediately.
 
 ---
 
