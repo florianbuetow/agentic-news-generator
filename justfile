@@ -128,6 +128,7 @@ help:
     @printf "  %-46s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
     @printf "  %-46s %s\n" "research \"<keywords>\"" "List transcripts & summaries matching comma-separated keywords"
     @printf "  %-46s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
+    @printf "  %-46s %s\n" "export-files <video-id> [<dest-dir>]" "Copy all files found for a video ID into a destination folder (default: ~/Downloads/export-<video-id>)"
     @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
     @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
@@ -1095,6 +1096,14 @@ find-files VIDEO_ID:
     @printf "\033[0;34m=== Finding Files for Video ID: {{ VIDEO_ID }} ===\033[0m\n"
     @echo ""
     @bash scripts/find-files.sh {{ VIDEO_ID }}
+    @echo ""
+
+# Copy all files found for a video ID into a destination folder (default: ~/Downloads/export-<video-id>)
+export-files VIDEO_ID DEST_DIR="":
+    @echo ""
+    @printf "\033[0;34m=== Exporting Files for Video ID: {{ VIDEO_ID }} ===\033[0m\n"
+    @echo ""
+    @bash scripts/export-files.sh {{ VIDEO_ID }} {{ DEST_DIR }}
     @echo ""
 
 # Check if a downloaded video has an audible, non-quiet audio track
