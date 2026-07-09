@@ -29,7 +29,8 @@ import requests
 from autogen_core.models import UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
-from src.config import Config
+from src.config import AgenticReviewConfig, Config
+from src.llm.lm_studio import LMStudioRegistry
 
 # Configure logging
 logging.basicConfig(
@@ -795,6 +796,31 @@ class FakeTestOrchestrator:
 # =============================================================================
 
 
+def resolve_review_model(review_cfg: AgenticReviewConfig) -> str:
+    """Return the first loaded review model's LM Studio id, or exit 2.
+
+    Called only from phases that talk to the LLM, so discover/extract stay offline.
+    Returns the bare LM Studio id: OpenAIChatCompletionClient forwards `model`
+    verbatim, so a litellm-style 'openai/' prefix would 404 here.
+    """
+    base_url = review_cfg.llm.base_url
+    if not check_api_available(base_url):
+        print(f"\n⚠️  WARNING: Cannot connect to LLM API at {base_url}")
+        print("Please ensure:")
+        print("  1. LM Studio (or your LLM server) is running")
+        print("  2. The server is accessible at the configured base URL")
+        print(f"  3. The API endpoint {base_url}/models is reachable")
+        print("\nCannot run the script without an available model API.")
+        sys.exit(2)
+
+    try:
+        registry = LMStudioRegistry.fetch(base_url)
+        return registry.resolve_first_loaded(review_cfg.llm.models, min_context_window=None).lm_studio_id
+    except (ValueError, RuntimeError) as exc:
+        print(f"\n⚠️  {exc}")
+        sys.exit(2)
+
+
 def main():
     """Main entry point for fake test detector."""
     parser = argparse.ArgumentParser(description="Detect fraudulent unit tests using AI (Autogen v0.7.5)")
@@ -824,20 +850,8 @@ def main():
 
     config = Config.load_default()
     review_cfg = config.get_agentic_unit_test_reviews_config()
-    model = review_cfg.llm.model
     base_url = review_cfg.llm.base_url
     api_key = review_cfg.llm.api_key
-
-    # Check API availability for tests that require the model
-    if args.test in ["analyze", "full"]:
-        if not check_api_available(base_url):
-            print(f"\n⚠️  WARNING: Cannot connect to LLM API at {base_url}")
-            print("Please ensure:")
-            print("  1. LM Studio (or your LLM server) is running")
-            print("  2. The server is accessible at the configured base URL")
-            print(f"  3. The API endpoint {base_url}/models is reachable")
-            print("\nCannot run the script without an available model API.")
-            sys.exit(2)
 
     try:
         if args.test == "discover":
@@ -873,6 +887,7 @@ def main():
 
         elif args.test == "analyze":
             # Test Phase 3: Analyze one test case
+            model = resolve_review_model(review_cfg)
             print("=== Test Phase 3: Analyze Test Case ===")
             finder = TestFileFinder()
             test_files = finder.find_test_files(args.root_path)
@@ -903,6 +918,7 @@ def main():
 
         else:
             # Full detection
+            model = resolve_review_model(review_cfg)
             print("=== Fake Unit Test Detector ===")
             print(f"Model: {model}")
             print(f"Base URL: {base_url}")

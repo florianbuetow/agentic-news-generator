@@ -8,7 +8,7 @@ import tiktoken
 import yaml
 
 from src.config import Config
-from src.url_ingestion.formatting import FormattingAgent
+from src.url_ingestion.formatting import FormattingAgent, PromptEstimator
 from src.url_ingestion.metadata import MetadataHelper
 from src.url_ingestion.raw_processing import (
     HtmlPageClassifier,
@@ -76,8 +76,8 @@ def make_formatting_agent(response: str) -> FormattingAgent:
     """Build a formatting agent with a fake LLM client."""
     return FormattingAgent(
         llm=make_llm_config(),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=1000,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=FakeLlmClient(response),
     )

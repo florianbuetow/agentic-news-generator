@@ -8,7 +8,7 @@ from src.config import LLMConfig
 from src.url_ingestion.clean_content_pipeline import CleaningErrorLog, UncleanableRegistry, UnextractableRegistry, UrlCleanContentPipeline
 from src.url_ingestion.download_pipeline import InboxArchive, UrlDownloadPipeline
 from src.url_ingestion.downloader import DownloaderFactory
-from src.url_ingestion.formatting import FormattingAgent
+from src.url_ingestion.formatting import FormattingAgent, PromptEstimator
 from src.url_ingestion.identity import sanitize_normalized_url_to_stem
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
@@ -109,8 +109,8 @@ def make_clean_pipeline(config_path: Path, data_dir: Path) -> UrlCleanContentPip
     config = write_config(config_path, data_dir)
     formatting_agent = FormattingAgent(
         llm=make_llm_config(),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=1000,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=FixtureFormattingClient(),
     )

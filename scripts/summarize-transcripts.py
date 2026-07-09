@@ -17,7 +17,7 @@ import tiktoken
 from litellm.exceptions import BadRequestError, Timeout
 
 from src.config import Config, LLMConfig, SummarizeTranscriptsConfig
-from src.summarize.lm_studio_client import get_loaded_context_length
+from src.llm.lm_studio import LMStudioRegistry, required_context_window
 from src.summarize.transcripts import collect_pending_files, strip_think_tags
 from src.util.fs_util import FSUtil
 from src.util.log_util import configure_root_logger, get_logger
@@ -70,29 +70,19 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
     prompt_template = FSUtil.read_text_file(prompt_path)
     encoding_name = config.get_encoding_name()
 
-    configured_context_window = summarize_cfg.llm.context_window
-    context_label = "auto" if configured_context_window == "auto" else f"{configured_context_window:,} tokens"
-
     logger.info(f"Input: {cleaned_dir}")
     logger.info(f"Output: {summaries_dir}")
-    logger.info(
-        "Model: %s (ctx=%s, skip>%s%%, workers=%s)",
-        summarize_cfg.llm.model,
-        context_label,
-        summarize_cfg.skip_transcripts_above_context_window_pct,
-        summarize_cfg.parallelism,
-    )
 
     return summarize_cfg, cleaned_dir, summaries_dir, prompt_template, encoding_name
 
 
-def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
+def call_llm(prompt: str, llm: LLMConfig, model: str, max_tokens: int) -> str:
     """Call the LLM and return the response text."""
     messages = [{"role": "user", "content": prompt}]
 
     try:
         response = litellm.completion(
-            model=llm.model,
+            model=model,
             messages=messages,
             api_base=llm.api_base,
             api_key=llm.api_key,
@@ -110,9 +100,7 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
     except BadRequestError as e:
         error_msg = str(e)
         if "No models loaded" in error_msg:
-            raise RuntimeError(
-                f"No models loaded in LM Studio. Expected model: {llm.model}. Load it with: lms load {llm.model.split('/')[-1]}"
-            ) from e
+            raise RuntimeError(f"Resolved model is no longer loaded in LM Studio: {model}") from e
         if "Context size has been exceeded" in error_msg:
             raise ContextSizeExceededError("Context size has been exceeded") from e
         raise
@@ -127,39 +115,6 @@ def call_llm(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
     return result
 
 
-def resolve_effective_context_window(llm: LLMConfig) -> int:
-    """Resolve the context window used for transcript-size gating."""
-    configured_context_window = llm.context_window
-    try:
-        loaded_context_window = get_loaded_context_length(llm.api_base, llm.model)
-    except RuntimeError as exc:
-        if configured_context_window == "auto":
-            raise RuntimeError(f"context_window=auto but LM Studio ctx is unavailable: {exc}") from exc
-        logger.warning(
-            "LM Studio ctx unavailable; using config ctx=%s (%s)",
-            f"{configured_context_window:,}",
-            exc,
-        )
-        return configured_context_window
-
-    if configured_context_window == "auto":
-        return loaded_context_window
-
-    if configured_context_window > loaded_context_window:
-        raise RuntimeError(
-            f"Configured context_window ({configured_context_window:,}) exceeds loaded LM Studio context length ({loaded_context_window:,})"
-        )
-
-    if loaded_context_window > configured_context_window:
-        logger.info(
-            "Using loaded ctx=%s (config=%s)",
-            f"{loaded_context_window:,}",
-            f"{configured_context_window:,}",
-        )
-
-    return loaded_context_window
-
-
 def resolve_parallel_context_window(effective_context_window: int, parallelism: int) -> int:
     """Return the conservative per-worker context window for local skip checks."""
     return max(1, effective_context_window // parallelism)
@@ -170,6 +125,7 @@ def process_single_file(
     output_file: Path,
     prompt_template: str,
     llm: LLMConfig,
+    model: str,
     encoder: tiktoken.Encoding,
     effective_context_window: int,
     skip_threshold_pct: int,
@@ -205,7 +161,7 @@ def process_single_file(
     result: tuple[str, str | None] | None = None
     for attempt in range(1, llm.max_retries + 1):
         try:
-            summary = call_llm(prompt, llm, request_max_tokens)
+            summary = call_llm(prompt, llm, model, request_max_tokens)
             FSUtil.write_text_file(output_file, summary, create_parents=True)
             result = "ok", None
             break
@@ -316,6 +272,7 @@ def run_process_single_file(
     output_file: Path,
     prompt_template: str,
     llm: LLMConfig,
+    model: str,
     encoder: tiktoken.Encoding,
     effective_context_window: int,
     skip_threshold_pct: int,
@@ -330,6 +287,7 @@ def run_process_single_file(
             output_file,
             prompt_template,
             llm,
+            model,
             encoder,
             effective_context_window,
             skip_threshold_pct,
@@ -345,6 +303,7 @@ def process_pending(
     pending: list[tuple[Path, Path]],
     prompt_template: str,
     llm: LLMConfig,
+    model: str,
     encoder: tiktoken.Encoding,
     effective_context_window: int,
     skip_threshold_pct: int,
@@ -394,6 +353,7 @@ def process_pending(
             output_file,
             prompt_template,
             llm,
+            model,
             encoder,
             effective_context_window,
             skip_threshold_pct,
@@ -471,11 +431,23 @@ def main() -> int:
         return 0
 
     try:
-        effective_context_window = resolve_effective_context_window(llm)
-    except RuntimeError as exc:
+        registry = LMStudioRegistry.fetch(llm.api_base)
+        loaded = registry.resolve_first_loaded(
+            llm.models,
+            min_context_window=required_context_window(llm.context_window),
+        )
+    except (ValueError, RuntimeError) as exc:
         logger.error(f"Error: {exc}")
         return 1
 
+    effective_context_window = loaded.loaded_context_length
+    logger.info(
+        "Model: %s (ctx=%s, skip>%s%%, workers=%s)",
+        loaded.lm_studio_id,
+        f"{effective_context_window:,} tokens",
+        summarize_cfg.skip_transcripts_above_context_window_pct,
+        summarize_cfg.parallelism,
+    )
     logger.info(f"Context: {effective_context_window:,} tokens")
     parallel_context_window = resolve_parallel_context_window(effective_context_window, summarize_cfg.parallelism)
     if summarize_cfg.parallelism > 1:
@@ -486,6 +458,7 @@ def main() -> int:
         pending,
         prompt_template,
         llm,
+        loaded.configured_model,
         encoder,
         parallel_context_window,
         summarize_cfg.skip_transcripts_above_context_window_pct,

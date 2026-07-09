@@ -11,6 +11,7 @@ from pathlib import Path
 import tiktoken
 
 from src.config import Config
+from src.llm.lm_studio import LMStudioRegistry, ModelNotLoadedError, required_context_window
 from src.url_ingestion.clean_content_pipeline import (
     CleaningErrorLog,
     UncleanableRegistry,
@@ -18,7 +19,7 @@ from src.url_ingestion.clean_content_pipeline import (
     UrlCleanContentPipeline,
     select_pending_items,
 )
-from src.url_ingestion.formatting import FormattingAgent, FormattingWorkEstimate, LiteLlmClient
+from src.url_ingestion.formatting import FormattingAgent, FormattingWorkEstimate, LiteLlmClient, PromptEstimator
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
     HtmlTextExtractor,
@@ -76,26 +77,37 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"Raw URL content directory: {config.get_url_raw_dir()}", flush=True)
         print(f"Cleaned Markdown directory: {config.get_url_cleaned_dir()}", flush=True)
-        print(f"Formatting model: {clean_config.llm.model}", flush=True)
         print(f"Prompt template: {prompt_path}", flush=True)
 
-        formatting_agent = FormattingAgent(
-            llm=clean_config.llm,
+        estimator = PromptEstimator(
             prompt_template=prompt_path.read_text(encoding="utf-8"),
             encoder=tiktoken.get_encoding(config.get_encoding_name()),
-            skip_threshold_pct=clean_config.skip_documents_above_context_window_pct,
-            llm_client=LiteLlmClient(),
-            progress_callback=lambda message: print(f"  {message}", flush=True),
         )
         if args.dry_run:
             return run_dry_run(
                 config,
-                formatting_agent,
+                estimator,
                 limit=args.limit,
                 raw_path=args.raw_path,
                 force=args.force,
                 max_estimated_prompt_tokens=args.max_estimated_prompt_tokens,
             )
+
+        registry = LMStudioRegistry.fetch(clean_config.llm.api_base)
+        loaded = registry.resolve_first_loaded(
+            clean_config.llm.models,
+            min_context_window=required_context_window(clean_config.llm.context_window),
+        )
+        print(f"Formatting model: {loaded.lm_studio_id} (ctx={loaded.loaded_context_length:,})", flush=True)
+
+        formatting_agent = FormattingAgent(
+            llm=clean_config.llm,
+            context_window=loaded.loaded_context_length,
+            estimator=estimator,
+            skip_threshold_pct=clean_config.skip_documents_above_context_window_pct,
+            llm_client=LiteLlmClient(model=loaded.configured_model),
+            progress_callback=lambda message: print(f"  {message}", flush=True),
+        )
 
         html_processor = HtmlRawProcessor(HtmlTextExtractor(), formatting_agent)
         pdf_processor = PdfRawProcessor(PypdfTextExtractor(), formatting_agent)
@@ -103,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         processor_factory = RawProcessorFactory(html_processor, pdf_processor, plain_text_processor)
         selected_raw_paths = estimate_selected_raw_paths(
             config,
-            formatting_agent,
+            estimator,
             limit=args.limit,
             raw_path=args.raw_path,
             force=args.force,
@@ -125,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
             raw_paths=selected_raw_paths,
             force=args.force,
         )
-    except (FileNotFoundError, KeyError, NotADirectoryError, ValueError) as exc:
+    except (FileNotFoundError, KeyError, NotADirectoryError, ValueError, ModelNotLoadedError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
@@ -150,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def run_dry_run(
     config: Config,
-    formatting_agent: FormattingAgent,
+    estimator: PromptEstimator,
     *,
     limit: int | None = None,
     raw_path: Path | None = None,
@@ -160,7 +172,7 @@ def run_dry_run(
     """Inspect pending raw content without calling the LLM or writing cleaned files."""
     scan_result, estimated_items, failures = estimate_pending_items(
         config,
-        formatting_agent,
+        estimator,
         limit=limit,
         raw_path=raw_path,
         force=force,
@@ -213,7 +225,7 @@ class EstimatedRawContentItem:
 
 def estimate_selected_raw_paths(
     config: Config,
-    formatting_agent: FormattingAgent,
+    estimator: PromptEstimator,
     *,
     limit: int | None,
     raw_path: Path | None,
@@ -225,7 +237,7 @@ def estimate_selected_raw_paths(
         return None
     _, estimated_items, failures = estimate_pending_items(
         config,
-        formatting_agent,
+        estimator,
         limit=limit,
         raw_path=raw_path,
         force=force,
@@ -239,7 +251,7 @@ def estimate_selected_raw_paths(
 
 def estimate_pending_items(
     config: Config,
-    formatting_agent: FormattingAgent,
+    estimator: PromptEstimator,
     *,
     limit: int | None,
     raw_path: Path | None,
@@ -256,7 +268,7 @@ def estimate_pending_items(
     for item in pending_items:
         try:
             extracted_text, extraction_type = extract_text_for_dry_run(item, html_extractor, pdf_extractor)
-            estimate = formatting_agent.estimate_work(extracted_text)
+            estimate = estimator.estimate_work(extracted_text)
         except Exception as exc:
             failures.append((item.raw_path, str(exc)))
             continue

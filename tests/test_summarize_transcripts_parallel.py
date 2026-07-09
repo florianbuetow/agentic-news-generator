@@ -41,6 +41,7 @@ def test_process_pending_runs_with_parallelism_one(tmp_path: Path, monkeypatch: 
         output_file: Path,
         prompt_template: str,
         llm: object,
+        model: str,
         encoder: object,
         effective_context_window: int,
         skip_threshold_pct: int,
@@ -52,7 +53,7 @@ def test_process_pending_runs_with_parallelism_one(tmp_path: Path, monkeypatch: 
 
     monkeypatch.setattr(module, "process_single_file", fake_process_single_file)
 
-    rc = module.process_pending(pending_files(tmp_path, 3), "", None, None, 8192, 80, 1)
+    rc = module.process_pending(pending_files(tmp_path, 3), "", None, "test/model", None, 8192, 80, 1)
 
     assert rc == 0
     assert processed == ["0.txt", "1.txt", "2.txt"]
@@ -67,6 +68,7 @@ def test_process_pending_parallelism_one_collects_failures(tmp_path: Path, monke
         output_file: Path,
         prompt_template: str,
         llm: object,
+        model: str,
         encoder: object,
         effective_context_window: int,
         skip_threshold_pct: int,
@@ -78,7 +80,7 @@ def test_process_pending_parallelism_one_collects_failures(tmp_path: Path, monke
 
     monkeypatch.setattr(module, "process_single_file", fake_process_single_file)
 
-    rc = module.process_pending(pending_files(tmp_path, 3), "", None, None, 8192, 80, 1)
+    rc = module.process_pending(pending_files(tmp_path, 3), "", None, "test/model", None, 8192, 80, 1)
 
     assert rc == 1
     assert processed == ["0.txt", "1.txt", "2.txt"]
@@ -93,6 +95,7 @@ def test_process_pending_logs_each_failure_with_its_reason(tmp_path: Path, monke
         output_file: Path,
         prompt_template: str,
         llm: object,
+        model: str,
         encoder: object,
         effective_context_window: int,
         skip_threshold_pct: int,
@@ -104,7 +107,7 @@ def test_process_pending_logs_each_failure_with_its_reason(tmp_path: Path, monke
     monkeypatch.setattr(module, "process_single_file", fake_process_single_file)
 
     with caplog.at_level(logging.ERROR):
-        rc = module.process_pending(pending_files(tmp_path, 3), "", None, None, 8192, 80, 1)
+        rc = module.process_pending(pending_files(tmp_path, 3), "", None, "test/model", None, 8192, 80, 1)
 
     assert rc == 1
     assert "channel/1.txt" in caplog.text
@@ -113,7 +116,7 @@ def test_process_pending_logs_each_failure_with_its_reason(tmp_path: Path, monke
 
 def _make_llm_config() -> LLMConfig:
     return LLMConfig(
-        model="test/model",
+        models=["test/model"],
         api_base=None,
         api_key="test",
         context_window=8192,
@@ -155,7 +158,7 @@ def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
     monkeypatch.setattr(module.litellm, "completion", fake_completion)
 
     llm = LLMConfig(
-        model="test/model",
+        models=["test/model"],
         api_base=None,
         api_key="test",
         context_window=8192,
@@ -167,7 +170,7 @@ def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
         request_timeout_seconds=30.0,
     )
 
-    module.call_llm("test prompt", llm, 512)
+    module.call_llm("test prompt", llm, "test/model", 512)
 
     assert captured["timeout"] == 30.0
 
@@ -184,7 +187,7 @@ def test_call_llm_disables_client_internal_retries(monkeypatch: Any) -> None:
 
     monkeypatch.setattr(module.litellm, "completion", fake_completion)
 
-    module.call_llm("test prompt", _make_llm_config(), 512)
+    module.call_llm("test prompt", _make_llm_config(), "test/model", 512)
 
     assert captured["max_retries"] == 0
 
@@ -199,7 +202,7 @@ def test_call_llm_raises_descriptive_error_on_timeout(monkeypatch: Any) -> None:
     monkeypatch.setattr(module.litellm, "completion", timing_out_completion)
 
     with pytest.raises(RuntimeError, match="timed out after"):
-        module.call_llm("test prompt", _make_llm_config(), 512)
+        module.call_llm("test prompt", _make_llm_config(), "test/model", 512)
 
 
 def test_call_llm_raises_when_llm_returns_empty_response(monkeypatch: Any) -> None:
@@ -208,7 +211,7 @@ def test_call_llm_raises_when_llm_returns_empty_response(monkeypatch: Any) -> No
     monkeypatch.setattr(module.litellm, "completion", _empty_completion)
 
     with pytest.raises(ValueError, match="LLM returned empty response"):
-        module.call_llm("test prompt", _make_llm_config(), 512)
+        module.call_llm("test prompt", _make_llm_config(), "test/model", 512)
 
 
 def test_call_llm_raises_when_think_tags_produce_empty_response(monkeypatch: Any) -> None:
@@ -217,7 +220,7 @@ def test_call_llm_raises_when_think_tags_produce_empty_response(monkeypatch: Any
     monkeypatch.setattr(module.litellm, "completion", _think_only_completion)
 
     with pytest.raises(ValueError, match="empty"):
-        module.call_llm("test prompt", _make_llm_config(), 512)
+        module.call_llm("test prompt", _make_llm_config(), "test/model", 512)
 
 
 def test_process_single_file_does_not_write_empty_file_when_llm_returns_only_think_tags(tmp_path: Path, monkeypatch: Any) -> None:
@@ -234,7 +237,7 @@ def test_process_single_file_does_not_write_empty_file_when_llm_returns_only_thi
     encoder = tiktoken.get_encoding("cl100k_base")
 
     with pytest.raises(ValueError, match="empty"):
-        module.process_single_file(txt_file, output_file, "{transcript}", _make_llm_config(), encoder, 8192, 80)
+        module.process_single_file(txt_file, output_file, "{transcript}", _make_llm_config(), "test/model", encoder, 8192, 80)
 
     assert not output_file.exists()
 
@@ -261,7 +264,7 @@ def test_process_single_file_logs_reason_when_retrying(tmp_path: Path, monkeypat
     encoder = tiktoken.get_encoding("cl100k_base")
 
     llm = LLMConfig(
-        model="test/model",
+        models=["test/model"],
         api_base=None,
         api_key="test",
         context_window=8192,
@@ -273,7 +276,7 @@ def test_process_single_file_logs_reason_when_retrying(tmp_path: Path, monkeypat
     )
 
     with caplog.at_level(logging.ERROR):
-        status, _ = module.process_single_file(txt_file, output_file, "{transcript}", llm, encoder, 8192, 80)
+        status, _ = module.process_single_file(txt_file, output_file, "{transcript}", llm, "test/model", encoder, 8192, 80)
 
     assert status == "ok"
     assert "connection refused by LM Studio" in caplog.text

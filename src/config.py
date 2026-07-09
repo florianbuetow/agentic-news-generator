@@ -108,9 +108,10 @@ class ChannelConfig(BaseModel):
 class LLMConfig(BaseModel):
     """Configuration for an individual LLM connection via litellm."""
 
-    model: str = Field(
+    models: list[str] = Field(
         ...,
-        description="litellm model string (e.g., 'openai/gpt-4', 'anthropic/claude-3-5-sonnet', 'openai/local-model' for LM Studio)",
+        min_length=1,
+        description="litellm model strings in preference order; the first one loaded in LM Studio is used",
     )
     api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
     api_key: str = Field(..., description="API key for the LLM service")
@@ -132,6 +133,17 @@ class LLMConfig(BaseModel):
         float | None,
         Field(gt=0, description="Optional LLM request timeout in seconds; None lets the client/provider decide"),
     ] = None
+
+    @field_validator("models")
+    @classmethod
+    def validate_models(cls, models: list[str]) -> list[str]:
+        """Reject blank entries and duplicates, which make the preference order meaningless."""
+        for model in models:
+            if not model.strip():
+                raise ValueError("models entries must be non-empty")
+        if len(set(models)) != len(models):
+            raise ValueError("models must not contain duplicate entries")
+        return models
 
     @field_validator("context_window")
     @classmethod
@@ -168,7 +180,11 @@ class SummarizeTranscriptsConfig(BaseModel):
 class AgenticReviewLLMConfig(BaseModel):
     """LLM connection settings for agentic review tools."""
 
-    model: str = Field(..., min_length=1, description="Model name in LM Studio")
+    models: list[str] = Field(
+        ...,
+        min_length=1,
+        description="LM Studio model names in preference order; the first one loaded is used",
+    )
     base_url: str = Field(..., min_length=1, description="LM Studio OpenAI-compatible base URL")
     api_key: str = Field(..., min_length=1, description="API key (any non-empty string for local LLMs)")
 

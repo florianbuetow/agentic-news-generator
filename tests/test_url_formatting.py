@@ -12,6 +12,7 @@ from src.url_ingestion.formatting import (
     MarkdownValidationError,
     OutputWindowExceededError,
     OversizedDocumentError,
+    PromptEstimator,
     validate_cleaned_markdown,
 )
 
@@ -61,7 +62,7 @@ class FailOnceLlmClient:
 def make_llm_config(*, context_window: int = 1000, max_tokens: int = 100, max_retries: int = 1) -> LLMConfig:
     """Build a valid LLM config for tests."""
     return LLMConfig(
-        model="openai/test-model",
+        models=["openai/test-model"],
         api_base="http://127.0.0.1:1234/v1",
         api_key="test-key",
         context_window=context_window,
@@ -73,13 +74,25 @@ def make_llm_config(*, context_window: int = 1000, max_tokens: int = 100, max_re
     )
 
 
+def test_prompt_estimator_counts_rendered_prompt_tokens() -> None:
+    """The estimator renders the template and counts tokens without an LLM or a context window."""
+    encoder = tiktoken.get_encoding("o200k_base")
+    estimator = PromptEstimator(prompt_template="Clean this:\n{source_text}", encoder=encoder)
+
+    rendered = estimator.render_prompt("hello world")
+    estimate = estimator.estimate_work("hello world")
+
+    assert rendered == "Clean this:\nhello world"
+    assert estimate.prompt_tokens == len(encoder.encode(rendered, disallowed_special=()))
+
+
 def test_formatting_agent_renders_prompt_and_returns_valid_markdown() -> None:
     """Render prompt with source text and return validated Markdown."""
     fake_client = FakeLlmClient("# Heading\n\nSource text")
     agent = FormattingAgent(
         llm=make_llm_config(),
-        prompt_template="Format this:\n{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=1000,
+        estimator=PromptEstimator(prompt_template="Format this:\n{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=fake_client,
     )
@@ -101,7 +114,7 @@ def test_litellm_client_passes_configured_request_timeout(monkeypatch: pytest.Mo
     monkeypatch.setattr("src.url_ingestion.formatting.litellm.completion", fake_completion)
     llm = make_llm_config().model_copy(update={"request_timeout_seconds": 12.5})
 
-    result = LiteLlmClient().complete("Format this", llm)
+    result = LiteLlmClient(model="openai/test-model").complete("Format this", llm)
 
     assert result == "# Done"
     assert captured_kwargs["timeout"] == 12.5
@@ -116,7 +129,7 @@ def test_litellm_client_raises_when_output_window_is_exhausted(monkeypatch: pyte
     monkeypatch.setattr("src.url_ingestion.formatting.litellm.completion", fake_completion)
 
     with pytest.raises(OutputWindowExceededError) as exc_info:
-        LiteLlmClient().complete("Format this", make_llm_config(max_tokens=100))
+        LiteLlmClient(model="openai/test-model").complete("Format this", make_llm_config(max_tokens=100))
 
     assert exc_info.value.max_output_tokens == 100
 
@@ -139,8 +152,8 @@ def test_formatting_agent_does_not_retry_when_output_window_is_exhausted() -> No
     client = TruncatingClient()
     agent = FormattingAgent(
         llm=make_llm_config(max_retries=3),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=1000,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=client,
     )
@@ -157,8 +170,8 @@ def test_formatting_agent_skips_oversized_documents() -> None:
     progress_messages: list[str] = []
     agent = FormattingAgent(
         llm=make_llm_config(context_window=50),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=50,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=fake_client,
         progress_callback=progress_messages.append,
@@ -178,8 +191,8 @@ def test_formatting_agent_skips_documents_that_exceed_output_window() -> None:
     fake_client = FakeLlmClient("unused")
     agent = FormattingAgent(
         llm=make_llm_config(context_window=100_000, max_tokens=100),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=100_000,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=fake_client,
     )
@@ -198,8 +211,8 @@ def test_formatting_agent_reports_retry_failures() -> None:
     progress_messages: list[str] = []
     agent = FormattingAgent(
         llm=make_llm_config(max_retries=2),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=1000,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=fake_client,
         progress_callback=progress_messages.append,
@@ -221,8 +234,8 @@ def test_formatting_agent_estimates_prompt_tokens_without_llm_call() -> None:
     fake_client = FakeLlmClient("unused")
     agent = FormattingAgent(
         llm=make_llm_config(context_window=50),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=50,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=fake_client,
     )

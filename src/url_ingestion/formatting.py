@@ -62,14 +62,17 @@ class _CompletionChoice(Protocol):
     finish_reason: str | None
 
 
+@dataclass(frozen=True)
 class LiteLlmClient:
-    """LiteLLM-backed formatting client."""
+    """LiteLLM-backed formatting client bound to one resolved model."""
+
+    model: str
 
     def complete(self, prompt: str, llm: LLMConfig) -> str:
         """Call the configured LLM and return response text."""
         try:
             response = litellm.completion(
-                model=llm.model,
+                model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 api_base=llm.api_base,
                 api_key=llm.api_key,
@@ -79,7 +82,7 @@ class LiteLlmClient:
             )
         except BadRequestError as exc:
             if "No models loaded" in str(exc):
-                raise RuntimeError(f"No models loaded in LM Studio. Expected model: {llm.model}") from exc
+                raise RuntimeError(f"Resolved model is no longer loaded in LM Studio: {self.model}") from exc
             raise
 
         choice = response.choices[0]
@@ -96,19 +99,39 @@ class LiteLlmClient:
 
 
 @dataclass(frozen=True)
+class PromptEstimator:
+    """Render formatting prompts and count their tokens. Needs no LLM and no context window."""
+
+    prompt_template: str
+    encoder: tiktoken.Encoding
+
+    def render_prompt(self, source_text: str) -> str:
+        """Render the formatting prompt for extracted source text."""
+        return self.prompt_template.replace("{source_text}", source_text)
+
+    def estimate_work(self, source_text: str) -> FormattingWorkEstimate:
+        """Estimate formatting work without calling the LLM."""
+        return FormattingWorkEstimate(prompt_tokens=self._prompt_token_count(source_text))
+
+    def _prompt_token_count(self, source_text: str) -> int:
+        """Return rendered prompt token count for source text."""
+        return len(self.encoder.encode(self.render_prompt(source_text), disallowed_special=()))
+
+
+@dataclass(frozen=True)
 class FormattingAgent:
     """Format extracted URL content into clean Markdown."""
 
     llm: LLMConfig
-    prompt_template: str
-    encoder: tiktoken.Encoding
+    context_window: int
+    estimator: PromptEstimator
     skip_threshold_pct: int
     llm_client: LlmClient
     progress_callback: Callable[[str], None] | None = None
 
     def render_prompt(self, source_text: str) -> str:
         """Render the formatting prompt for extracted source text."""
-        return self.prompt_template.replace("{source_text}", source_text)
+        return self.estimator.render_prompt(source_text)
 
     def format_markdown(self, source_text: str) -> str:
         """Format extracted source text as Markdown with retries and validation."""
@@ -116,7 +139,7 @@ class FormattingAgent:
 
     def estimate_work(self, source_text: str) -> FormattingWorkEstimate:
         """Estimate formatting work without calling the LLM."""
-        return FormattingWorkEstimate(prompt_tokens=self._prompt_token_count(source_text))
+        return self.estimator.estimate_work(source_text)
 
     def format_markdown_with_stats(self, source_text: str) -> FormattingResult:
         """Format extracted source text as Markdown and return progress metrics."""
@@ -132,7 +155,7 @@ class FormattingAgent:
     def _format_single_document(self, source_text: str) -> tuple[str, int, int, float]:
         """Format one source document and return Markdown, prompt tokens, and attempts."""
         prompt = self.render_prompt(source_text)
-        prompt_tokens = len(self.encoder.encode(prompt, disallowed_special=()))
+        prompt_tokens = len(self.estimator.encoder.encode(prompt, disallowed_special=()))
         self._raise_if_oversized(prompt_tokens)
 
         attempt = 1
@@ -161,15 +184,9 @@ class FormattingAgent:
         if self.progress_callback is not None:
             self.progress_callback(message)
 
-    def _prompt_token_count(self, source_text: str) -> int:
-        """Return rendered prompt token count for source text."""
-        return len(self.encoder.encode(self.render_prompt(source_text), disallowed_special=()))
-
     def _context_token_limit(self) -> int:
         """Return the prompt token limit imposed by the context-window threshold."""
-        if self.llm.context_window == "auto":
-            raise ValueError("url_clean_content.llm.context_window must be an explicit integer")
-        return int(self.llm.context_window * self.skip_threshold_pct / 100)
+        return int(self.context_window * self.skip_threshold_pct / 100)
 
     def _token_limit(self) -> int:
         """Return the prompt token limit: the smaller of the context-window threshold and the output window."""
@@ -188,7 +205,7 @@ class FormattingAgent:
         raise OversizedDocumentError(
             f"document prompt contains {prompt_tokens:,} tokens, over the {token_limit:,}-token clean limit "
             f"(bound by {bound_by}; output window {self.llm.max_tokens:,}, "
-            f"context threshold {self.skip_threshold_pct}% of {self.llm.context_window:,})"
+            f"context threshold {self.skip_threshold_pct}% of {self.context_window:,})"
         )
 
 

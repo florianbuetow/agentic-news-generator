@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.config import LLMConfig, SummarizeTranscriptsConfig
+from src.config import AgenticReviewLLMConfig, LLMConfig, SummarizeTranscriptsConfig
 
 
 class TestLLMConfig:
@@ -12,7 +12,7 @@ class TestLLMConfig:
     def test_valid_llm_config(self) -> None:
         """Test valid LLM configuration."""
         config = LLMConfig(
-            model="qwen3-30b-a3b-thinking-2507-mlx@8bit",
+            models=["qwen3-30b-a3b-thinking-2507-mlx@8bit"],
             api_base="http://127.0.0.1:1234/v1",
             api_key="LMSTUDIO_API_KEY",
             context_window=262144,
@@ -22,7 +22,7 @@ class TestLLMConfig:
             max_retries=3,
             retry_delay=2.0,
         )
-        assert config.model == "qwen3-30b-a3b-thinking-2507-mlx@8bit"
+        assert config.models == ["qwen3-30b-a3b-thinking-2507-mlx@8bit"]
         assert config.api_base == "http://127.0.0.1:1234/v1"
         assert config.api_key == "LMSTUDIO_API_KEY"
         assert config.context_window == 262144
@@ -35,7 +35,7 @@ class TestLLMConfig:
     def test_valid_llm_config_with_none_api_base(self) -> None:
         """Test valid LLM configuration with None api_base."""
         config = LLMConfig(
-            model="anthropic/claude-3-5-sonnet-20241022",
+            models=["anthropic/claude-3-5-sonnet-20241022"],
             api_base=None,
             api_key="ANTHROPIC_API_KEY",
             context_window=200000,
@@ -45,7 +45,7 @@ class TestLLMConfig:
             max_retries=3,
             retry_delay=2.0,
         )
-        assert config.model == "anthropic/claude-3-5-sonnet-20241022"
+        assert config.models == ["anthropic/claude-3-5-sonnet-20241022"]
         assert config.api_base is None
         assert config.api_key == "ANTHROPIC_API_KEY"
         assert config.context_window_threshold == 85
@@ -53,7 +53,7 @@ class TestLLMConfig:
     def test_valid_llm_config_with_auto_context_window(self) -> None:
         """Test valid LLM configuration with auto context window."""
         config = LLMConfig(
-            model="openai/qwen/qwen3.6-35b-a3b",
+            models=["openai/qwen/qwen3.6-35b-a3b"],
             api_base="http://127.0.0.1:1234/v1",
             api_key="LMSTUDIO_API_KEY",
             context_window="auto",
@@ -65,8 +65,8 @@ class TestLLMConfig:
         )
         assert config.context_window == "auto"
 
-    def test_missing_model_field(self) -> None:
-        """Test LLM config with missing model field."""
+    def test_missing_models_field(self) -> None:
+        """Test LLM config with missing models field."""
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
@@ -78,14 +78,65 @@ class TestLLMConfig:
                 }
             )
         errors = exc_info.value.errors()
-        assert any(err["loc"] == ("model",) and err["type"] == "missing" for err in errors)
+        assert any(err["loc"] == ("models",) and err["type"] == "missing" for err in errors)
+
+    def test_empty_models_list_rejected(self) -> None:
+        """An empty models list is a configuration error, not an empty preference order."""
+        with pytest.raises(ValidationError, match="at least 1 item"):
+            LLMConfig.model_validate(
+                {
+                    "models": [],
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
+                }
+            )
+
+    def test_duplicate_models_rejected(self) -> None:
+        """A duplicate entry makes the preference order meaningless."""
+        with pytest.raises(ValidationError, match="duplicate"):
+            LLMConfig.model_validate(
+                {
+                    "models": ["model-a", "model-a"],
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
+                }
+            )
+
+    def test_blank_model_entry_rejected(self) -> None:
+        """A whitespace-only entry can never resolve to a loaded model."""
+        with pytest.raises(ValidationError, match="non-empty"):
+            LLMConfig.model_validate(
+                {
+                    "models": ["  "],
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
+                }
+            )
 
     def test_missing_api_key_field(self) -> None:
         """Test LLM config with missing api_key field."""
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "context_window": 100000,
                     "max_tokens": 2048,
@@ -100,7 +151,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "max_tokens": 2048,
@@ -115,7 +166,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -130,7 +181,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -145,7 +196,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_key": "API_KEY",
                     "context_window": 100000,
                     "max_tokens": 2048,
@@ -160,7 +211,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": "not_an_int",
@@ -176,7 +227,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 0,
@@ -195,7 +246,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -211,7 +262,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -227,7 +278,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -242,7 +293,7 @@ class TestLLMConfig:
     def test_frozen_model(self) -> None:
         """Test that LLM config is frozen."""
         config = LLMConfig(
-            model="test-model",
+            models=["test-model"],
             api_base="http://localhost:1234/v1",
             api_key="API_KEY",
             context_window=100000,
@@ -260,7 +311,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -276,7 +327,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -293,7 +344,7 @@ class TestLLMConfig:
         with pytest.raises(ValidationError) as exc_info:
             LLMConfig.model_validate(
                 {
-                    "model": "test-model",
+                    "models": ["test-model"],
                     "api_base": "http://localhost:1234/v1",
                     "api_key": "API_KEY",
                     "context_window": 100000,
@@ -309,7 +360,7 @@ class TestLLMConfig:
         """Test LLM config with context_window_threshold at boundary values (0 and 100)."""
         # Test 0
         config_0 = LLMConfig(
-            model="test-model",
+            models=["test-model"],
             api_base="http://localhost:1234/v1",
             api_key="API_KEY",
             context_window=100000,
@@ -323,7 +374,7 @@ class TestLLMConfig:
 
         # Test 100
         config_100 = LLMConfig(
-            model="test-model",
+            models=["test-model"],
             api_base="http://localhost:1234/v1",
             api_key="API_KEY",
             context_window=100000,
@@ -338,7 +389,7 @@ class TestLLMConfig:
 
 def _make_llm() -> LLMConfig:
     return LLMConfig(
-        model="openai/test-model",
+        models=["openai/test-model"],
         api_base="http://127.0.0.1:1234/v1",
         api_key="test-key",
         context_window=131072,
@@ -419,3 +470,31 @@ class TestSummarizeTranscriptsConfig:
             )
         errors = exc_info.value.errors()
         assert any(err["loc"] == ("parallelism",) and err["type"] == "greater_than" for err in errors)
+
+
+class TestAgenticReviewLLMConfig:
+    """Tests for AgenticReviewLLMConfig model."""
+
+    def test_valid_agentic_review_llm_config(self) -> None:
+        """A models list in preference order validates."""
+        config = AgenticReviewLLMConfig(
+            models=["qwen2.5-7b-instruct-mlx", "qwen2.5-7b-instruct-mlx:2"],
+            base_url="http://localhost:1234/v1",
+            api_key="local",
+        )
+
+        assert config.models == ["qwen2.5-7b-instruct-mlx", "qwen2.5-7b-instruct-mlx:2"]
+
+    def test_missing_models_field(self) -> None:
+        """The singular 'model' key no longer validates."""
+        with pytest.raises(ValidationError) as exc_info:
+            AgenticReviewLLMConfig.model_validate(
+                {"model": "qwen2.5-7b-instruct-mlx", "base_url": "http://localhost:1234/v1", "api_key": "local"}
+            )
+        errors = exc_info.value.errors()
+        assert any(err["loc"] == ("models",) and err["type"] == "missing" for err in errors)
+
+    def test_empty_models_list_rejected(self) -> None:
+        """An empty models list is a configuration error."""
+        with pytest.raises(ValidationError, match="at least 1 item"):
+            AgenticReviewLLMConfig.model_validate({"models": [], "base_url": "http://localhost:1234/v1", "api_key": "local"})

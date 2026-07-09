@@ -47,7 +47,7 @@ def get_valid_url_processing_config() -> dict[str, str]:
 def get_valid_llm_config() -> dict[str, object]:
     """Return a valid LLM config dictionary."""
     return {
-        "model": "openai/test-model",
+        "models": ["openai/test-model"],
         "api_base": "http://127.0.0.1:1234/v1",
         "api_key": "test-key",
         "context_window": 1000,
@@ -321,6 +321,6 @@ class TestConfigPaths:
             clean_config = config.get_url_clean_content_config()
             assert clean_config.prompt_template == "prompts/format-url-content.md"
             assert clean_config.skip_documents_above_context_window_pct == 80
-            assert clean_config.llm.model == "openai/test-model"
+            assert clean_config.llm.models == ["openai/test-model"]
         finally:
             temp_path.unlink()

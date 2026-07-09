@@ -15,7 +15,7 @@ from src.url_ingestion.clean_content_pipeline import (
     UrlCleanContentPipeline,
     select_pending_items,
 )
-from src.url_ingestion.formatting import FormattingAgent, LlmClient, OutputWindowExceededError
+from src.url_ingestion.formatting import FormattingAgent, LlmClient, OutputWindowExceededError, PromptEstimator
 from src.url_ingestion.raw_processing import (
     HtmlRawProcessor,
     HtmlTextExtractor,
@@ -67,8 +67,8 @@ def make_pipeline(
         raise ValueError("make_pipeline requires formatter_response or llm_client")
     formatting_agent = FormattingAgent(
         llm=make_llm_config(max_tokens=max_output_tokens),
-        prompt_template="{source_text}",
-        encoder=tiktoken.get_encoding("o200k_base"),
+        context_window=1000,
+        estimator=PromptEstimator(prompt_template="{source_text}", encoder=tiktoken.get_encoding("o200k_base")),
         skip_threshold_pct=80,
         llm_client=selected_client,
     )

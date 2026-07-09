@@ -28,7 +28,8 @@ import requests
 from autogen_core.models import UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
-from src.config import Config
+from src.config import AgenticReviewConfig, Config
+from src.llm.lm_studio import LMStudioRegistry
 
 # Configure logging
 logging.basicConfig(
@@ -847,6 +848,31 @@ def run_full_analysis(root_path: str, model: str, base_url: str, api_key: str, u
 # =============================================================================
 
 
+def resolve_review_model(review_cfg: AgenticReviewConfig) -> str:
+    """Return the first loaded review model's LM Studio id, or exit 2.
+
+    Called only from phases that talk to the LLM, so discover/extract stay offline.
+    Returns the bare LM Studio id: OpenAIChatCompletionClient forwards `model`
+    verbatim, so a litellm-style 'openai/' prefix would 404 here.
+    """
+    base_url = review_cfg.llm.base_url
+    if not check_api_available(base_url):
+        print(f"\n⚠️  WARNING: Cannot connect to LLM API at {base_url}")
+        print("Please ensure:")
+        print("  1. LM Studio (or your LLM server) is running")
+        print("  2. The server is accessible at the configured base URL")
+        print(f"  3. The API endpoint {base_url}/models is reachable")
+        print("\nCannot run the script without an available model API.")
+        sys.exit(2)
+
+    try:
+        registry = LMStudioRegistry.fetch(base_url)
+        return registry.resolve_first_loaded(review_cfg.llm.models, min_context_window=None).lm_studio_id
+    except (ValueError, RuntimeError) as exc:
+        print(f"\n⚠️  {exc}")
+        sys.exit(2)
+
+
 def main() -> None:
     """Main entry point for shell script parameter detector."""
     parser = argparse.ArgumentParser(
@@ -878,19 +904,8 @@ def main() -> None:
 
     config = Config.load_default()
     review_cfg = config.get_agentic_shell_script_reviews_config()
-    model = review_cfg.llm.model
     base_url = review_cfg.llm.base_url
     api_key = review_cfg.llm.api_key
-
-    # Check API availability for tests that require the model
-    if args.test in ["analyze", "full"] and not check_api_available(base_url):
-        print(f"\n⚠️  WARNING: Cannot connect to LLM API at {base_url}")
-        print("Please ensure:")
-        print("  1. LM Studio (or your LLM server) is running")
-        print("  2. The server is accessible at the configured base URL")
-        print(f"  3. The API endpoint {base_url}/models is reachable")
-        print("\nCannot run the script without an available model API.")
-        sys.exit(2)
 
     try:
         if args.test == "discover":
@@ -898,9 +913,9 @@ def main() -> None:
         elif args.test == "extract":
             test_extract(args.root_path)
         elif args.test == "analyze":
-            test_analyze(args.root_path, model, base_url, api_key)
+            test_analyze(args.root_path, resolve_review_model(review_cfg), base_url, api_key)
         else:
-            run_full_analysis(args.root_path, model, base_url, api_key, not args.no_cache, args.file)
+            run_full_analysis(args.root_path, resolve_review_model(review_cfg), base_url, api_key, not args.no_cache, args.file)
 
     except KeyboardInterrupt:
         print("\n\nInterrupted by user")

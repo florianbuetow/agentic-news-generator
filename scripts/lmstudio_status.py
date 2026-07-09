@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 """Check if LM Studio is running and required models are loaded."""
 
-import json
 import re
 import sys
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from typing import Any, cast
 
 import yaml
 
 from src.config import Config
+from src.llm.lm_studio import LMStudioRegistry
 
 CONFIG_PATH = Config.repo_config_path()
-
-_TIMEOUT_SECONDS = 5
 
 _GREEN = "\033[32m"
 _RED = "\033[31m"
@@ -27,11 +23,11 @@ _ANSI_RE = re.compile(r"\033\[[0-9;]*m")
 
 
 @dataclass(frozen=True)
-class RequiredModel:
-    """A model required by a config section."""
+class RequiredModels:
+    """The ordered models a config section may use, and where they live."""
 
     section: str
-    model: str
+    models: list[str]
     api_base: str
 
 
@@ -45,29 +41,31 @@ def _sub(cfg: _Cfg, key: str) -> _Cfg:
     return cast(_Cfg, val)
 
 
-def collect_required_models(config: _Cfg) -> list[RequiredModel]:
-    """Walk config and collect all (section, model, api_base) tuples for LM Studio endpoints."""
-    models: list[RequiredModel] = []
+def collect_required_models(config: _Cfg) -> list[RequiredModels]:
+    """Walk config and collect every LM Studio section's ordered models list."""
+    models: list[RequiredModels] = []
 
     for top_key in ("summarize_transcripts", "url_clean_content"):
         llm = _sub(_sub(config, top_key), "llm")
         if llm.get("api_base"):
             models.append(
-                RequiredModel(
+                RequiredModels(
                     section=f"{top_key}.llm",
-                    model=str(llm["model"]),
+                    models=[str(model) for model in llm["models"]],
                     api_base=str(llm["api_base"]),
                 )
             )
 
     for top_key in ("agentic_unit_test_reviews", "agentic_shell_script_reviews"):
         llm = _sub(_sub(config, top_key), "llm")
-        api_base = llm.get("base_url") or llm.get("api_base")
+        api_base = llm.get("base_url")
+        if not api_base:
+            api_base = llm.get("api_base")
         if api_base:
             models.append(
-                RequiredModel(
+                RequiredModels(
                     section=f"{top_key}.llm",
-                    model=str(llm["model"]),
+                    models=[str(model) for model in llm["models"]],
                     api_base=str(api_base),
                 )
             )
@@ -75,67 +73,9 @@ def collect_required_models(config: _Cfg) -> list[RequiredModel]:
     return models
 
 
-def _fetch_json(url: str) -> dict[str, Any] | None:
-    try:
-        req = urllib.request.Request(url)  # noqa: S310
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:  # noqa: S310
-            if resp.status != 200:
-                return None
-            return json.loads(resp.read().decode())  # type: ignore[no-any-return]
-    except (urllib.error.URLError, TimeoutError, OSError):
-        return None
-
-
-def _strip_v1(api_base: str) -> str:
-    base = api_base.rstrip("/")
-    return base[:-3] if base.endswith("/v1") else base
-
-
 def _canonical_base(api_base: str) -> str:
     """Normalize URL so localhost and 127.0.0.1 at the same port group together."""
     return api_base.replace("localhost", "127.0.0.1")
-
-
-@dataclass(frozen=True)
-class ModelIndex:
-    """Per-instance state from /api/v0/models, keyed by full model id.
-
-    The keys are the verbatim LM Studio ids, so duplicate instances of the same
-    model (which LM Studio suffixes with ':N', e.g. 'qwen/qwen3.6-35b-a3b:2')
-    are kept distinct rather than collapsed together.
-    """
-
-    states: dict[str, str]
-
-
-def get_model_index(api_base: str) -> ModelIndex | None:
-    """GET /api/v0/models — map each model id (incl. ':N' duplicate instances) to its state. None if unreachable."""
-    base = _strip_v1(api_base)
-    data = _fetch_json(f"{base}/api/v0/models")
-    if data is None:
-        return None
-    items = data.get("data", [])
-    states = {m["id"]: str(m.get("state", "unknown")) for m in items}
-    return ModelIndex(states=states)
-
-
-def _model_matches(model: str, model_set: set[str]) -> bool:
-    if model in model_set:
-        return True
-    short = model.split("/")[-1] if "/" in model else model
-    return any(short in mid for mid in model_set)
-
-
-def _matching_instances(model: str, states: dict[str, str]) -> list[str]:
-    """Every LM Studio instance id that corresponds to a configured model id.
-
-    Reuses the prefix-tolerant matching of ``_model_matches`` (an exact id, or the
-    model's short name as a substring — which is how the configured ``openai/``
-    prefix is matched against LM Studio's prefix-free id), but returns each
-    matching instance separately so duplicate ':N' instances are surfaced rather
-    than collapsed into a single yes/no.
-    """
-    return sorted(mid for mid in states if _model_matches(model, {mid}))
 
 
 def _vlen(s: str) -> int:
@@ -194,21 +134,27 @@ def _print_table(rows: list[tuple[str, str, str, bool, str | None]]) -> None:
         )
     )
     print(sep)
-    prev_key: tuple[str, str] | None = None
+    prev_section: str | None = None
     for section, model, instance, avail, state in rows:
-        key = (section, model)
-        first = key != prev_key
-        print(row(section if first else "", model if first else "", instance, _yn(avail), _state_cell(state)))
-        prev_key = key
+        first = section != prev_section
+        print(row(section if first else "", model, instance, _yn(avail), _state_cell(state)))
+        prev_section = section
     print(bottom)
 
 
-def _check_base(api_base: str, entries: list[RequiredModel]) -> tuple[bool, list[tuple[str, str, str, bool, str | None]]]:
+def _check_base(api_base: str, entries: list[RequiredModels]) -> tuple[bool, list[tuple[str, str, str, bool, str | None]]]:
+    """Report each configured model's exact LM Studio state. Never raises.
+
+    A section is available when at least one of its configured models is loaded —
+    the same predicate ``LMStudioRegistry.resolve_first_loaded`` applies, so status
+    and the pipeline can no longer disagree about the same server.
+    """
     print(f"\n  LM Studio: {api_base}")
 
-    index = get_model_index(api_base)
-    if index is None:
-        print(f"  {_RED}FAIL{_RESET}  Server not reachable at {api_base}")
+    try:
+        registry = LMStudioRegistry.fetch(api_base)
+    except (RuntimeError, ValueError) as exc:
+        print(f"  {_RED}FAIL{_RESET}  Server not reachable at {api_base} ({exc})")
         return False, []
 
     print(f"  {_GREEN}OK{_RESET}    Server is running")
@@ -216,12 +162,18 @@ def _check_base(api_base: str, entries: list[RequiredModel]) -> tuple[bool, list
     rows: list[tuple[str, str, str, bool, str | None]] = []
     all_available = True
     for entry in sorted(entries, key=lambda e: e.section):
-        instances = _matching_instances(entry.model, index.states)
-        if not instances:
+        section_has_loaded = False
+        for model in entry.models:
+            record = registry.find(model)
+            if record is None:
+                rows.append((entry.section, model, "-", False, None))
+                continue
+            is_loaded = record.state == "loaded"
+            if is_loaded:
+                section_has_loaded = True
+            rows.append((entry.section, model, record.lm_studio_id, is_loaded, record.state))
+        if not section_has_loaded:
             all_available = False
-            rows.append((entry.section, entry.model, "-", False, None))
-            continue
-        rows.extend((entry.section, entry.model, instance, True, index.states[instance]) for instance in instances)
 
     return all_available, rows
 
@@ -240,7 +192,7 @@ def main() -> int:
         print("No LM Studio endpoints found in config.")
         return 0
 
-    bases: dict[str, list[RequiredModel]] = {}
+    bases: dict[str, list[RequiredModels]] = {}
     for rm in required:
         bases.setdefault(_canonical_base(rm.api_base), []).append(rm)
 

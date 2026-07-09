@@ -22,9 +22,12 @@ def load_summarize_transcripts_module() -> Any:
     return module
 
 
+_MODEL: str = "openai/qwen/qwen3.6-35b-a3b:2"
+
+
 def make_llm(*, context_window: int | Literal["auto"] = "auto") -> LLMConfig:
     return LLMConfig(
-        model="openai/qwen/qwen3.6-35b-a3b",
+        models=["openai/qwen/qwen3.6-35b-a3b", _MODEL],
         api_base="http://127.0.0.1:1234/v1",
         api_key="lm-studio",
         context_window=context_window,
@@ -34,69 +37,6 @@ def make_llm(*, context_window: int | Literal["auto"] = "auto") -> LLMConfig:
         max_retries=1,
         retry_delay=1.0,
     )
-
-
-def test_auto_context_window_uses_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
-    module = load_summarize_transcripts_module()
-
-    def loaded(api_base: str | None, model: str) -> int:
-        assert api_base == "http://127.0.0.1:1234/v1"
-        assert model == "openai/qwen/qwen3.6-35b-a3b"
-        return 8618
-
-    monkeypatch.setattr(module, "get_loaded_context_length", loaded)
-
-    assert module.resolve_effective_context_window(make_llm(context_window="auto")) == 8618
-
-
-def test_numeric_context_window_uses_larger_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
-    module = load_summarize_transcripts_module()
-
-    def loaded(api_base: str | None, model: str) -> int:
-        return 8618
-
-    monkeypatch.setattr(module, "get_loaded_context_length", loaded)
-
-    assert module.resolve_effective_context_window(make_llm(context_window=4096)) == 8618
-
-
-def test_numeric_context_window_rejects_loaded_context_that_is_smaller(monkeypatch: pytest.MonkeyPatch) -> None:
-    module = load_summarize_transcripts_module()
-
-    def loaded(api_base: str | None, model: str) -> int:
-        return 4096
-
-    monkeypatch.setattr(module, "get_loaded_context_length", loaded)
-
-    with pytest.raises(RuntimeError, match="exceeds loaded LM Studio context length"):
-        module.resolve_effective_context_window(make_llm(context_window=8618))
-
-
-def test_numeric_context_window_warns_and_uses_config_when_metadata_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    module = load_summarize_transcripts_module()
-
-    def fail(api_base: str | None, model: str) -> int:
-        raise RuntimeError("metadata unavailable")
-
-    monkeypatch.setattr(module, "get_loaded_context_length", fail)
-
-    assert module.resolve_effective_context_window(make_llm(context_window=4096)) == 4096
-    assert "LM Studio ctx unavailable; using config ctx=4,096" in caplog.text
-
-
-def test_auto_context_window_rejects_missing_loaded_context(monkeypatch: pytest.MonkeyPatch) -> None:
-    module = load_summarize_transcripts_module()
-
-    def fail(api_base: str | None, model: str) -> int:
-        raise RuntimeError("metadata unavailable")
-
-    monkeypatch.setattr(module, "get_loaded_context_length", fail)
-
-    with pytest.raises(RuntimeError, match="context_window=auto"):
-        module.resolve_effective_context_window(make_llm(context_window="auto"))
 
 
 def test_parallel_context_window_divides_loaded_context_by_parallelism() -> None:
@@ -123,6 +63,7 @@ def test_process_single_file_uses_effective_context_window_for_skip_decision(tmp
         output_file,
         "{transcript}",
         make_llm(context_window=1000),
+        _MODEL,
         FakeEncoder(),
         10,
         50,
@@ -150,6 +91,7 @@ def test_process_single_file_counts_prompt_tokens_for_skip_decision(tmp_path: Pa
         output_file,
         "prompt wrapper {transcript}",
         make_llm(context_window=1000),
+        _MODEL,
         FakeEncoder(),
         10,
         80,
@@ -173,7 +115,7 @@ def test_process_single_file_caps_max_tokens_to_remaining_context(tmp_path: Path
                 return [0, 1]
             return list(range(12))
 
-    def complete(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
+    def complete(prompt: str, llm: LLMConfig, model: str, max_tokens: int) -> str:
         requested_max_tokens.append(max_tokens)
         return "summary"
 
@@ -184,6 +126,7 @@ def test_process_single_file_caps_max_tokens_to_remaining_context(tmp_path: Path
         output_file,
         "prompt wrapper {transcript}",
         make_llm(context_window=1000),
+        _MODEL,
         FakeEncoder(),
         20,
         80,
@@ -206,7 +149,7 @@ def test_process_single_file_does_not_swallow_context_size_exceeded(tmp_path: Pa
         def encode(self, transcript: str, disallowed_special: tuple[object, ...]) -> list[int]:
             return [0, 1, 2]
 
-    def fail_with_context_error(prompt: str, llm: LLMConfig, max_tokens: int) -> str:
+    def fail_with_context_error(prompt: str, llm: LLMConfig, model: str, max_tokens: int) -> str:
         nonlocal calls
         calls += 1
         raise module.ContextSizeExceededError("Context size has been exceeded")
@@ -219,6 +162,7 @@ def test_process_single_file_does_not_swallow_context_size_exceeded(tmp_path: Pa
             output_file,
             "{transcript}",
             make_llm(context_window=1000),
+            _MODEL,
             FakeEncoder(),
             100,
             80,
@@ -312,6 +256,7 @@ def test_final_summary_details_failures_but_counts_oversized_skips(
         output_file: Path,
         prompt_template: str,
         llm: object,
+        model: str,
         encoder: object,
         effective_context_window: int,
         skip_threshold_pct: int,
@@ -329,6 +274,7 @@ def test_final_summary_details_failures_but_counts_oversized_skips(
         ],
         "",
         None,
+        _MODEL,
         None,
         10,
         80,
