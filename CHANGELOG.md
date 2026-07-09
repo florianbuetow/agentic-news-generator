@@ -11,6 +11,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 2026-07
 
+### 2026-07-09
+
+#### Added
+
+- LLM config sections now take an ordered `models:` list; the first loaded model wins.
+- Model resolution logs every candidate checked, why it was skipped, and the final pick.
+
+#### Changed
+
+- **BREAKING:** `llm.model` is now `llm.models`. Replace `model: x` with a `models:` list.
+- `summarize-transcripts` now picks loaded `:N` model instances instead of aborting.
+- `just status` reports each configured model's exact load state, agreeing with the pipeline.
+- Models resolve just before the first LLM call, so no-op and dry runs stay offline.
+
+#### Removed
+
+- Removed the fallback to the configured context window when LM Studio is unreachable.
+
+#### Security
+
+- Bumped soupsieve to 2.8.4, closing GHSA-836r-79rf-4m37 and GHSA-2wc2-fm75-p42x.
+
+---
+
 ### 2026-07-05
 
 #### Added
