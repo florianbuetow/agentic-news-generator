@@ -108,7 +108,7 @@ class ModelRecord:
     lm_studio_id: str
     state: str
     loaded_context_length: int | None
-    max_context_length: int
+    max_context_length: int | None
 
 
 @dataclass(frozen=True)
@@ -142,12 +142,15 @@ class LMStudioRegistry:
             loaded_context_length = info.get("loaded_context_length")
             if not isinstance(loaded_context_length, int) or loaded_context_length <= 0:
                 loaded_context_length = None
+            max_context_length = info.get("max_context_length")
+            if not isinstance(max_context_length, int) or max_context_length <= 0:
+                max_context_length = None
             model_id = str(info["id"])
             records[model_id] = ModelRecord(
                 lm_studio_id=model_id,
                 state=str(info["state"]),
                 loaded_context_length=loaded_context_length,
-                max_context_length=int(info["max_context_length"]),
+                max_context_length=max_context_length,
             )
 
         registry = cls(api_base=api_base, records=records)
@@ -197,6 +200,10 @@ class LMStudioRegistry:
             if record.loaded_context_length is None:
                 raise ModelNotLoadedError(f"Loaded LM Studio model does not report loaded_context_length: {record.lm_studio_id}")
 
+            max_context_length = record.max_context_length
+            if max_context_length is None:
+                raise ModelNotLoadedError(f"Loaded LM Studio model does not report max_context_length: {record.lm_studio_id}")
+
             if min_context_window is not None and record.loaded_context_length < min_context_window:
                 logger.warning(
                     "%s LOADED but its context window is %s tokens, below the configured %s — skipping",
@@ -215,7 +222,7 @@ class LMStudioRegistry:
                 configured_model=model,
                 lm_studio_id=record.lm_studio_id,
                 loaded_context_length=record.loaded_context_length,
-                max_context_length=record.max_context_length,
+                max_context_length=max_context_length,
             )
             break
 

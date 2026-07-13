@@ -77,7 +77,7 @@ def _registry(records: list[dict[str, Any]]) -> lm_studio.LMStudioRegistry:
                 lm_studio_id=record["id"],
                 state=record["state"],
                 loaded_context_length=record.get("loaded_context_length"),
-                max_context_length=record["max_context_length"],
+                max_context_length=record.get("max_context_length"),
             )
             for record in records
         },
@@ -94,6 +94,10 @@ _INSTANCE_LOADED: dict[str, Any] = {
     "state": "loaded",
     "max_context_length": 262144,
     "loaded_context_length": 32768,
+}
+_INCOMPLETE_NOT_LOADED: dict[str, Any] = {
+    "id": "paddleocr-vl-1.6",
+    "state": "not-loaded",
 }
 
 
@@ -169,6 +173,14 @@ def test_resolve_first_loaded_raises_when_loaded_record_lacks_context_length() -
         registry.resolve_first_loaded(["model-a"], min_context_window=None)
 
 
+def test_resolve_first_loaded_raises_when_loaded_record_lacks_max_context_length() -> None:
+    """A selected loaded model must report its supported maximum context length."""
+    registry = _registry([{"id": "model-a", "state": "loaded", "loaded_context_length": 8192}])
+
+    with pytest.raises(lm_studio.ModelNotLoadedError, match="max_context_length"):
+        registry.resolve_first_loaded(["model-a"], min_context_window=None)
+
+
 def test_loaded_ids_lists_only_loaded_records() -> None:
     """loaded_ids ignores downloaded-but-not-loaded models."""
     registry = _registry([_BASE_NOT_LOADED, _INSTANCE_LOADED])
@@ -190,6 +202,26 @@ def test_registry_fetch_parses_lm_studio_payload(monkeypatch: pytest.MonkeyPatch
 
     assert registry.records["qwen/qwen3.6-35b-a3b"].loaded_context_length is None
     assert registry.records["qwen/qwen3.6-35b-a3b:2"].loaded_context_length == 32768
+
+
+def test_registry_fetch_tolerates_unloaded_record_without_max_context_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Incomplete metadata for an unrelated unloaded model must not block resolution."""
+
+    def fake_urlopen(url: str, timeout: int) -> FakeResponse:
+        return FakeResponse({"data": [_INCOMPLETE_NOT_LOADED, _BASE_NOT_LOADED, _INSTANCE_LOADED]})
+
+    monkeypatch.setattr(lm_studio, "urlopen", fake_urlopen)
+
+    registry = lm_studio.LMStudioRegistry.fetch("http://127.0.0.1:1234/v1")
+    loaded = registry.resolve_first_loaded(
+        ["openai/qwen/qwen3.6-35b-a3b", "openai/qwen/qwen3.6-35b-a3b:2"],
+        min_context_window=None,
+    )
+
+    assert registry.records["paddleocr-vl-1.6"].max_context_length is None
+    assert loaded.lm_studio_id == "qwen/qwen3.6-35b-a3b:2"
 
 
 def test_registry_fetch_requires_api_base() -> None:
