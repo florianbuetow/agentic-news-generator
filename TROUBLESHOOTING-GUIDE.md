@@ -17,6 +17,7 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | Fetch missing `.info.json` | `just fetch-video-metadata <CHANNEL> <ID...>` |
 | Nuke every file for a video ID | `just clean-video-files VIDEO_ID=<id>` |
 | Find format-code artifacts | `find <audio_dir> -name '*.f[0-9]*.wav'` |
+| Find interrupted-merge leftovers | `find <videos_dir> -name '*.temp.mp4' -o -name '*.f[0-9]*.webm'` |
 | Find macOS AppleDouble sidecars | `find <data_dir> -name '._*'` |
 
 ---
@@ -206,6 +207,40 @@ print(len(audio_formats), 'audio formats available')
 
 ---
 
+## Playbook: Interrupted Merge — Unmerged Stream Artifacts in `videos/`
+
+A variant of the above that reports the same "No audio stream found" error, but for a different reason: yt-dlp downloaded both streams successfully and was **interrupted during the ffmpeg merge**. No merged `.mp4` was ever produced.
+
+**How to identify** — `just find-files <VIDEO_ID>` shows several files in `downloads/videos/<CHANNEL>/` where there should be exactly one `.mp4`:
+
+| Artifact | Contents |
+|---|---|
+| `[…].f137.mp4` | video-only (h264) — the source of the "no audio stream" error |
+| `[…].f251.webm` | audio-only (opus) |
+| `[…].temp.mp4` | partial merge output — `ffprobe` reports `moov atom not found` |
+
+Confirm with `ffprobe -v error -show_entries stream=codec_type,codec_name -of csv=p=0 <file>` on each.
+
+**The trap:** `extract-audio` succeeds on the audio-only `.webm` and writes `[…].f251.wav` — a *complete, valid* WAV carrying a format-code suffix. It looks like a usable result and tempts you into keeping it. Do not. It is derived from the abandoned download, and keeping it prevents re-extraction from the clean merge (see the derived-WAV rule under **Playbook: Removing Download Artifacts**). It will also break metadata lookup — see **Case 2** of the "Metadata file not found" playbook.
+
+**Steps:**
+
+1. `just find-files <VIDEO_ID>` — enumerate every artifact.
+2. `rm` all three video-dir artifacts (`.f*.mp4`, `.f*.webm`, `.temp.mp4`) — one literal `rm` per file.
+3. `rm` the derived `[…].f*.wav` **and** `[…].f*.silence_map.json`.
+4. Remove the ID from the archive so yt-dlp will refetch:
+   ```bash
+   sed -i '' '/<VIDEO_ID>/d' <videos_dir>/<CHANNEL>/downloaded.txt
+   ```
+   Verify with `grep -c <VIDEO_ID> …/downloaded.txt` → must print `0`.
+5. `just download-videos` → `just extract-audio` → `just transcribe`.
+
+`.info.json` and `.webp` can stay — yt-dlp overwrites both on re-download.
+
+**Note the archive bug:** yt-dlp wrote the ID to `downloaded.txt` even though the merge never completed, so without step 4 the video is skipped forever while `extract-audio` fails on the leftovers **every single run**. That is the loop this playbook breaks. A permanent fix would verify the merged MP4 exists and has both streams before trusting the archive write.
+
+---
+
 ## Playbook: Corrupt Video Suspected
 
 1. `just check-video-integrity` — flags all corrupt files.
@@ -215,6 +250,21 @@ print(len(audio_formats), 'audio formats available')
 ---
 
 ## Playbook: Removing Download Artifacts — Re-download Decision
+
+### Rule: deleting a stream artifact means deleting its derived WAV
+
+**Whenever you remove a partial or broken download artifact — a video-only stream (`.f137.mp4`), an audio-only stream (`.f251.webm`), a `.temp.mp4`, a `.part`, or a corrupt merged `.mp4` — you MUST also remove every artifact derived from it:**
+
+- the `.wav` under `downloads/audio/<CHANNEL>/`
+- the `.silence_map.json` under `downloads/metadata/<CHANNEL>/audio/`
+
+**Why this is not optional:** `extract-audio` skips any video whose `.wav` already exists ("WAV already exists"). A WAV left behind from the broken download therefore **survives the re-download and silently wins** — the pipeline transcribes audio from the download you just decided was bad, and the fresh MP4 is never extracted. Nothing errors. You get a clean-looking run built on the discarded artifact.
+
+The same applies in reverse: never delete the WAV and keep the stream artifacts, and never keep a WAV whose format-code suffix no longer matches anything on disk.
+
+**Sequencing:** if the WAV is the only surviving copy of the audio, that is a reason to check the re-download will work (cookies valid, video still public) — **not** a reason to keep the WAV through the re-download. Keeping it defeats the entire operation.
+
+### Archive entry decision
 
 When deleting any artifact for a video ID (`.mp4`, `.mp4.part`, `.wav`, `.info.json`, `.silence_map.json`, transcript files), **always ask explicitly** whether to also remove the entry from `downloaded.txt` (yt-dlp archive).
 
