@@ -1,15 +1,50 @@
 #!/bin/bash
 
 # move-metadata.sh: Move .info.json files from video folders to metadata folders
-# Usage: ./scripts/move-metadata.sh
+# Usage: ./scripts/move-metadata.sh [channel]
+# Without an argument every channel directory is processed; with one, only that
+# channel's directory is touched.
 
 # Source central configuration
 source "$(dirname "$0")/config.sh"
 
+if [ $# -gt 1 ]; then
+    echo "Usage: $0 [channel]" >&2
+    exit 1
+fi
+
+# Accept the raw channel name from config.yaml as well as its directory form, so
+# this takes the same argument as `just download-videos <channel>`. Sanitizing
+# goes through the shared helper to stay in step with the downloader.
+channel=""
+if [ -n "${1:-}" ]; then
+    channel=$(cd "$(dirname "$0")/.." && uv run python -c "
+import sys
+from src.util.channel_name import sanitize_channel_name
+print(sanitize_channel_name(sys.argv[1]))
+" "$1")
+    if [ -z "$channel" ]; then
+        echo "🚨 ERROR: Failed to resolve a directory name for channel '$1'" >&2
+        exit 1
+    fi
+fi
+
 # Create metadata directory if it doesn't exist
 mkdir -p "$metadata_dir"
 
-echo "Moving metadata files from videos to metadata folders..."
+# Directories to process: just the requested channel, or every channel.
+if [ -n "$channel" ]; then
+    if [ ! -d "$videos_dir/$channel" ]; then
+        echo "No video directory for channel '$channel' - nothing to move."
+        echo ""
+        exit 0
+    fi
+    channel_dirs=("$videos_dir/$channel")
+    echo "Moving metadata files for channel '$channel' from videos to metadata folders..."
+else
+    channel_dirs=("$videos_dir"/*)
+    echo "Moving metadata files from videos to metadata folders..."
+fi
 echo ""
 
 # Thumbnail extensions yt-dlp may produce from YouTube responses (see scripts/fetch-video-thumbnails.py).
@@ -41,8 +76,8 @@ total_moved=0
 total_errors=0
 total_thumbs_moved=0
 
-# Iterate through all channel directories
-for channel_dir in "$videos_dir"/*; do
+# Iterate through the selected channel directories
+for channel_dir in "${channel_dirs[@]}"; do
     # Skip if not a directory
     if [ ! -d "$channel_dir" ]; then
         continue

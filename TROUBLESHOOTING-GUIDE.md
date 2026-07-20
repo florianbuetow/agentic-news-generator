@@ -16,8 +16,7 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | Total transcribed hours | `just audio-hours` |
 | Fetch missing `.info.json` | `just fetch-video-metadata <CHANNEL> <ID...>` |
 | Nuke every file for a video ID | `just clean-video-files VIDEO_ID=<id>` |
-| Find format-code artifacts | `find <audio_dir> -name '*.f[0-9]*.wav'` |
-| Find interrupted-merge leftovers | `find <videos_dir> -name '*.temp.mp4' -o -name '*.f[0-9]*.webm'` |
+| Find unmerged format-code artifacts | `just find-partial [<CHANNEL>]` |
 | Find macOS AppleDouble sidecars | `find <data_dir> -name '._*'` |
 
 ---
@@ -29,6 +28,16 @@ Scan all data directories in `config.yaml` for filenames containing the video ID
 
 ### `scripts/find-empty-transcripts.sh` — `just find-empty-transcripts`
 List transcript `*.txt` files ≤100 bytes under `data_downloads_transcripts_dir`. Grouped by channel.
+
+### `scripts/find-partial-downloads.sh` — `just find-partial [<CHANNEL>]`
+Read-only scan of every data directory in `config.yaml` for format-code artifacts (`*.f[0-9]*.*`) — the unmerged single streams yt-dlp leaves behind when an ffmpeg merge never completes, plus everything derived from them (`.f251-8.wav`, `.f251-11.silence_map.json`). Without a channel argument it scans all channels.
+
+Results are grouped by video ID, since that is the unit the cleanup playbook operates on. Each group states whether a properly merged `.mp4` exists for that ID, which decides the remedy:
+
+- **merged `.mp4` present** → the merge did complete; the format-code files are stale leftovers to delete along with their derived files.
+- **merged `.mp4` MISSING** → the download never completed; the ID also needs removing from `downloaded.txt` and re-downloading.
+
+AppleDouble sidecars (`._*`) are counted but not listed — they are macOS metadata shadows of the real artifacts, not downloads. Exits `1` if any artifacts are found, else `0`. See **Playbook: Interrupted Merge**.
 
 ### `scripts/find-and-clean-empty-data-files.py` — `just clean-empty-files`
 Walk the data root, find all 0-byte files (skipping `.gitkeep`, `.DS_Store`), list them, prompt to delete.
@@ -211,7 +220,7 @@ print(len(audio_formats), 'audio formats available')
 
 A variant of the above that reports the same "No audio stream found" error, but for a different reason: yt-dlp downloaded both streams successfully and was **interrupted during the ffmpeg merge**. No merged `.mp4` was ever produced.
 
-**How to identify** — `just find-files <VIDEO_ID>` shows several files in `downloads/videos/<CHANNEL>/` where there should be exactly one `.mp4`:
+**How to identify** — `just find-partial` sweeps every channel for these artifacts without needing a video ID up front, and reports for each ID whether the merged `.mp4` exists. Use it when you do not yet know which videos are affected; use `just find-files <VIDEO_ID>` when you do. Either way you see several files in `downloads/videos/<CHANNEL>/` where there should be exactly one `.mp4`:
 
 | Artifact | Contents |
 |---|---|
@@ -225,7 +234,7 @@ Confirm with `ffprobe -v error -show_entries stream=codec_type,codec_name -of cs
 
 **Steps:**
 
-1. `just find-files <VIDEO_ID>` — enumerate every artifact.
+1. `just find-partial <CHANNEL>` (or `just find-files <VIDEO_ID>`) — enumerate every artifact.
 2. `rm` all three video-dir artifacts (`.f*.mp4`, `.f*.webm`, `.temp.mp4`) — one literal `rm` per file.
 3. `rm` the derived `[…].f*.wav` **and** `[…].f*.silence_map.json`.
 4. Remove the ID from the archive so yt-dlp will refetch:
@@ -326,15 +335,17 @@ UnicodeDecodeError: 'utf-8' codec can't decode byte 0xb0 in position 37: invalid
 
 Root cause: the transcription script reads a **macOS AppleDouble shadow file** (`._<name>.info.json`) as if it were the real metadata JSON. AppleDouble files are binary — they begin with the magic header `00 05 16 07 ... "Mac OS X"` — so `json.load` chokes on the first non-UTF-8 byte. The `0xb0` at position 37 is part of that binary header, not real content. (The byte/position may differ; any `invalid start byte` from `json.load` on a metadata file is the same problem.)
 
-Why the wrong file gets picked (verified at `scripts/transcribe_audio.py:122-139`):
+**Fixed in code (commit `6a099b5`, 2026-06-10).** `find_metadata_file` now skips dotfiles in its glob fallback, so this failure can no longer be triggered by AppleDouble sidecars. The mechanism below is retained because the error text still appears in older logs, and because the same class of bug can return if the filter is ever dropped. If you hit this error on current code, the cause is something else — do not assume sidecars.
+
+Why the wrong file used to get picked (`scripts/transcribe_audio.py:119-136`):
 
 - `find_metadata_file` first tries the exact stem `<base_name>.info.json`. For a normal WAV this hits the real file and the bug never triggers.
 - When the WAV carries a **format-code suffix** (e.g. `… [VIDEO_ID].f251-11.wav` — see **Case 2** of the previous playbook), the exact stem `… .f251-11.info.json` does not exist, so the code falls back to `sorted(metadata_video_dir.glob("*.info.json"))` and returns the first file whose bracketed video ID matches.
 - On the external data drive (a non-APFS/HFS+ filesystem — exFAT/SMB/etc.), macOS writes an AppleDouble `._<name>.info.json` sidecar next to every real file. The glob returns **both**, and `sorted()` ranks `._…` first because `.` (`0x2E`) sorts before `A` (`0x41`). The script therefore opens the binary sidecar.
 
-So two conditions must both hold: a format-code-suffixed WAV **and** AppleDouble sidecars on disk. WAV discovery already filters these out (`scripts/transcribe_audio.py:405,483` — `if not f.name.startswith(".")`); only the metadata glob fallback at `scripts/transcribe_audio.py:135` is missing the same filter.
+Two conditions had to hold together: a format-code-suffixed WAV **and** AppleDouble sidecars on disk. WAV discovery already filtered these out (`scripts/transcribe_audio.py:401,479` — `if not f.name.startswith(".")`); the metadata glob fallback lacked the same filter until `6a099b5` added it at `scripts/transcribe_audio.py:133`.
 
-**Immediate fix — remove the AppleDouble sidecars** (they carry no real content, only resource-fork/xattr metadata):
+**Cleaning up the sidecars** (they carry no real content, only resource-fork/xattr metadata):
 
 1. Dry run — list what would be removed under the metadata dir (narrow to one channel with `/<CHANNEL>`):
    ```bash
@@ -346,7 +357,7 @@ So two conditions must both hold: a format-code-suffixed WAV **and** AppleDouble
    ```
 3. Re-run `just transcribe`.
 
-**This recurs.** macOS recreates `._` files whenever it touches that filesystem (Finder copy, Spotlight indexing, etc.), so deletion is a band-aid. The permanent fix is in code: `find_metadata_file` must skip dotfiles in its glob fallback, mirroring the WAV-discovery filter at `scripts/transcribe_audio.py:405,483`.
+**Sidecars still recur** — macOS recreates `._` files whenever it touches that filesystem (Finder copy, Spotlight indexing, etc.), so deletion remains a band-aid. That no longer matters for transcription, which now ignores them, but they still add noise to any directory listing or glob written without a dotfile filter.
 
 The underlying `.f251-11` format-code artifact is itself a broken-download symptom — see **Case 2** above for cleaning it up and re-downloading.
 

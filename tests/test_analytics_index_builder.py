@@ -204,6 +204,23 @@ class TestBuildIndexHappyPath:
 
         assert len(build_index(config).records) == 1
 
+    def test_hidden_directories_ignored(self, tmp_path: Path) -> None:
+        """Hidden dot-directories in the cleaned tree (e.g. .claude) are not channels.
+
+        Stray tooling cruft such as a .claude project dir can appear beside the
+        real channel dirs. It must be skipped, not treated as an unconfigured
+        channel — sanitize_channel_name strips '.', so no real channel starts
+        with one.
+        """
+        config = make_config(tmp_path, ["Mock Channel"])
+        add_video(tmp_path, "Mock_Channel", "Video A", "aaaaaaaaaa1")
+        cleaned_root = tmp_path / "data" / "downloads" / "transcripts_cleaned"
+        (cleaned_root / ".claude").mkdir(parents=True, exist_ok=True)
+
+        index = build_index(config)
+        assert len(index.records) == 1
+        assert index.records[0].channel == "Mock_Channel"
+
 
 class TestBuildIndexFailFast:
     """Every documented fail-fast condition aborts the run."""

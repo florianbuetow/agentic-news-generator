@@ -116,11 +116,17 @@ def _channel_map(config: Config) -> dict[str, ChannelConfig]:
 
 
 def _iter_channel_dirs(cleaned_dir: Path) -> list[Path]:
-    """List channel directories in the cleaned corpus in stable order."""
+    """List channel directories in the cleaned corpus in stable order.
+
+    Hidden dot-directories (a stray ``.claude`` project dir, ``.DS_Store``,
+    macOS ``._`` AppleDouble entries) are never channels: sanitize_channel_name
+    strips ``.``, so no real channel directory can start with one. They are
+    skipped rather than treated as an unconfigured channel.
+    """
     if not cleaned_dir.is_dir():
         return []
     return sorted(
-        (entry for entry in cleaned_dir.iterdir() if entry.is_dir() and not entry.name.startswith("._")),
+        (entry for entry in cleaned_dir.iterdir() if entry.is_dir() and not entry.name.startswith(".")),
         key=lambda entry: entry.name,
     )
 

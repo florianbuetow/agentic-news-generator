@@ -102,6 +102,7 @@ help:
     @printf "  %-38s %s\n" "analytics-index" "Build corpus index from cleaned transcripts + summaries"
     @printf "  %-38s %s\n" "analytics-themes" "Theme frequency + TF-IDF term report"
     @printf "  %-38s %s\n" "analytics-timeline" "Timeline report bucketed by upload date"
+    @printf "  %-38s %s\n" "publication-timeseries [<channel>]" "Per-channel publication timeseries CSV + frequency report"
     @echo ""
     @printf "\033[0;33mCode Quality:\033[0m\n"
     @printf "  %-38s %s\n" "code-format" "Auto-fix code style and formatting"
@@ -135,6 +136,7 @@ help:
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @printf "  %-46s %s\n" "find-files-without-youtube-id" "Report data files missing a YouTube ID (writes to reports/)"
     @printf "  %-46s %s\n" "find-files-with-filtered-video-ids" "Flag data files whose video ID is in the filter file (read-only)"
+    @printf "  %-46s %s\n" "find-partial [<channel>]" "List unmerged format-code artifacts (*.f<code>.*), all channels or one"
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
@@ -339,7 +341,7 @@ download-videos channel="":
         exit $download_exit_code
     fi
     printf "\033[0;34m=== Moving Metadata Files ===\033[0m\n"
-    bash scripts/move-metadata.sh
+    bash scripts/move-metadata.sh {{ channel }}
     echo ""
     printf "\033[0;34m=== Adding Members-Only Videos to Skip List ===\033[0m\n"
     uv run scripts/parse-and-archive-membersonly.py
@@ -1139,6 +1141,14 @@ find-empty-transcripts:
     @bash scripts/find-empty-transcripts.sh
     @echo ""
 
+# List unmerged format-code artifacts (*.f<code>.*), optionally for one channel
+find-partial CHANNEL="":
+    @echo ""
+    @printf "\033[0;34m=== Finding Partial Downloads ===\033[0m\n"
+    @echo ""
+    @bash scripts/find-partial-downloads.sh {{ CHANNEL }}
+    @echo ""
+
 # Flag data files whose video ID is in the filter file but were never removed (read-only)
 find-files-with-filtered-video-ids:
     @echo ""
@@ -1279,3 +1289,10 @@ analytics-timeline:
 # Full research digest: index + themes + timeline + emerging diff
 analytics:
     @uv run python scripts/analytics/digest.py
+
+# Build per-channel publication timeseries CSV + frequency report (optional: just publication-timeseries <channel>)
+publication-timeseries channel="":
+    @echo ""
+    @printf "\033[0;34m=== Building Publication Timeseries ===\033[0m\n"
+    @uv run python scripts/analytics/publication_timeseries.py {{ if channel == "" { "" } else { "--channel " + channel } }}
+    @echo ""
