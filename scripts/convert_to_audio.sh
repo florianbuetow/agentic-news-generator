@@ -142,25 +142,17 @@ compute_kept_segments_from_speech() {
     '
 }
 
-# ============================================================================
-
-echo "Converting videos to audio files"
-echo "=========================================="
-echo ""
-
-total_fail_count=0
-
-# Iterate over all channel folders in videos directory
-while read -r channel_dir; do
-    channel_name=$(basename "$channel_dir")
-
-    # Create output directory for this channel
-    mkdir -p "$audio_dir/$channel_name"
-
-    # Count total files and files needing processing in this channel
-    total_files=0
-    to_process=0
-    current_time_prescan=$(date +%s)
+# Function to count a channel's video files: how many still need conversion,
+# and how many there are in total. Mirrors the skip logic in the conversion loop.
+# Arguments: $1 = channel directory, $2 = channel name
+# Returns: "<to_process>\t<total_files>"
+count_channel_work() {
+    local channel_dir="$1"
+    local channel_name="$2"
+    local total_files=0
+    local to_process=0
+    local prescan_file prescan_filename prescan_ext prescan_base prescan_ext_lower
+    local prescan_valid allowed_ext prescan_wav prescan_json
 
     while IFS= read -r -d '' prescan_file; do
         prescan_filename=$(basename "$prescan_file")
@@ -192,6 +184,24 @@ while read -r channel_dir; do
 
         to_process=$((to_process + 1))
     done < <(find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -print0)
+
+    printf '%s\t%s\n' "$to_process" "$total_files"
+}
+
+# ============================================================================
+
+echo "Converting videos to audio files"
+echo "=========================================="
+echo ""
+
+total_fail_count=0
+
+# Iterate over channel folders, fewest videos awaiting conversion first
+while IFS=$'\t' read -r to_process total_files channel_dir; do
+    channel_name=$(basename "$channel_dir")
+
+    # Create output directory for this channel
+    mkdir -p "$audio_dir/$channel_name"
 
     process_index=0
 
@@ -459,7 +469,11 @@ while read -r channel_dir; do
     fi
 
     echo ""
-done < <(find "$videos_dir" -mindepth 1 -maxdepth 1 -type d)
+done < <(
+    while IFS= read -r channel_dir; do
+        printf '%s\t%s\n' "$(count_channel_work "$channel_dir" "$(basename "$channel_dir")")" "$channel_dir"
+    done < <(find "$videos_dir" -mindepth 1 -maxdepth 1 -type d) | sort -t$'\t' -k1,1n
+)
 
 if [ $total_fail_count -gt 0 ]; then
     echo "Audio conversion finished with $total_fail_count failure(s)."
