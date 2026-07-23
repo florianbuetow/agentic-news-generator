@@ -23,6 +23,11 @@ fi
 # Detect number of CPU cores for optimal threading
 num_threads=$(detect_cpu_cores)
 
+# Stop before converting the next video once free space drops below this floor.
+# Mirrors the per-channel disk guard in yt-downloader.py.
+min_free_disk_gb=3
+min_free_disk_kb=$((min_free_disk_gb * 1024 * 1024))
+
 # ============================================================================
 # HELPER FUNCTIONS FOR SILENCE DETECTION
 # ============================================================================
@@ -256,12 +261,11 @@ while read -r channel_dir; do
             process_index=$((process_index + 1))
             echo "  [$process_index/$to_process] Processing: $filename"
 
-            # Check available disk space on target device (require >= 2 GB)
+            # Check available disk space on target device before converting
             available_kb=$(df -k "$audio_dir" | awk 'NR==2 {print $4}')
-            required_kb=$((2 * 1024 * 1024))
-            if [ "$available_kb" -lt "$required_kb" ]; then
+            if [ "$available_kb" -lt "$min_free_disk_kb" ]; then
                 available_mb=$((available_kb / 1024))
-                echo "  🚨 ERROR: Less than 2 GB disk space remaining on target device (${available_mb} MB available)"
+                echo "  🚨 ERROR: Less than $min_free_disk_gb GB disk space remaining on target device (${available_mb} MB available)"
                 exit 1
             fi
 

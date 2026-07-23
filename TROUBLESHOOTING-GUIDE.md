@@ -18,6 +18,7 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | Nuke every file for a video ID | `just clean-video-files VIDEO_ID=<id>` |
 | Find unmerged format-code artifacts | `just find-partial [<CHANNEL>]` |
 | Find macOS AppleDouble sidecars | `find <data_dir> -name '._*'` |
+| Files stuck in a channel, no errors | See **Playbook: Files Stuck in a Channel** |
 
 ---
 
@@ -38,6 +39,11 @@ Results are grouped by video ID, since that is the unit the cleanup playbook ope
 - **merged `.mp4` MISSING** → the download never completed; the ID also needs removing from `downloaded.txt` and re-downloading.
 
 AppleDouble sidecars (`._*`) are counted but not listed — they are macOS metadata shadows of the real artifacts, not downloads. Exits `1` if any artifacts are found, else `0`. See **Playbook: Interrupted Merge**.
+
+Two guards exist because an empty result from this tool authorises deletions:
+
+- **Unknown channel is an error, not a clean scan.** A channel name matching no directory under any configured data path exits `1` with `Error: no directory named …`. Channels live below the per-stage directories (`downloads/videos/<CHANNEL>`, `downloads/metadata/<CHANNEL>/video`, `archive/videos/<CHANNEL>`), never directly under the data root, so the scan matches the channel as a path component wherever it appears.
+- **A running `yt-dlp` triggers a banner.** yt-dlp writes these exact artifacts while downloading and only merges at the end, so an in-flight download is indistinguishable from an abandoned one by filename alone — and the remedy for the abandoned case would destroy the live one. When a download is running the scan is only a snapshot: artifacts may still be in flight and more may appear. Wait for it to exit, then re-run.
 
 ### `scripts/find-and-clean-empty-data-files.py` — `just clean-empty-files`
 Walk the data root, find all 0-byte files (skipping `.gitkeep`, `.DS_Store`), list them, prompt to delete.
@@ -185,6 +191,14 @@ If the count matches the number of entries in `downloaded.txt`, the pipeline ran
 
 When `just extract-audio` reports `❌ FAILED: No audio stream found (video-only file)`, first confirm the downloaded file has no audio stream, then determine whether YouTube had audio available.
 
+**Step 0 — Is `just download-videos` still running?** If the reported filename carries a format code (`… [VIDEO_ID].f137.mp4`), this is the most likely cause and nothing is wrong with the data. yt-dlp writes the video-only stream first and merges last, so a concurrent `extract-audio` reads a file that is still being assembled and correctly reports it has no audio.
+
+```bash
+ps -Ao lstart,command | grep '[y]t-dlp'
+```
+
+Any hit → let the download finish, then re-run `just extract-audio`; the merged `.mp4` will have both streams. Delete nothing, and do not touch `downloaded.txt`. Confirm afterwards with the ffprobe in Step 1: `h264,video` **and** an audio line means it resolved itself. The two stages are not safe to run concurrently against the same channel.
+
 **Step 1 — Confirm with ffprobe that the MP4 has no audio stream:**
 
 ```bash
@@ -232,6 +246,14 @@ Confirm with `ffprobe -v error -show_entries stream=codec_type,codec_name -of cs
 
 **The trap:** `extract-audio` succeeds on the audio-only `.webm` and writes `[…].f251.wav` — a *complete, valid* WAV carrying a format-code suffix. It looks like a usable result and tempts you into keeping it. Do not. It is derived from the abandoned download, and keeping it prevents re-extraction from the clean merge (see the derived-WAV rule under **Playbook: Removing Download Artifacts**). It will also break metadata lookup — see **Case 2** of the "Metadata file not found" playbook.
 
+**First, rule out a download that is still running.** A live `yt-dlp` produces artifacts identical to this playbook's symptoms — including `extract-audio` failing with "No audio stream found" on a `.f137.mp4` that merges cleanly minutes later. Running the steps below mid-download deletes work in progress:
+
+```bash
+ps -Ao lstart,command | grep '[y]t-dlp'
+```
+
+Any hit → stop. Wait for it to exit, then re-scan; the artifact is very likely transient. `just find-partial` prints a banner in this case, but check directly when working from `just find-files` instead.
+
 **Steps:**
 
 1. `just find-partial <CHANNEL>` (or `just find-files <VIDEO_ID>`) — enumerate every artifact.
@@ -247,6 +269,148 @@ Confirm with `ffprobe -v error -show_entries stream=codec_type,codec_name -of cs
 `.info.json` and `.webp` can stay — yt-dlp overwrites both on re-download.
 
 **Note the archive bug:** yt-dlp wrote the ID to `downloaded.txt` even though the merge never completed, so without step 4 the video is skipped forever while `extract-audio` fails on the leftovers **every single run**. That is the loop this playbook breaks. A permanent fix would verify the merged MP4 exists and has both streams before trusting the archive write.
+
+---
+
+## Playbook: Files Stuck in a Channel — Nothing Errors, Nothing Progresses
+
+Symptom: a channel's `downloads/videos/<CHANNEL>/`, `downloads/audio/<CHANNEL>/` or `archive/videos/<CHANNEL>/` holds files that survive run after run. No recipe fails. `just stats` looks fine. The files simply never become transcripts.
+
+Stuck files are the residue of a stage that **failed without raising**. Three mechanisms produce them, and they need opposite remedies — so classify before deleting anything. The cost of guessing is asymmetric: the data volume has no backup, and a wrong deletion of a good WAV is unrecoverable if the disk is too full to re-download (see step 2).
+
+### Step 0 — Rule out a live download
+
+yt-dlp produces artifacts indistinguishable from abandoned ones. Everything below is invalid while it runs:
+
+```bash
+ps -Ao lstart,command | grep '[y]t-dlp'
+```
+
+Any hit → stop, wait, re-scan.
+
+### Step 1 — Inventory the channel across all stage dirs
+
+```bash
+ls -la <videos_dir>/<CHANNEL>/ <audio_dir>/<CHANNEL>/ <archive_videos_dir>/<CHANNEL>/
+```
+
+Then, for each suspicious video ID, get the full cross-stage picture — this is the single most informative command in this playbook:
+
+```bash
+just find-files <VIDEO_ID>
+```
+
+Read it for two things: (a) which stage the ID stops at, and (b) whether a **format-code twin** (`.f251`, `.f251-8`, `.f399`) exists beside a clean file. A twin means two parallel artifact sets for one video.
+
+### Step 2 — Check free disk before forming any theory
+
+```bash
+df -h <data_dir>
+```
+
+This governs both diagnosis and remedy. `MIN_FREE_DISK_GB = 20` in `scripts/yt-downloader.py`; `just download-videos` refuses to start below it. **If free space is under that threshold, deleting a good MP4/WAV strands the video** — it cannot be re-fetched until space is freed. A full disk is also a prime cause of the silent failure in Case A.
+
+### Step 3 — Classify each stuck ID
+
+| Evidence | Case |
+|---|---|
+| ID present in `config/filefilter.json` | **A** — condemned as "no speech" |
+| Format-code twin alongside a clean set | **B** — interrupted-merge duplicate |
+| `.info.json` in `videos/` but absent from `metadata/<CHANNEL>/video/` | **C** — metadata never landed |
+
+---
+
+### Case A — Silently condemned as "no speech"
+
+`scripts/transcribe_audio.py` treats a **0-byte SRT** from Whisper as "no speech detected": it appends to `logs/empty_transcripts.log`, calls `add_no_speech_to_filefilter` to write the ID into `config/filefilter.json`, and **returns success**. Nothing reaches `error.log`. The video is now queued for permanent deletion by `remove-filtered-files.py`, and stays on disk until `just filter-videos` next runs.
+
+A 0-byte SRT means Whisper produced nothing — **not** that the audio is silent. A full disk, an unloaded model, or a crashed run all yield the same empty file, and all get recorded as a content verdict.
+
+**Confirm the overlap** (the two files should be read together — `filefilter.json` says *condemned*, the log says *why*):
+
+```bash
+jq -r '.. | strings | select(test("<CHANNEL>"))' config/filefilter.json
+grep '<CHANNEL>/' <logs_dir>/empty_transcripts.log
+```
+
+**Never trust the verdict — verify the audio directly.** Probe the WAV, not the MP4:
+
+```bash
+ffprobe -v error -show_entries stream=codec_name,sample_rate,channels -of default=nw=1 "<audio_dir>/<CHANNEL>/<TITLE> [<VIDEO_ID>].wav"
+ffmpeg -hide_banner -nostats -i "<audio_dir>/<CHANNEL>/<TITLE> [<VIDEO_ID>].wav" -af volumedetect -f null - 2>&1 | grep -E 'mean_volume|max_volume'
+```
+
+- `pcm_s16le` / `16000` / `1 channel` with `mean_volume` around **−25 to −35 dB** → **audible speech. The verdict is a false positive.**
+- `mean_volume` at or below **−91 dB** → genuinely silent; the verdict stands.
+
+Cross-check duration against the threshold (`transcription.min_duration`, 90 s) using the metadata rather than the filter's say-so:
+
+```bash
+jq '.duration' "<metadata_dir>/<CHANNEL>/video/<TITLE> [<VIDEO_ID>].info.json"
+```
+
+**Remedy for a false positive — repair, do not delete.** The WAV is already correct; only the verdict is wrong:
+
+1. Remove the offending `<CHANNEL>/<VIDEO_ID>` entries from `config/filefilter.json`. Leave `downloaded.txt` alone — the media is on disk and must not be re-fetched.
+2. Re-run `just transcribe`. It costs zero bytes of download and works regardless of free space.
+
+Do **not** run `just filter-videos` before doing this: step 2 of that recipe (`remove-filtered-files.py`) will sweep the still-listed files off disk, along with their upstream MP4s.
+
+**Confirming the historical cause.** `error.log` is retained far longer than `app.log` (which rotates). Correlate the `mtime` of `config/filefilter.json` with the log:
+
+```bash
+ls -la config/filefilter.json
+grep -n 'disk space' <logs_dir>/error.log
+grep -nE '<VIDEO_ID_1>|<VIDEO_ID_2>' <logs_dir>/error.log
+```
+
+A `🚨 Less than 20 GB disk space remaining (0 MB available)` entry near the filter's write time is the signature of Whisper being starved of space. Note that the condemning run itself leaves **no** error line — only the earlier, noisier failures for the same IDs appear.
+
+---
+
+### Case B — Interrupted-merge duplicates in `archive/`
+
+An audio-only stream (`[…].f251.webm`) that was transcribed before the merge was repaired gets archived by `just archive-videos` as though it were a video. The re-download then produces a **second, clean** set. The corpus now counts the video twice — duplicate transcripts, cleaned transcripts and summaries — which skews every downstream aggregate.
+
+```bash
+just find-partial <CHANNEL>
+```
+
+Groups by video ID and lists every derived artifact, including ones easy to miss by hand (`transcripts-hallucinations/`, `metadata/<CHANNEL>/transcript/`). Exits `1` when anything is found.
+
+**Before deleting, prove the clean twin is complete** — the format-code set is only redundant if a non-suffixed `.srt`, `.txt`, cleaned transcript *and* summary all exist. `just find-files <VIDEO_ID>` shows both sets side by side.
+
+**Remedy:** delete the `.webm` and every format-code-suffixed derivative, and **keep the ID in `downloaded.txt`**. The clean transcripts already exist; removing the archive entry only triggers a pointless re-download of content that is fully processed.
+
+`find-partial` reporting `merged .mp4 MISSING` is **not** by itself grounds for re-download. If clean transcripts and a summary exist, the pipeline completed and the MP4 was simply reclaimed. Judge by the derived text artifacts, not by the absence of the video.
+
+---
+
+### Case C — Metadata never landed in `metadata/<CHANNEL>/video/`
+
+`just transcribe` aborts per-file with `Metadata file not found` and the video never advances. Unlike Case A this leaves no `filefilter.json` entry and no `empty_transcripts.log` line — the ID is invisible to every audit and retries identically forever.
+
+```bash
+just find-files <VIDEO_ID>
+```
+
+`.info.json` sitting in `downloads/videos/<CHANNEL>/` with nothing under `metadata/<CHANNEL>/video/` confirms it. A missing `.silence_map.json` under `metadata/<CHANNEL>/audio/` is corroborating evidence that the file never got past extraction.
+
+**Remedy** — see **Case 1** of "Transcription Fails With Metadata file not found":
+
+```bash
+just fetch-video-metadata <CHANNEL> <VIDEO_ID>
+```
+
+Then re-run `just transcribe`. Delete nothing; the MP4 and WAV are sound.
+
+---
+
+### Why these hide so well
+
+Each mechanism converts a failure into something that reads as a normal outcome — a content verdict (A), a successful archive (B), or a per-file skip (C). None sets a non-zero exit code, so `just` reports success and the next stage finds nothing to do. Treat "a file that is still here after two full runs" as the primary signal; the logs will not raise it for you.
+
+**Stray files that are not stuck.** A lone `.webp`, or a channel-level `<CHANNEL> - Videos [UC…].info.json`/`.jpg` (a `UC…` playlist ID, not an 11-char video ID) left in `videos/<CHANNEL>/`, is yt-dlp residue with no pipeline stage waiting on it. Harmless; do not treat it as a stuck video.
 
 ---
 
@@ -360,6 +524,55 @@ Two conditions had to hold together: a format-code-suffixed WAV **and** AppleDou
 **Sidecars still recur** — macOS recreates `._` files whenever it touches that filesystem (Finder copy, Spotlight indexing, etc.), so deletion remains a band-aid. That no longer matters for transcription, which now ignores them, but they still add noise to any directory listing or glob written without a dotfile filter.
 
 The underlying `.f251-11` format-code artifact is itself a broken-download symptom — see **Case 2** above for cleaning it up and re-downloading.
+
+---
+
+## Playbook: Metadata `timestamp` Is Missing (Publication Timeseries Fails)
+
+Symptom: `just publication-timeseries` reports one line per offending file and exits non-zero:
+
+```
+❌ Metadata 'timestamp' is missing or not a number: <…>/metadata/<CHANNEL>/video/<TITLE> [VIDEO_ID].info.json
+```
+
+The check lives in `src/analytics/publication_timeseries.py` (`_require_number`, called from `read_publication_record`). The timeseries derives each video's publication instant from the `.info.json` **`timestamp`** field (epoch seconds, which carries a time of day). It deliberately does **not** fall back to `upload_date`: that field is date-only and would collapse every video published on a given day onto the same instant. So a file whose `timestamp` is `null` fails the check even though `upload_date` is present.
+
+**Root cause:** yt-dlp wrote `"timestamp": null`. Older yt-dlp versions (and some extraction paths) populate only the date-only `upload_date` for a regular video and leave `timestamp` null. A newer yt-dlp usually extracts the full epoch timestamp for the same video, so re-fetching the metadata fixes it. `live_status: not_live` / `was_live: false` in the file confirms this is an ordinary upload, not a premiere/livestream (whose publication time can legitimately be modelled differently).
+
+**How to identify** — inspect the flagged file (read-only):
+
+```bash
+jq '{timestamp, upload_date, release_timestamp, live_status, ytdlp: ._version.version}' \
+  '<…>/metadata/<CHANNEL>/video/<TITLE> [VIDEO_ID].info.json'
+```
+
+`timestamp: null` with a non-null `upload_date` confirms this playbook. Compare the file's `._version.version` against the installed `yt-dlp --version`; a newer installed version is a strong sign a re-fetch will populate `timestamp`.
+
+**Before deleting anything, confirm a fresh fetch actually returns a timestamp.** YouTube does not expose a precise time for every video — if it doesn't, deleting and re-fetching only loses the file. This probe writes nothing (`firefox` = the browser set in `scripts/config.sh`):
+
+```bash
+yt-dlp --skip-download --no-warnings --cookies-from-browser firefox \
+  --print "timestamp=%(timestamp)s upload_date=%(upload_date)s" \
+  "https://www.youtube.com/watch?v=<VIDEO_ID>"
+```
+
+A numeric `timestamp=` (not `NA`) means the re-fetch will fix the file. `NA` means it won't — stop and decide separately (keep the file, or teach the analytics to accept a date-only fallback).
+
+**Fix:**
+
+1. Delete the stale `.info.json` — one literal `rm` per file.
+2. Re-fetch the metadata:
+   ```bash
+   just fetch-video-metadata <CHANNEL> <VIDEO_ID>
+   ```
+   This resolves the video's stem from whichever artifact survives — the audio WAV for an active video, or the archived MP4 / transcript for an **archived** one — so it works whether or not the WAV is still on disk. (`just check-missing-metadata` also re-fetches, but only for videos whose WAV still exists — see the trap below.)
+3. Validate:
+   ```bash
+   jq '.timestamp' '<…>/metadata/<CHANNEL>/video/<TITLE> [VIDEO_ID].info.json'
+   ```
+   A number (not `null`) means the `just publication-timeseries` check will now pass.
+
+**The `check-missing-metadata` trap:** `just check-missing-metadata` discovers work only by matching an existing **WAV** on disk (`scripts/check-missing-metadata.py`). For an archived video the WAV is gone, so it reports "all metadata present" and re-fetches **nothing** — a silent no-op, not an error. That is why this playbook uses `just fetch-video-metadata` instead: its stem lookup also searches the archived video and the transcript (`src/util/media_stem.py`), so it restores metadata for archived videos too. `scripts/fetch-video-metadata.sh '<…>/video/<TITLE> [VIDEO_ID]' <VIDEO_ID>` remains the low-level escape hatch — it takes the exact output stem with no extension.
 
 ---
 

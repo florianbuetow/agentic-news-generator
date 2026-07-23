@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `extract-audio` now requires 3 GB free on the target device before converting the next video (was 2 GB).
+
 ---
 
 ## 2026-07

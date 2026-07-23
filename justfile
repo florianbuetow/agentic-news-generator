@@ -130,7 +130,7 @@ help:
     @printf "  %-46s %s\n" "research \"<keywords>\"" "List transcripts & summaries matching comma-separated keywords"
     @printf "  %-46s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
     @printf "  %-46s %s\n" "export-files <video-id> [<dest-dir>]" "Copy all files found for a video ID into a destination folder (default: ~/Downloads/export-<video-id>)"
-    @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json; no args scans all non-archived videos"
+    @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json (incl. archived videos); no args scans all"
     @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
@@ -959,7 +959,7 @@ test-coverage: init
     @echo "  HTML: reports/coverage/html/index.html"
     @echo ""
 
-# Fetch missing .info.json metadata. With no args, scans all non-archived video files. With args: CHANNEL VIDEO_ID [...]
+# Fetch missing .info.json metadata. With no args, scans all active and archived video files. With args: CHANNEL VIDEO_ID [...]
 fetch-video-metadata *ARGS:
     @echo ""
     @printf "\033[0;34m=== Fetching Video Metadata ===\033[0m\n"
