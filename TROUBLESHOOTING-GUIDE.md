@@ -384,6 +384,36 @@ Groups by video ID and lists every derived artifact, including ones easy to miss
 
 `find-partial` reporting `merged .mp4 MISSING` is **not** by itself grounds for re-download. If clean transcripts and a summary exist, the pipeline completed and the MP4 was simply reclaimed. Judge by the derived text artifacts, not by the absence of the video.
 
+**Variant — the orphan is the only copy.** Case B above assumes the repair already happened and left a clean twin behind. The interrupted download can also be archived and never repaired: `archive/videos/<CHANNEL>/` then holds `[…].fNNN.webm` and **no `.mp4` at all**, and the only transcripts are format-code-suffixed. The remedy inverts — re-download *is* warranted, and the archive entry must go. Classify before touching anything:
+
+| Signal | Case B — clean twin exists | Variant — orphan is the only copy |
+|---|---|---|
+| `archive/videos/<CHANNEL>/` | merged `.mp4` alongside the `.webm` | `[…].fNNN.webm` only |
+| Transcripts | both `[…].srt` and `[…].fNNN.srt` | `[…].fNNN.srt` only |
+| Remedy | delete the orphan set, **keep** the archive entry | re-download, **remove** the archive entry |
+
+Confirm the orphan is genuinely audio-only first — one `opus` stream, no video stream:
+
+```bash
+ffprobe -v error -show_entries stream=codec_type,codec_name -of csv=p=0 <file>
+```
+
+**Archiving does not imply the ID was recorded.** `downloaded.txt` is inconsistent across such IDs — in one observed channel only one of five archived orphans was present, and the other four re-downloaded with no archive edit at all. Check per ID instead of assuming:
+
+```bash
+grep -c <VIDEO_ID> <videos_dir>/<CHANNEL>/downloaded.txt
+```
+
+**Re-downloading specific IDs.** `just download-videos <CHANNEL>` re-scans the whole channel. To refetch individual videos with identical flags, cookies and archive bookkeeping, call the downloader directly — the single-video form documented in `scripts/yt-downloader.sh`:
+
+```bash
+scripts/yt-downloader.sh 'https://www.youtube.com/watch?v=<VIDEO_ID>' '<videos_dir>/<CHANNEL>' '1'
+```
+
+Any `[…].fNNN.mp4.part` still in `videos/<CHANNEL>/` is consumed as a resume point and deleted once the merge succeeds. Verify both streams landed before trusting the result, then run `scripts/move-metadata.sh <CHANNEL>` — `just download-videos` runs it after the download, so skipping it leaves `.info.json` and `.webp` stranded in the videos dir. **Judge that move by the filesystem, not by its summary line:** a run that moved five `.info.json` and five `.webp` reported `0 metadata file(s) moved, 0 thumbnail(s) moved`.
+
+Delete the superseded `[…].fNNN.*` transcripts only **after** the replacements exist. Until `extract-audio` and `transcribe` have re-run, they are the video's only coverage, and removing them early opens a gap in the corpus.
+
 ---
 
 ### Case C — Metadata never landed in `metadata/<CHANNEL>/video/`
