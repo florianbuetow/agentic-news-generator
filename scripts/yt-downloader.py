@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 # Stop before downloading the next channel once free space drops below this floor.
 # Downloads are batched per channel, so this is checked between channels - mirroring
 # the per-file disk guard in convert_to_audio.sh.
-MIN_FREE_DISK_GB = 20
+MIN_FREE_DISK_GB = 10
 MIN_FREE_DISK_BYTES = MIN_FREE_DISK_GB * 1024**3
 
 

@@ -257,6 +257,7 @@ scratch/
 .impeccable/
 update.sh
 archive-videos.sh
+sync-to-minirag.sh
 
 # Dolt (beads issue tracker)
 .doltcfg/
