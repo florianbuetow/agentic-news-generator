@@ -176,6 +176,7 @@ just help
 - `just download-videos` - Download videos from configured YouTube channels
 - `just extract-audio` - Convert downloaded videos to WAV audio files
 - `just transcribe` - Transcribe audio files using MLX Whisper (medium.en/medium with auto-translation)
+- `just classify-audio` - Map speech/music/other segments per WAV file to a 100ms-grid JSON (Silero VAD + YAMNet one-vs-rest classifiers on ONNX)
 - `just analyze-transcripts-hallucinations` - Analyze transcripts for hallucinations and generate digest
 - `just archive-videos` - Archive processed videos and clean up audio files
 
@@ -245,6 +246,14 @@ just archive-videos
 - Channels are grouped by language to minimize model switching
 - Models are cached in `~/.cache/huggingface/hub/`
 - Archive step frees up disk space by moving videos and deleting intermediate audio
+
+#### Optional: Audio classification maps
+
+```bash
+just classify-audio
+```
+
+`scripts/classify-audio.py` writes one JSON map per WAV file in `data/downloads/audio/` into `data/downloads/audio-classification/<channel>/<name>.json`, in the form `{"speech": [[start, end], ...], "music": [...], "other": [...]}` with second timestamps on a 100 ms grid (relative to the WAV timeline, whose long silences were already removed by `extract-audio`). Two one-vs-rest ONNX classifiers run per file — Silero VAD v6 for speech-vs-rest (32 ms chunks, batched streams) and YAMNet for music-vs-rest (five interleaved 96 ms-shifted passes) — and an RMS silence floor plus threshold arbitration from the `audio_classification` section of `config/config.yaml` combines them into the three classes. Both model files (~18 MB) download once into `data/models/audio-classification/` on first run. Existing maps are skipped, so run it after `extract-audio` and before `archive-videos` deletes the WAV files; one failed file never stops the batch and exits `1` after a failure summary.
 
 ### URL Processing Workflow
 
@@ -376,15 +385,22 @@ just filter-videos
 ```
 This single target chains two scripts:
 1. `scripts/filter-short-videos.py` walks `data_downloads_videos_dir/<channel>/` **and** `data_downloads_audio_dir/<channel>/` (orphan wav files without a matching video are caught too). It uses `ffprobe` to verify audio presence and reads `.info.json` for duration. Any file shorter than `transcription.min_duration` (from `config.yaml`), or any video with no audio stream, is appended to `config/filefilter.json` under `data_downloads_audio_dir`.
-2. `scripts/remove-filtered-files.py` resolves every filter entry to concrete on-disk paths and unlinks them together with their upstream copies. The pipeline order is `videos → audio → transcripts`, so an entry under `data_downloads_audio_dir` also removes the video file; an entry under `data_downloads_transcripts_dir` removes audio and video too. Matching is lexical on the `[<video_id>]` substring, so every sibling file (`.info.json`, `.silence_map.json`, `._*` sidecars) is swept up automatically.
+2. `scripts/remove-filtered-files.py` resolves every filter entry to concrete on-disk paths and unlinks them together with their upstream copies. The pipeline order is `videos → audio → transcripts`, so an entry under `data_downloads_audio_dir` also removes the video file; an entry under `data_downloads_transcripts_dir` removes audio and video too. Derived files outside that chain, including metadata, cleaned transcripts, and summaries, are not removed automatically.
 
 The target is wired into `just video-all` immediately after `just check-video-integrity`. Both scripts read everything from `config/config.yaml` and operate on `config/filefilter.json`; they take no CLI arguments and there is no dry-run mode.
 
-**Audit for leftover files of filtered videos:**
+**Audit pipeline integrity:**
 ```bash
-just find-files-with-filtered-video-ids
+just check-pipeline-integrity
 ```
-`scripts/find-files-with-filtered-video-ids.py` builds a set of every video ID in `config/filefilter.json`, then walks each ID-convention data folder channel-by-channel and flags any file whose `[<video_id>]` is in that set. Because `remove-filtered-files.py` only sweeps the `videos → audio → transcripts` chain, downstream artifacts (hallucination JSON, cleaned transcripts, summaries, metadata) of a filtered video can survive — this read-only check surfaces them. It prints one `ERROR:` line per offending file and exits `1` if any are found, `0` otherwise.
+`scripts/check-pipeline-integrity.py` runs two read-only stages. Stage 1 finds every file whose video ID is listed in `config/filefilter.json`; it writes absolute paths to `reports/files-whose-video-id-is-listed-in-filefilter.txt` and aborts with exit `1` when any are found. If stage 1 passes, stage 2 checks every channel's `downloaded.txt` entries and requires a matching active/archived video, WAV, or transcript. Missing entries are written as absolute `downloaded.txt` path plus video ID to `reports/downloaded-video-ids-without-video-audio-or-transcript.txt`. The terminal shows only offender counts and report paths.
+
+**Remove every artifact belonging to a filtered video:**
+```bash
+just clean-filtered-video-artifacts          # dry run; refreshes the report only
+just clean-filtered-video-artifacts --apply  # deletes the freshly recomputed targets
+```
+The cleanup recomputes targets from the current `filefilter.json` rather than trusting a stale report. Before deleting, it requires each target to be a regular non-symlink file inside a configured pipeline data directory and verifies that its filename still contains a filtered video ID. It preserves `downloaded.txt` so intentionally filtered videos are not downloaded again. The integrity check's second stage excludes filtered IDs for the same reason.
 
 **Probe a single video for audio health:**
 ```bash

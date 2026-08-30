@@ -78,6 +78,7 @@ help:
     @printf "  %-38s %s\n" "filter-videos" "Filter and delete videos shorter than transcription.min_duration"
     @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
     @printf "  %-38s %s\n" "transcribe" "Transcribe audio files to text"
+    @printf "  %-38s %s\n" "classify-audio" "Map speech/music/other segments per WAV (100ms grid)"
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
     @printf "  %-38s %s\n" "analyze-transcripts-hallucinations" "Analyze transcripts for hallucinations"
     @printf "  %-38s %s\n" "transcripts-remove-hallucinations" "Remove hallucinations from transcripts using LLM"
@@ -135,13 +136,15 @@ help:
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @printf "  %-46s %s\n" "find-files-without-youtube-id" "Report data files missing a YouTube ID (writes to reports/)"
-    @printf "  %-46s %s\n" "find-files-with-filtered-video-ids" "Flag data files whose video ID is in the filter file (read-only)"
+    @printf "  %-46s %s\n" "check-pipeline-integrity" "Check filtered IDs and downloaded.txt entries against pipeline artifacts"
+    @printf "  %-46s %s\n" "clean-filtered-video-artifacts [--apply]" "Preview or delete every artifact belonging to a filtered video ID"
     @printf "  %-46s %s\n" "find-partial [<channel>]" "List unmerged format-code artifacts (*.f<code>.*), all channels or one"
     @printf "  %-46s %s\n" "cleanup-plain-filename-duplicates" "Move plain-named duplicate files (no YouTube ID) to backup location"
     @printf "  %-46s %s\n" "clean-empty-files" "Scan for and remove empty files in data folder"
     @printf "  %-46s %s\n" "clean-video-files <VIDEO_ID>" "Delete all files for a YouTube video ID (interactive)"
     @printf "  %-46s %s\n" "disk-free" "Show free disk space for each drive used by config.yaml paths"
     @printf "  %-46s %s\n" "histogram-transcript-sizes" "Render a terminal histogram of pending transcript sizes in tokens"
+    @printf "  %-46s %s\n" "histogram-video-dates" "Render terminal histograms of video release dates (2-week/30-day/7-day)"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test [<target>]" "Run Python unit tests; optional pytest file/class/function target"
@@ -397,6 +400,14 @@ transcribe n="":
     printf "\033[0;34m=== Moving Transcript Metadata ===\033[0m\n"
     bash scripts/move-transcript-metadata.sh
 
+# Map speech/music/other segments for extracted audio files (100ms grid)
+classify-audio:
+    @echo ""
+    @printf "\033[0;34m=== Classifying Audio Segments ===\033[0m\n"
+    @uv run python scripts/classify-audio.py
+    @printf "\033[0;32m✓ classify-audio completed successfully\033[0m\n"
+    @echo ""
+
 # Archive processed videos
 archive-videos:
     @echo ""
@@ -436,6 +447,14 @@ histogram-transcript-sizes:
     @printf "\033[0;34m=== Transcript Size Histogram ===\033[0m\n"
     @uv run scripts/summarize-transcripts-token-histogram.py
     @printf "\033[0;32m✓ histogram-transcript-sizes completed successfully\033[0m\n"
+    @echo ""
+
+# Render terminal histograms of video release dates (bi-weekly, 30-day, 7-day)
+histogram-video-dates:
+    @echo ""
+    @printf "\033[0;34m=== Video Release Date Histograms ===\033[0m\n"
+    @uv run python scripts/analytics/histogram_video_dates.py
+    @printf "\033[0;32m✓ histogram-video-dates completed successfully\033[0m\n"
     @echo ""
 
 # Analyze transcripts for hallucinations
@@ -1149,12 +1168,21 @@ find-partial CHANNEL="":
     @bash scripts/find-partial-downloads.sh {{ CHANNEL }}
     @echo ""
 
-# Flag data files whose video ID is in the filter file but were never removed (read-only)
-find-files-with-filtered-video-ids:
+# Check filtered IDs, then ensure every downloaded.txt entry has a pipeline artifact (read-only)
+check-pipeline-integrity:
     @echo ""
-    @printf "\033[0;34m=== Finding Files With Filtered Video IDs ===\033[0m\n"
+    @printf "\033[0;34m=== Checking Pipeline Integrity ===\033[0m\n"
     @echo ""
-    @uv run python scripts/find-files-with-filtered-video-ids.py
+    @uv run python scripts/check-pipeline-integrity.py
+    @echo ""
+
+# Preview or delete all artifacts whose video ID is listed in filefilter.json
+clean-filtered-video-artifacts *ARGS:
+    @echo ""
+    @printf "\033[0;34m=== Cleaning Filtered Video Artifacts ===\033[0m\n"
+    @echo ""
+    @uv run python scripts/clean-filtered-video-artifacts.py {{ ARGS }}
+    @echo ""
 
 # Run ALL validation checks (verbose)
 ci-verbose:

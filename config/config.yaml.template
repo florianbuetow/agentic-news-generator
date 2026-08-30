@@ -23,6 +23,9 @@ paths:
   # Analytics output (isolated; written only by scripts/analytics/)
   data_output_analytics_dir: ./data/output/analytics
 
+  # Audio classification maps (written only by classify-audio)
+  data_downloads_audio_classification_dir: ./data/downloads/audio-classification
+
 url_processing:
   base_dir: urls
   inbox_dir: inbox_urls
@@ -206,3 +209,12 @@ analytics:
 integrations:
   raindrop_io:
     token: YOUR_RAINDROP_TOKEN_HERE
+
+# Audio classification map (speech/music/other; see just classify-audio)
+audio_classification:
+  silence_floor_dbfs: -50.0        # RMS below this level -> other
+  music_threshold: 0.5             # YAMNet music probability above this -> music
+  music_override_speech_max: 0.2   # Strong music overrides speech below this YAMNet speech posterior
+  speech_onset_probability: 0.5    # Silero probability that starts a speech region
+  speech_offset_probability: 0.35  # Silero probability below which a speech region ends
+  min_segment_seconds: 0.3         # Shorter segments merge into a neighbor

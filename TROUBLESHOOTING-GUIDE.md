@@ -19,6 +19,7 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | Find unmerged format-code artifacts | `just find-partial [<CHANNEL>]` |
 | Find macOS AppleDouble sidecars | `find <data_dir> -name '._*'` |
 | Files stuck in a channel, no errors | See **Playbook: Files Stuck in a Channel** |
+| `analyze-transcript-languages` exits 1 | See **Playbook: Language Analysis Exits 1** |
 
 ---
 
@@ -67,8 +68,11 @@ For each channel, flags files with no audio stream or duration below `transcript
 ### `scripts/remove-filtered-files.py` — `just filter-videos` (step 2 of 2)
 Sweeps files listed in `config/filefilter.json` plus upstream copies (transcripts → audio → videos) by `[<video_id>]` substring. Always deletes; no CLI args, no dry-run mode.
 
-### `scripts/find-files-with-filtered-video-ids.py` — `just find-files-with-filtered-video-ids`
-Read-only audit. Builds a set of every video ID in `config/filefilter.json`, then walks each ID-convention data folder channel-by-channel and flags any file whose `[<video_id>]` is in that set. Because `remove-filtered-files.py` only sweeps the `videos → audio → transcripts` chain, downstream artifacts (hallucination JSON, cleaned transcripts, summaries, metadata) of a filtered video can survive — this surfaces them. Prints one `ERROR:` line per offender; exits `1` if any are found, else `0`. No CLI args.
+### `scripts/check-pipeline-integrity.py` — `just check-pipeline-integrity`
+Read-only two-stage audit. Stage 1 finds files whose video ID is listed in `config/filefilter.json`, writes their absolute paths to `reports/files-whose-video-id-is-listed-in-filefilter.txt`, and exits `1` before stage 2 when any are found. Stage 2 runs only after stage 1 passes; it finds `downloaded.txt` video IDs with no active/archived video, WAV, or transcript and writes the absolute archive path plus video ID to `reports/downloaded-video-ids-without-video-audio-or-transcript.txt`. The terminal prints only counts and report paths. No CLI args.
+
+### `scripts/clean-filtered-video-artifacts.py` — `just clean-filtered-video-artifacts [--apply]`
+Safe cleanup companion to the integrity check. With no argument it recomputes all files belonging to filtered video IDs, refreshes `reports/files-whose-video-id-is-listed-in-filefilter.txt`, and deletes nothing. `--apply` deletes only those freshly recomputed targets after validating that each is a regular non-symlink file inside a configured pipeline directory and still contains a currently filtered ID. It preserves `downloaded.txt`; filtered IDs are excluded from pipeline-integrity stage 2 so intentional exclusions do not become false missing-artifact failures.
 
 ### `scripts/clean-video-files.py` — `just clean-video-files VIDEO_ID=<id>`
 Interactive: lists every file containing `[<video_id>]`, asks which to delete, optionally removes the ID from yt-dlp `downloaded.txt` archive. Every destructive action confirmed.
@@ -140,19 +144,150 @@ Run individually when CI fails:
 
 ---
 
-## Playbook: Non-English / Language Detection False Positive
+## Playbook: Language Analysis Exits 1 — Non-English Files Detected
 
-When `transcript-language-analysis.py` flags a file as non-English, **check content quality first** before assuming genuine foreign language content.
+Symptom: `just analyze-transcript-languages` prints one `[WARNING]` line per file and the recipe fails:
 
-Degenerate transcripts (Whisper hallucinations with repetitive tokens like "AI, AI, AI...") trigger false language classifications because short repeated tokens resemble words in other languages (e.g. "ai" is French for "have").
+```
+[WARNING] |   [OpenAI] [fr] /…/downloads/transcripts/OpenAI/Réinventer l'expérience beauté grâce à l'IA [sLYXRA5Ay9g].txt
+[WARNING] | Total non-English files: 11
+error: Recipe `analyze-transcript-languages` failed on line 462 with exit code 1
+```
 
-1. `just find-files <VIDEO_ID>` — confirm transcript file exists and find its path.
-2. Check file size: `ls -lh <transcript.txt>` — suspiciously small or unexpectedly large files indicate problems.
-3. Read first ~20 lines: look for repeated tokens, all-caps acronyms, or single words repeated thousands of times.
-4. If degenerate/hallucinated → treat as corrupt transcript, follow **Playbook: Empty Transcript for a Video**.
-5. If genuinely non-English → decide whether to keep, filter, or redownload with correct language settings.
+**The exit code is a designed gate, not a crash.** `scripts/transcript-language-analysis.py:368-370` returns `1` whenever the run collected at least one file that failed the English check in a channel configured `language: en`. Nothing errored; the script is reporting a verdict.
 
-**General rule:** content size and basic content sanity (empty files, missing files, degenerate repetition) are the **first things to check** for any transcript quality issue, before deeper analysis.
+**Never act on the warning list alone.** The warning states a *language*, not a *defect*. Two unrelated conditions produce byte-identical warnings and need opposite remedies:
+
+- a genuinely foreign-language upload on an English channel — the detection is correct, and the decision is editorial;
+- a failed transcription whose text is not language at all — the detection is meaningless, and the file needs re-transcribing or filtering.
+
+Telling them apart requires the per-file evidence table below. File size alone does not separate them: a 96-word file of one repeated token and a 20-word real fragment look the same in `ls -lh`.
+
+### Step 1 — Build the evidence table
+
+Report every flagged file with these columns. Anything less and the class cannot be decided:
+
+| Column | Where it comes from |
+|---|---|
+| File | the path from the `[WARNING]` line |
+| Words | `wc -w < "<file>"` |
+| Chunks | 1 if Words < 1000, else `ceil(Words / 1000)` (`transcript-language-analysis.py:95`) |
+| Per-chunk verdict | `lang @ confidence` for every chunk |
+| English ratio | `english_count / chunks` (`transcript-language-analysis.py:65`) |
+| Excerpt | first ~20 words of the actual file content |
+| Class | **A** (failed transcription) or **B** (genuine foreign language) — see Step 2 |
+
+Words and Excerpt come straight from the file. The per-chunk verdicts and ratio require running the production logic — drop this in `debug/` (disposable, gitignored) and run `uv run debug/lang_report.py`:
+
+```python
+#!/usr/bin/env python3
+"""Per-chunk language verdicts for flagged transcripts. Mirrors transcript-language-analysis.py."""
+from pathlib import Path
+
+from src.config import Config
+from src.nlp.language_detector import LanguageDetector
+
+FLAGGED = [  # paste the paths from the [WARNING] lines
+    "OpenAI/Réinventer l'expérience beauté grâce à l'IA [sLYXRA5Ay9g].txt",
+]
+
+config = Config.load_default()
+min_confidence = config.get_language_analysis_min_confidence()
+detector = LanguageDetector(model_path=config.get_data_models_dir() / "fasttext" / "lid.176.ftz")
+
+def chunk_text(text: str, target: int = 1000) -> list[str]:
+    """Faithful copy of transcript-language-analysis.py:77-115, including the
+    last-chunk expansion — omitting it changes the verdict (see warning below)."""
+    words = text.split()
+    if not words:
+        return []
+    if len(words) < target:
+        return [text.strip()]
+    chunks = [c for i in range(0, len(words), target) if (c := " ".join(words[i : i + target])).strip()]
+    if len(chunks) > 1 and len(chunks[-1].split()) < target:
+        chunks[-1] = " ".join(words[-target:])  # expand tail back to a full window
+    return chunks
+
+
+for rel in FLAGGED:
+    path = Path(config.get_data_downloads_transcripts_dir()) / rel
+    content = path.read_text(encoding="utf-8", errors="replace")
+    words = content.split()
+    chunks = chunk_text(content)
+
+    labels = []
+    for chunk in chunks:
+        r = detector.detect(chunk, k=1)
+        lang, conf = (r.language, r.confidence) if not isinstance(r, list) else (r[0].language, r[0].confidence)
+        # same downgrade rule as transcript-language-analysis.py:165
+        labels.append((lang, conf, "en" if lang != "en" and conf < min_confidence else lang))
+
+    english = sum(1 for _, _, final in labels if final in {"en", "??"})
+    print(f"{path.name}\n  words={len(words)} chunks={len(chunks)} ratio={english / len(labels):.2f}")
+    for i, (lang, conf, final) in enumerate(labels):
+        print(f"    chunk[{i}] {lang} @ {conf:.4f} -> {final}")
+    print(f"    excerpt: {' '.join(words[:20])}\n")
+```
+
+**Do not simplify the chunker.** The last-chunk expansion at `transcript-language-analysis.py:104-113` is load-bearing: a file's trailing partial chunk is replaced by the *last full 1000 words*, not left short. Dropping it changes verdicts. Measured on `Réinventer l'expérience beauté grâce à l'IA [sLYXRA5Ay9g].txt` (1186 words):
+
+| Chunker | chunk[0] | chunk[1] | Ratio |
+|---|---|---|---|
+| With expansion (production) | fr @ 0.9882 | fr @ 0.9798 | **0.00** |
+| Without expansion | fr @ 0.9882 | en @ 0.4992 | **0.50** |
+
+The raw 186-word tail scores 0.4992, below the 0.7 floor, so the guard relabels it `en` and the file reads as half English — a different class from the one production assigns.
+
+### Step 2 — Classify each row
+
+Decide from the **Excerpt**, never from the language code:
+
+| Excerpt shows | Class | Meaning |
+|---|---|---|
+| One token repeated (`FireCrawl FireCrawl …`, `web2.com web2.com …`), a bare URL fragment, `【Music】`, or scriptless gibberish (`инегет инегет …`, kana loops) | **A** | Failed transcription. The language verdict is noise — there is no language in the file. |
+| Continuous, varied prose in a real language (`Bonjour à tous, mais c'est Lydia…`) | **B** | Genuine foreign-language upload. Detection is correct. |
+
+A strong Class A tell: **Words is far too small for the video's duration.** Cross-check against the metadata — a 970-second video that yielded 96 words did not get transcribed:
+
+```bash
+jq '.duration' "<metadata_dir>/<CHANNEL>/video/<TITLE> [<VIDEO_ID>].info.json"
+```
+
+**Do not use confidence to classify.** Confidence measures how strongly the text matches a language's character n-grams, not whether the text is meaningful. Repeated tokens match *more* consistently than real speech, so Class A files routinely score **higher** than Class B ones (observed: a kana loop at 0.9292 against genuine Spanish at 0.9463).
+
+### Step 3 — Remedy per class
+
+- **Class A** — the transcript is the defect. Confirm the audio was not the problem before blaming the download: read the video's `silence_map.json` under `metadata/<CHANNEL>/audio/`. `total_silence_removed_seconds: 0` with `silence_intervals: []` means the audio was continuous and audible for the full duration, so the fault is in transcription, not the media. Then treat as a corrupt transcript per **Playbook: Empty Transcript for a Video**. Check for downstream contamination first — Class A text propagates into `transcripts_cleaned/`, `transcripts_summaries/` and `transcripts-topics/` unchallenged, and those derived files must go too.
+- **Class B** — nothing is broken. Decide editorially: keep the channel English-only and filter the video, or accept mixed-language content for that channel. Re-downloading changes nothing; the upload really is in that language.
+
+### Why the two safeguards do not catch Class A
+
+Both guards in `analyze_file` are inert against short degenerate files, and neither can be tuned to fix it:
+
+- **Confidence floor** (`min_detection_confidence`, `config/config.yaml`; applied at `transcript-language-analysis.py:165-167`). A non-English chunk below the floor is relabelled `en`. Class A chunks score 0.77–0.93, far above the 0.7 default. Raising the floor breaks Class B detection long before it catches Class A.
+- **80% majority vote** (`is_english_only`, `transcript-language-analysis.py:60-65`). A file passes if ≥80% of chunks are English. But `chunk_text` returns a *single* chunk for any file under 1000 words (`transcript-language-analysis.py:95`), and Class A files are typically 1–100 words. With one chunk the ratio can only be `0.00` or `1.00` — there is no majority to take, and one bad detection condemns the file. The safeguard only functions on files ≥1000 words.
+
+**Consequence for reporting:** always record the chunk count. A row with `chunks=1` had no safeguard applied at all, and its verdict rests entirely on a single FastText call.
+
+### Worked example (2026-08-11 run, 11 files)
+
+| File | Words | Chunks | Verdicts | Ratio | Excerpt | Class |
+|---|---|---|---|---|---|---|
+| `…Finishing Tasks On Time [X-I2mKcs49s]` | 3 | 1 | ja @ 0.7824 | 0.00 | `Cal's role 【Music】` | A |
+| `…Shabbat Rituals… [cgbWIKwbdfY]` | 56 | 1 | ru @ 0.8952 | 0.00 | `стакой онакантась срегданий инегет инегет…` | A |
+| `…Build AI Podcasts… [ievgM928RBc]` | 96 | 1 | ru @ 0.8418 | 0.00 | `FireCrawl FireCrawl FireCrawl…` | A |
+| `…Gary Vaynerchuk's… [gytWTM6ZY9M]` | 61 | 1 | pt @ 0.7715 | 0.00 | `web2.com web2.com web2.com…` | A |
+| `…MUFG aims to become AI-native… [pE1ljLVY1Rg]` | 6 | 1 | pl @ 0.9292 | 0.00 | `保つべつりまけちちねねつねつねつ…` | A |
+| `…Réinventer l'expérience beauté… [sLYXRA5Ay9g]` | 1186 | 2 | fr @ 0.9882, fr @ 0.9798 | 0.00 | `Applause On a l'oïlité client…` | B |
+| `…Verso, l'entreprise qui ne dort jamais [mFwWax5pLTs]` | 1236 | 2 | fr @ 0.9937, fr @ 0.9962 | 0.00 | `Bonjour à tous, mais c'est Lydia…` | B |
+| `…Demo en Español [-voWZLuFAZk]` | 2212 | 3 | es @ 0.9463, 0.9519, 0.9470 | 0.00 | `hola, soy Eric Desoner y en este vídeo…` | B |
+| `…Demo en Español [uqz-tEZIrOQ]` | 2287 | 3 | es @ 0.9573, 0.9483, 0.9490 | 0.00 | `Hola, soy Eric Desoner y en este video…` | B |
+| `…AI is Making Us Dumber… [yZqbLNi9fhQ]` | 1 | 1 | de @ 0.7809 | 0.00 | `ers.com.au` | A |
+| `…How Decoder-Only Transformers… [baykhvFS_e4]` | 20 | 1 | el @ 0.8838 | 0.00 | `www.kirillestem.com kirillestem.com…` | A |
+
+Seven Class A, four Class B, one exit code. Every ratio was `0.00` — no file had even one English chunk — and the lowest confidence across all 20 chunks was 0.7715, so the confidence floor rescued nothing.
+
+**General rule:** content sanity (empty, missing, degenerate repetition, word count versus video duration) is the **first** thing to check for any transcript quality issue, before deeper analysis.
 
 ---
 
@@ -702,7 +837,7 @@ Steps:
 
 1. `just status` — record which models are loaded. Compare against `summarize_transcripts.llm.model` in `config/config.yaml`.
 2. Read the log line preceding `Attempt 1/3 failed` to identify the offending transcript path.
-3. Inspect that transcript: `ls -lh <path>` for size, then read the first ~20 lines. If it shows hallucination patterns (repeated tokens, single phrase repeated) → treat as corrupt transcript and follow **Playbook: Empty Transcript for a Video**. See **Playbook: Non-English / Language Detection False Positive** for the same content-sanity checks.
+3. Inspect that transcript: `ls -lh <path>` for size, then read the first ~20 lines. If it shows hallucination patterns (repeated tokens, single phrase repeated) → treat as corrupt transcript and follow **Playbook: Empty Transcript for a Video**. See **Playbook: Language Analysis Exits 1** for the same content-sanity checks.
 4. If the model from step 1 is not loaded or differs from config, load the configured one:
    ```bash
    lms unload --all

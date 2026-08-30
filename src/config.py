@@ -323,6 +323,39 @@ class AnalyticsConfig(BaseModel):
         return self
 
 
+class AudioClassificationConfig(BaseModel):
+    """Configuration for the speech/music/other audio classification map tool."""
+
+    silence_floor_dbfs: float = Field(..., lt=0.0, description="RMS level in dBFS below which a bin is classified as other")
+    music_threshold: float = Field(..., gt=0.0, lt=1.0, description="Music probability above which a bin counts as music")
+    music_override_speech_max: float = Field(
+        ...,
+        ge=0.0,
+        lt=1.0,
+        description="YAMNet speech probability below which strong music overrides the speech detector",
+    )
+    speech_onset_probability: float = Field(..., gt=0.0, lt=1.0, description="Speech probability that starts a speech region")
+    speech_offset_probability: float = Field(
+        ...,
+        gt=0.0,
+        lt=1.0,
+        description="Speech probability below which an active speech region ends",
+    )
+    min_segment_seconds: float = Field(..., ge=0.0, description="Segments shorter than this are merged into a neighbor segment")
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    @model_validator(mode="after")
+    def _validate_hysteresis(self) -> "AudioClassificationConfig":
+        """Reject an offset probability above the onset probability at config load time."""
+        if self.speech_offset_probability > self.speech_onset_probability:
+            raise ValueError(
+                f"speech_offset_probability ({self.speech_offset_probability}) must be <= "
+                f"speech_onset_probability ({self.speech_onset_probability})"
+            )
+        return self
+
+
 class PathsConfig(BaseModel):
     """Configuration for all project directory paths."""
 
@@ -348,6 +381,10 @@ class PathsConfig(BaseModel):
     data_output_analytics_dir: Annotated[
         str | None,
         Field(min_length=1, description="Analytics output directory path; required only when analytics runs"),
+    ] = None
+    data_downloads_audio_classification_dir: Annotated[
+        str | None,
+        Field(min_length=1, description="Audio classification map directory path; required only when classify-audio runs"),
     ] = None
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -409,6 +446,8 @@ class Config:
             self._agentic_shell_script_reviews = self._validate_agentic_review("agentic_shell_script_reviews")
         if "integrations" in self._data:
             self._integrations = self._validate_integrations()
+        if "audio_classification" in self._data:
+            self._audio_classification = self._validate_audio_classification()
 
     def _load(self, config_path: str | Path) -> None:
         """Load the configuration from a YAML file.
@@ -580,6 +619,14 @@ class Config:
             error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
             raise ValueError(f"Integrations configuration validation failed: {error_messages}") from e
 
+    def _validate_audio_classification(self) -> AudioClassificationConfig:
+        """Validate audio classification configuration."""
+        try:
+            return AudioClassificationConfig.model_validate(self._data["audio_classification"])
+        except ValidationError as e:
+            error_messages = "; ".join(f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in e.errors())
+            raise ValueError(f"Audio classification configuration validation failed: {error_messages}") from e
+
     def _validate_paths(self) -> PathsConfig:
         """Validate paths configuration.
 
@@ -644,6 +691,12 @@ class Config:
         if not hasattr(self, "_integrations"):
             raise KeyError("Missing required key 'integrations' in config file")
         return self._integrations
+
+    def get_audio_classification_config(self) -> AudioClassificationConfig:
+        """Get audio classification configuration."""
+        if not hasattr(self, "_audio_classification"):
+            raise KeyError("Missing required key 'audio_classification' in config file")
+        return self._audio_classification
 
     def get_raindrop_token(self) -> str:
         """Get the Raindrop.io API token."""
@@ -761,6 +814,20 @@ class Config:
             Path object pointing to the data/downloads/metadata directory.
         """
         return Path(self._paths.data_downloads_metadata_dir)
+
+    def get_data_downloads_audio_classification_dir(self) -> Path:
+        """Get the audio classification map directory path.
+
+        Returns:
+            Path object pointing to the audio classification map directory.
+
+        Raises:
+            KeyError: If paths.data_downloads_audio_classification_dir is not configured.
+        """
+        audio_classification_dir = self._paths.data_downloads_audio_classification_dir
+        if audio_classification_dir is None:
+            raise KeyError("Missing required key 'paths.data_downloads_audio_classification_dir' in config file")
+        return Path(audio_classification_dir)
 
     def get_data_output_dir(self) -> Path:
         """Get the data output directory path.
