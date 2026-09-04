@@ -19,3 +19,7 @@ class MetadataError(AnalyticsError):
 
 class JoinError(AnalyticsError):
     """Corpus files cannot be joined to metadata or channel configuration."""
+
+
+class WindowArgumentError(AnalyticsError):
+    """The date-window words given to the video listing are missing or malformed."""

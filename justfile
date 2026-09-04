@@ -145,6 +145,7 @@ help:
     @printf "  %-46s %s\n" "disk-free" "Show free disk space for each drive used by config.yaml paths"
     @printf "  %-46s %s\n" "histogram-transcript-sizes" "Render a terminal histogram of pending transcript sizes in tokens"
     @printf "  %-46s %s\n" "histogram-video-dates" "Render terminal histograms of video release dates (2-week/30-day/7-day)"
+    @printf "  %-46s %s\n" "list-videos since <date>|<from> <to>|last <n>" "List videos published in the window (inclusive), grouped by channel, oldest first"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test [<target>]" "Run Python unit tests; optional pytest file/class/function target"
@@ -456,6 +457,22 @@ histogram-video-dates:
     @uv run python scripts/analytics/histogram_video_dates.py
     @printf "\033[0;32m✓ histogram-video-dates completed successfully\033[0m\n"
     @echo ""
+
+# List videos published in an inclusive date window, grouped by channel, oldest first
+# Forms: since <YYYY-MM-DD> | <YYYY-MM-DD> <YYYY-MM-DD> | last <days>
+list-videos *ARGS:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Listing Videos by Publish Date ===\033[0m\n"
+    echo ""
+    if ! uv run python scripts/analytics/list_videos.py {{ ARGS }}; then
+        printf "\033[0;31m✗ list-videos failed\033[0m\n"
+        echo ""
+        exit 1
+    fi
+    printf "\033[0;32m✓ list-videos completed successfully\033[0m\n"
+    echo ""
 
 # Analyze transcripts for hallucinations
 analyze-transcripts-hallucinations:
