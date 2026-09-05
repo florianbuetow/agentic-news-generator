@@ -36,11 +36,6 @@ def test_get_lm_studio_models_url_rejects_non_http_scheme() -> None:
         lm_studio.get_lm_studio_models_url("ftp://127.0.0.1:1234/v1")
 
 
-def test_get_openai_models_url_preserves_the_configured_api_prefix() -> None:
-    """The JIT-policy probe targets the OpenAI-compatible model listing endpoint."""
-    assert lm_studio.get_openai_models_url("http://127.0.0.1:1234/v1") == "http://127.0.0.1:1234/v1/models"
-
-
 def test_get_model_id_candidates_includes_openai_prefixless_model() -> None:
     """LM Studio metadata may identify OpenAI-compatible models without the provider prefix."""
     assert lm_studio.get_model_id_candidates("openai/qwen/qwen3.6-35b-a3b") == [
@@ -222,43 +217,17 @@ def test_require_loaded_rejects_an_unloaded_model_before_inference() -> None:
         registry.require_loaded("openai/qwen/qwen3.6-35b-a3b")
 
 
-def test_require_autoload_disabled_accepts_loaded_only_openai_listing() -> None:
-    """JIT-off servers expose only resident instances through /v1/models."""
-    registry = _registry([_BASE_NOT_LOADED, _INSTANCE_LOADED])
+def test_require_model_loaded_reads_only_the_native_state_registry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The request guard trusts /api/v0/models state and never consults /v1/models.
 
-    registry.require_autoload_disabled({"qwen/qwen3.6-35b-a3b:2"})
-
-
-def test_require_autoload_disabled_rejects_unloaded_models_in_openai_listing() -> None:
-    """An unloaded model exposed by /v1/models proves that server-side JIT is enabled."""
-    registry = _registry([_BASE_NOT_LOADED, _INSTANCE_LOADED])
-
-    with pytest.raises(lm_studio.ModelAutoloadPolicyError, match="JIT Model Loading is enabled"):
-        registry.require_autoload_disabled(
-            {
-                "qwen/qwen3.6-35b-a3b",
-                "qwen/qwen3.6-35b-a3b:2",
-            }
-        )
-
-
-def test_require_autoload_disabled_fails_closed_when_policy_cannot_be_proven() -> None:
-    """No unloaded control model means the listing cannot distinguish JIT on from off."""
-    registry = _registry([_INSTANCE_LOADED])
-
-    with pytest.raises(lm_studio.ModelAutoloadPolicyError, match="could not be verified"):
-        registry.require_autoload_disabled({"qwen/qwen3.6-35b-a3b:2"})
-
-
-def test_require_model_loaded_verifies_loaded_state_and_jit_policy(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The request guard proves both exact residency and server-wide JIT-off behavior."""
+    LM Studio lists every downloaded model on /v1/models regardless of the JIT
+    setting, so that listing says nothing about what is loaded.
+    """
 
     def fake_urlopen(url: str, timeout: int) -> FakeResponse:
         assert timeout == 10
         if url.endswith("/api/v0/models"):
             return FakeResponse({"data": [_BASE_NOT_LOADED, _INSTANCE_LOADED]})
-        if url.endswith("/v1/models"):
-            return FakeResponse({"data": [{"id": "qwen/qwen3.6-35b-a3b:2"}]})
         raise AssertionError(f"Unexpected URL: {url}")
 
     monkeypatch.setattr(lm_studio, "urlopen", fake_urlopen)
@@ -271,23 +240,21 @@ def test_require_model_loaded_verifies_loaded_state_and_jit_policy(monkeypatch: 
     assert record.lm_studio_id == "qwen/qwen3.6-35b-a3b:2"
 
 
-def test_require_model_loaded_rejects_jit_enabled_server(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The request guard never reaches inference while LM Studio may autoload models."""
+def test_require_model_loaded_rejects_a_model_that_is_not_resident(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The request guard fails closed before inference when the exact model is not loaded."""
 
     def fake_urlopen(url: str, timeout: int) -> FakeResponse:
         assert timeout == 10
         if url.endswith("/api/v0/models"):
             return FakeResponse({"data": [_BASE_NOT_LOADED, _INSTANCE_LOADED]})
-        if url.endswith("/v1/models"):
-            return FakeResponse({"data": [_BASE_NOT_LOADED, _INSTANCE_LOADED]})
         raise AssertionError(f"Unexpected URL: {url}")
 
     monkeypatch.setattr(lm_studio, "urlopen", fake_urlopen)
 
-    with pytest.raises(lm_studio.ModelAutoloadPolicyError, match="JIT Model Loading is enabled"):
+    with pytest.raises(lm_studio.ModelNotLoadedError, match="autoload is disabled"):
         lm_studio.require_model_loaded(
             "http://127.0.0.1:1234/v1",
-            "openai/qwen/qwen3.6-35b-a3b:2",
+            "openai/qwen/qwen3.6-35b-a3b",
         )
 
 

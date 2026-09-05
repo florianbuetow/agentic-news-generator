@@ -16,6 +16,7 @@ Both directories are resolved at runtime from `config/config.yaml`, so the comma
 | Browse/open a summary interactively (live content search) | `just search` |
 | Rank summaries by a query | `just search "<query>"` |
 | Ranked report across **both** corpora for several keywords | `just research "<kw1>, <kw2>, ..."` |
+| List recent video titles in a date window | `just list-videos last <n>` |
 
 ## At a Glance
 
@@ -66,8 +67,23 @@ Searches cleaned transcripts **and** summaries — the union of what `find` and 
 just research "tool use, function calling, MCP"
 ```
 
+## `list-videos WINDOW` — recent video titles
+
+`find`, `search` and `research` all read transcript **contents**. `list-videos` instead lists the **titles** of the videos published inside a date window, grouped by channel, oldest first inside each channel. Use it to see what is recent.
+
+The window takes one of three forms, with dates written as `YYYY-MM-DD`:
+
+```bash
+just list-videos last 7                     # the last 7 days
+just list-videos since 2026-01-01           # from a date until today
+just list-videos 2026-01-01 2026-03-31      # between two dates
+```
+
+Both bounds are inclusive and publish times are UTC. The listing comes from the SQLite metadata database, so the target builds it with `just update-metadata-db` first if it is missing or unusable.
+
 ## Choosing a Target
 
 - Know roughly which file you want and want to open it → `just find` (transcripts) or `just search` (summaries).
 - Want to see which files mention a single term, ranked → `just find "<query>"` or `just search "<query>"`.
 - Exploring a topic across everything with several related terms → `just research "<kw1>, <kw2>, ..."`.
+- Wanting to see which videos are recent, by title → `just list-videos last <n>`.
