@@ -9,7 +9,7 @@ import re
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import litellm
@@ -17,7 +17,13 @@ import tiktoken
 from litellm.exceptions import BadRequestError, Timeout
 
 from src.config import Config, LLMConfig, SummarizeTranscriptsConfig
-from src.llm.lm_studio import LMStudioRegistry, required_context_window
+from src.llm.lm_studio import (
+    LMStudioRegistry,
+    ModelNotLoadedError,
+    is_model_unavailable_error,
+    require_model_loaded,
+    required_context_window,
+)
 from src.summarize.transcripts import collect_pending_files, strip_think_tags
 from src.util.fs_util import FSUtil
 from src.util.log_util import configure_root_logger, get_logger
@@ -78,6 +84,9 @@ def setup_environment() -> tuple[SummarizeTranscriptsConfig, Path, Path, str, st
 
 def call_llm(prompt: str, llm: LLMConfig, model: str, max_tokens: int) -> str:
     """Call the LLM and return the response text."""
+    if not llm.autoload_models:
+        require_model_loaded(llm.api_base, model)
+
     messages = [{"role": "user", "content": prompt}]
 
     try:
@@ -99,6 +108,8 @@ def call_llm(prompt: str, llm: LLMConfig, model: str, max_tokens: int) -> str:
         raise RuntimeError(f"LLM request timed out after {llm.request_timeout_seconds}s") from e
     except BadRequestError as e:
         error_msg = str(e)
+        if not llm.autoload_models and is_model_unavailable_error(error_msg):
+            raise ModelNotLoadedError(f"Model autoload is disabled and LM Studio lost {model!r} after the loaded-state check.") from e
         if "No models loaded" in error_msg:
             raise RuntimeError(f"Resolved model is no longer loaded in LM Studio: {model}") from e
         if "Context size has been exceeded" in error_msg:
@@ -118,6 +129,12 @@ def call_llm(prompt: str, llm: LLMConfig, model: str, max_tokens: int) -> str:
 def resolve_parallel_context_window(effective_context_window: int, parallelism: int) -> int:
     """Return the conservative per-worker context window for local skip checks."""
     return max(1, effective_context_window // parallelism)
+
+
+def raise_if_model_autoload_blocked(exc: Exception) -> None:
+    """Keep a loaded-only guard failure out of the ordinary retry loop."""
+    if isinstance(exc, ModelNotLoadedError):
+        raise exc
 
 
 def process_single_file(
@@ -168,6 +185,7 @@ def process_single_file(
         except ContextSizeExceededError as e:
             raise ContextSizeExceededError(f"context exceeded; prompt={prompt_tokens:,}, ctx={effective_context_window:,}") from e
         except Exception as exc:
+            raise_if_model_autoload_blocked(exc)
             will_retry = attempt < llm.max_retries
             retry_note = f"; retrying in {llm.retry_delay}s" if will_retry else ""
             logger.error(f"{txt_file.name}: attempt {attempt}/{llm.max_retries} failed: {exc}{retry_note}")
@@ -292,11 +310,26 @@ def run_process_single_file(
             effective_context_window,
             skip_threshold_pct,
         )
+    except ModelNotLoadedError:
+        raise
     except ContextSizeExceededError as exc:
         return display_worker_id, "context exceeded", str(exc)
     except Exception as exc:
         return display_worker_id, "failed", str(exc)
     return display_worker_id, status, note
+
+
+def future_result_or_cancel_pending(
+    future: Future[tuple[str, str, str | None]],
+    future_to_path: dict[Future[tuple[str, str, str | None]], str],
+) -> tuple[str, str, str | None]:
+    """Return one result or cancel queued work after a loaded-only guard failure."""
+    try:
+        return future.result()
+    except ModelNotLoadedError:
+        for pending_future in future_to_path:
+            pending_future.cancel()
+        raise
 
 
 def process_pending(
@@ -321,6 +354,7 @@ def process_pending(
     worker_local = threading.local()
     completed_count = 0
     progress_lock = threading.Lock()
+    model_unavailable = threading.Event()
     run_start = time.monotonic()
 
     def initialize_worker() -> None:
@@ -332,6 +366,9 @@ def process_pending(
 
     def run_pending_item(item_number: int, txt_file: Path, output_file: Path) -> tuple[str, str, str | None]:
         nonlocal completed_count
+        if model_unavailable.is_set():
+            raise ModelNotLoadedError("Model became unavailable; pending transcript work was cancelled.")
+
         worker_id = current_worker_id()
         rel_path = f"{txt_file.parent.name}/{txt_file.name}"
         with progress_lock:
@@ -348,18 +385,22 @@ def process_pending(
             parallelism,
         )
 
-        result = run_process_single_file(
-            txt_file,
-            output_file,
-            prompt_template,
-            llm,
-            model,
-            encoder,
-            effective_context_window,
-            skip_threshold_pct,
-            worker_id,
-            parallelism,
-        )
+        try:
+            result = run_process_single_file(
+                txt_file,
+                output_file,
+                prompt_template,
+                llm,
+                model,
+                encoder,
+                effective_context_window,
+                skip_threshold_pct,
+                worker_id,
+                parallelism,
+            )
+        except ModelNotLoadedError:
+            model_unavailable.set()
+            raise
         with progress_lock:
             completed_count += 1
         return result
@@ -375,7 +416,7 @@ def process_pending(
         }
         for future in as_completed(future_to_path):
             rel_path = future_to_path[future]
-            result = future.result()
+            result = future_result_or_cancel_pending(future, future_to_path)
 
             success_delta, skipped_delta = record_process_result(
                 rel_path,

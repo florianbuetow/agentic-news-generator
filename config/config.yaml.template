@@ -26,6 +26,9 @@ paths:
   # Audio classification maps (written only by classify-audio)
   data_downloads_audio_classification_dir: ./data/downloads/audio-classification
 
+  # SQLite video metadata database, relative to data_dir (written only by update-metadata-db)
+  data_downloads_metadata_db: downloads/metadata/metadata.sqlite
+
 url_processing:
   base_dir: urls
   inbox_dir: inbox_urls
@@ -142,6 +145,9 @@ summarize_transcripts:
     models:
       - openai/qwen/qwen3.6-35b-a3b
       - openai/qwen/qwen3.6-35b-a3b:2
+    # false: require LM Studio server-side JIT loading to be disabled, then re-check
+    # that the exact model is already loaded before every inference request.
+    autoload_models: false
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: auto
@@ -159,6 +165,7 @@ url_clean_content:
   llm:
     models:
       - openai/qwen/qwen3.6-35b-a3b
+    autoload_models: false
     api_base: http://127.0.0.1:1234/v1
     api_key: lm-studio
     context_window: 262144

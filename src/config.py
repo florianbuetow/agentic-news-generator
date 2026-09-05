@@ -113,6 +113,11 @@ class LLMConfig(BaseModel):
         min_length=1,
         description="litellm model strings in preference order; the first one loaded in LM Studio is used",
     )
+    autoload_models: bool = Field(
+        ...,
+        strict=True,
+        description="Whether LM Studio may JIT-load a model; false requires server-side JIT disabled and a resident model",
+    )
     api_base: str | None = Field(..., description="API base URL (for LM Studio or custom endpoints, None for standard providers)")
     api_key: str = Field(..., description="API key for the LLM service")
     context_window: int | Literal["auto"] = Field(
@@ -386,6 +391,21 @@ class PathsConfig(BaseModel):
         str | None,
         Field(min_length=1, description="Audio classification map directory path; required only when classify-audio runs"),
     ] = None
+    data_downloads_metadata_db: Annotated[
+        str | None,
+        Field(
+            min_length=1,
+            description="SQLite video metadata database file relative to data_dir; required only when the metadata database is used",
+        ),
+    ] = None
+
+    @field_validator("data_downloads_metadata_db")
+    @classmethod
+    def validate_metadata_db_relative(cls, path_value: str | None) -> str | None:
+        """Validate the metadata database path is a fragment relative to data_dir."""
+        if path_value is not None and Path(path_value).is_absolute():
+            raise ValueError("data_downloads_metadata_db must be relative to data_dir")
+        return path_value
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -828,6 +848,20 @@ class Config:
         if audio_classification_dir is None:
             raise KeyError("Missing required key 'paths.data_downloads_audio_classification_dir' in config file")
         return Path(audio_classification_dir)
+
+    def get_data_downloads_metadata_db_path(self) -> Path:
+        """Get the SQLite video metadata database file path.
+
+        Returns:
+            Path object pointing to the metadata database file under data_dir.
+
+        Raises:
+            KeyError: If paths.data_downloads_metadata_db is not configured.
+        """
+        metadata_db = self._paths.data_downloads_metadata_db
+        if metadata_db is None:
+            raise KeyError("Missing required key 'paths.data_downloads_metadata_db' in config file")
+        return self.get_data_dir() / metadata_db
 
     def get_data_output_dir(self) -> Path:
         """Get the data output directory path.

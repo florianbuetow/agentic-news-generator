@@ -28,6 +28,7 @@ _MODEL: str = "openai/qwen/qwen3.6-35b-a3b:2"
 def make_llm(*, context_window: int | Literal["auto"] = "auto") -> LLMConfig:
     return LLMConfig(
         models=["openai/qwen/qwen3.6-35b-a3b", _MODEL],
+        autoload_models=False,
         api_base="http://127.0.0.1:1234/v1",
         api_key="lm-studio",
         context_window=context_window,

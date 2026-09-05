@@ -11,6 +11,7 @@ import tiktoken
 from litellm.exceptions import BadRequestError
 
 from src.config import LLMConfig
+from src.llm.lm_studio import ModelNotLoadedError, is_model_unavailable_error, require_model_loaded
 
 
 class OversizedDocumentError(ValueError):
@@ -56,10 +57,23 @@ class FormattingWorkEstimate:
     prompt_tokens: int
 
 
+class _CompletionMessage(Protocol):
+    """Minimal completion message view needed by the formatter."""
+
+    content: str | None
+
+
 class _CompletionChoice(Protocol):
-    """Minimal view of a completion choice needed to detect output truncation."""
+    """Minimal completion choice view needed by the formatter."""
 
     finish_reason: str | None
+    message: _CompletionMessage
+
+
+class _CompletionResponse(Protocol):
+    """Minimal LiteLLM response view needed by the formatter."""
+
+    choices: list[_CompletionChoice]
 
 
 @dataclass(frozen=True)
@@ -70,23 +84,34 @@ class LiteLlmClient:
 
     def complete(self, prompt: str, llm: LLMConfig) -> str:
         """Call the configured LLM and return response text."""
+        if not llm.autoload_models:
+            require_model_loaded(llm.api_base, self.model)
+
         try:
-            response = litellm.completion(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}],
-                api_base=llm.api_base,
-                api_key=llm.api_key,
-                max_tokens=llm.max_tokens,
-                temperature=llm.temperature,
-                timeout=llm.request_timeout_seconds,
+            response = cast(
+                _CompletionResponse,
+                litellm.completion(
+                    model=self.model,
+                    messages=[{"role": "user", "content": prompt}],
+                    api_base=llm.api_base,
+                    api_key=llm.api_key,
+                    max_tokens=llm.max_tokens,
+                    temperature=llm.temperature,
+                    timeout=llm.request_timeout_seconds,
+                    max_retries=0 if not llm.autoload_models else None,
+                ),
             )
         except BadRequestError as exc:
+            if not llm.autoload_models and is_model_unavailable_error(str(exc)):
+                raise ModelNotLoadedError(
+                    f"Model autoload is disabled and LM Studio lost {self.model!r} after the loaded-state check."
+                ) from exc
             if "No models loaded" in str(exc):
                 raise RuntimeError(f"Resolved model is no longer loaded in LM Studio: {self.model}") from exc
             raise
 
         choice = response.choices[0]
-        if cast(_CompletionChoice, choice).finish_reason == "length":
+        if choice.finish_reason == "length":
             raise OutputWindowExceededError(
                 f"model stopped at its output token limit (finish_reason='length', "
                 f"output window {llm.max_tokens:,} tokens); content is truncated",
@@ -169,6 +194,8 @@ class FormattingAgent:
                 self._emit_progress(f"formatting_done: attempt={attempt}/{self.llm.max_retries} elapsed_seconds={elapsed_seconds:.2f}")
                 return cleaned_markdown, prompt_tokens, attempt, elapsed_seconds
             except OutputWindowExceededError:
+                raise
+            except ModelNotLoadedError:
                 raise
             except Exception:
                 self._emit_progress(f"formatting_failed: attempt={attempt}/{self.llm.max_retries} error={format_exception_summary()}")

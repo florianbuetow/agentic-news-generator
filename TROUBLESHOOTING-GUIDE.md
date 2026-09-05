@@ -15,6 +15,8 @@ Catalogue of helper scripts in `scripts/` and `tools/` for finding files and dia
 | All empty files in data dir | `just clean-empty-files` |
 | Total transcribed hours | `just audio-hours` |
 | Fetch missing `.info.json` | `just fetch-video-metadata <CHANNEL> <ID...>` |
+| Refresh the SQLite metadata database from `.info.json` files | `just update-metadata-db` |
+| List videos published in a date window (from the metadata database) | `just list-videos since <YYYY-MM-DD>` |
 | Nuke every file for a video ID | `just clean-video-files VIDEO_ID=<id>` |
 | Find unmerged format-code artifacts | `just find-partial [<CHANNEL>]` |
 | Find macOS AppleDouble sidecars | `find <data_dir> -name '._*'` |

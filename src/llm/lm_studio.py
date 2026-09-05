@@ -15,6 +15,12 @@ from src.util.log_util import get_logger
 
 logger: logging.Logger = get_logger(__name__)
 
+_MODEL_UNAVAILABLE_ERROR_FRAGMENTS = (
+    "no models loaded",
+    "model unloaded",
+    "failed to load model",
+)
+
 
 def get_lm_studio_models_url(api_base: str | None) -> str:
     """Return the native LM Studio models endpoint for an OpenAI-compatible API base."""
@@ -31,12 +37,33 @@ def get_lm_studio_models_url(api_base: str | None) -> str:
     return urlunparse((parsed.scheme, parsed.netloc, models_path, "", "", ""))
 
 
+def get_openai_models_url(api_base: str | None) -> str:
+    """Return the OpenAI-compatible models endpoint for an API base."""
+    if api_base is None:
+        raise ValueError("api_base is required to query LM Studio model metadata")
+
+    parsed = urlparse(api_base)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError(f"Invalid LM Studio api_base: {api_base}")
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError(f"Unsupported LM Studio api_base scheme: {parsed.scheme}")
+
+    models_path = f"{parsed.path.rstrip('/')}/models"
+    return urlunparse((parsed.scheme, parsed.netloc, models_path, "", "", ""))
+
+
 def get_model_id_candidates(model: str) -> list[str]:
     """Return model IDs to try against LM Studio metadata."""
     candidates = [model]
     if model.startswith("openai/"):
         candidates.append(model.removeprefix("openai/"))
     return candidates
+
+
+def is_model_unavailable_error(message: str) -> bool:
+    """Return whether LM Studio reports that the requested model is unavailable."""
+    normalized = message.lower()
+    return any(fragment in normalized for fragment in _MODEL_UNAVAILABLE_ERROR_FRAGMENTS)
 
 
 def fetch_lm_studio_models(models_url: str) -> list[object]:
@@ -58,6 +85,19 @@ def fetch_lm_studio_models(models_url: str) -> list[object]:
         raise RuntimeError("LM Studio metadata response did not contain a data list")
 
     return cast(list[object], data_raw)
+
+
+def fetch_model_ids(models_url: str) -> set[str]:
+    """Fetch model identifiers from an OpenAI-compatible models endpoint."""
+    model_ids: set[str] = set()
+    for entry in fetch_lm_studio_models(models_url):
+        if not isinstance(entry, dict):
+            continue
+        info = cast(dict[str, Any], entry)
+        model_id = info.get("id")
+        if isinstance(model_id, str) and model_id:
+            model_ids.add(model_id)
+    return model_ids
 
 
 def extract_loaded_context_length(model_info: dict[str, Any], model: str) -> int:
@@ -101,6 +141,10 @@ class ModelNotLoadedError(RuntimeError):
     """No configured model is loaded on the LM Studio server."""
 
 
+class ModelAutoloadPolicyError(ModelNotLoadedError):
+    """Server-side JIT policy cannot satisfy loaded-only inference."""
+
+
 @dataclass(frozen=True)
 class ModelRecord:
     """One record from LM Studio's /api/v0/models."""
@@ -131,6 +175,16 @@ class LMStudioRegistry:
     @classmethod
     def fetch(cls, api_base: str | None) -> LMStudioRegistry:
         """Snapshot every model record the server reports."""
+        return cls._fetch(api_base, log_snapshot=True)
+
+    @classmethod
+    def fetch_quietly(cls, api_base: str | None) -> LMStudioRegistry:
+        """Snapshot model records without emitting a per-request info message."""
+        return cls._fetch(api_base, log_snapshot=False)
+
+    @classmethod
+    def _fetch(cls, api_base: str | None, *, log_snapshot: bool) -> LMStudioRegistry:
+        """Build a registry snapshot with explicit logging behavior."""
         if api_base is None:
             raise ValueError("api_base is required to query LM Studio model metadata")
 
@@ -154,12 +208,13 @@ class LMStudioRegistry:
             )
 
         registry = cls(api_base=api_base, records=records)
-        logger.info(
-            "LM Studio at %s reports %d model(s); loaded right now: %s",
-            api_base,
-            len(records),
-            registry.loaded_ids(),
-        )
+        if log_snapshot:
+            logger.info(
+                "LM Studio at %s reports %d model(s); loaded right now: %s",
+                api_base,
+                len(records),
+                registry.loaded_ids(),
+            )
         return registry
 
     def loaded_ids(self) -> list[str]:
@@ -173,6 +228,40 @@ class LMStudioRegistry:
             if record is not None:
                 return record
         return None
+
+    def require_loaded(self, model: str) -> ModelRecord:
+        """Return an exact loaded model record or fail before an inference request is sent."""
+        record = self.find(model)
+        if record is None or record.state != "loaded":
+            state = "not found" if record is None else record.state
+            raise ModelNotLoadedError(
+                f"Model autoload is disabled and {model!r} is not currently loaded in LM Studio "
+                f"(state={state}). No inference request was sent."
+            )
+        return record
+
+    def require_autoload_disabled(self, openai_model_ids: set[str]) -> None:
+        """Fail unless /v1/models proves that LM Studio server-side JIT is disabled."""
+        loaded_ids = set(self.loaded_ids())
+        unloaded_ids = set(self.records) - loaded_ids
+        if not unloaded_ids:
+            raise ModelAutoloadPolicyError(
+                "LM Studio JIT Model Loading state could not be verified because every discovered model is loaded. "
+                "autoload_models=false requires JIT Model Loading to be disabled in LM Studio Server Settings."
+            )
+
+        exposed_unloaded_ids = sorted(openai_model_ids & unloaded_ids)
+        if exposed_unloaded_ids:
+            raise ModelAutoloadPolicyError(
+                "autoload_models=false, but LM Studio JIT Model Loading is enabled: /v1/models exposes unloaded "
+                f"model(s) {exposed_unloaded_ids}. Disable JIT Model Loading in LM Studio Server Settings."
+            )
+
+        if openai_model_ids != loaded_ids:
+            raise ModelAutoloadPolicyError(
+                "LM Studio JIT Model Loading state could not be verified because /v1/models did not exactly match "
+                "the native loaded-model registry. No inference request was sent."
+            )
 
     def resolve_first_loaded(self, models: Sequence[str], *, min_context_window: int | None) -> LoadedModel:
         """Return the first configured model that is loaded and meets the context floor.
@@ -237,6 +326,14 @@ class LMStudioRegistry:
             skipped,
         )
         return picked
+
+
+def require_model_loaded(api_base: str | None, model: str) -> ModelRecord:
+    """Prove server-side JIT is off and the exact model is resident before inference."""
+    registry = LMStudioRegistry.fetch_quietly(api_base)
+    record = registry.require_loaded(model)
+    registry.require_autoload_disabled(fetch_model_ids(get_openai_models_url(api_base)))
+    return record
 
 
 def _unresolved_message(models: list[str], loaded_ids: list[str], shortfalls: list[str]) -> str:

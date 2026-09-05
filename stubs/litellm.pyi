@@ -25,6 +25,7 @@ def completion(
     temperature: float,
     max_tokens: int,
     timeout: float | None = None,
+    max_retries: int | None = None,
     stream: bool | None = None,
     response_format: Mapping[str, object] | None = None,
 ) -> ModelResponse: ...

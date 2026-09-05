@@ -13,6 +13,7 @@ class TestLLMConfig:
         """Test valid LLM configuration."""
         config = LLMConfig(
             models=["qwen3-30b-a3b-thinking-2507-mlx@8bit"],
+            autoload_models=False,
             api_base="http://127.0.0.1:1234/v1",
             api_key="LMSTUDIO_API_KEY",
             context_window=262144,
@@ -36,6 +37,7 @@ class TestLLMConfig:
         """Test valid LLM configuration with None api_base."""
         config = LLMConfig(
             models=["anthropic/claude-3-5-sonnet-20241022"],
+            autoload_models=False,
             api_base=None,
             api_key="ANTHROPIC_API_KEY",
             context_window=200000,
@@ -54,6 +56,7 @@ class TestLLMConfig:
         """Test valid LLM configuration with auto context window."""
         config = LLMConfig(
             models=["openai/qwen/qwen3.6-35b-a3b"],
+            autoload_models=False,
             api_base="http://127.0.0.1:1234/v1",
             api_key="LMSTUDIO_API_KEY",
             context_window="auto",
@@ -64,6 +67,42 @@ class TestLLMConfig:
             retry_delay=2.0,
         )
         assert config.context_window == "auto"
+
+    def test_model_autoload_must_be_explicit(self) -> None:
+        """Model loading permission must never come from a hidden code default."""
+        with pytest.raises(ValidationError) as exc_info:
+            LLMConfig.model_validate(
+                {
+                    "models": ["test-model"],
+                    "api_base": "http://localhost:1234/v1",
+                    "api_key": "API_KEY",
+                    "context_window": 100000,
+                    "max_tokens": 2048,
+                    "temperature": 0.7,
+                    "context_window_threshold": 90,
+                    "max_retries": 3,
+                    "retry_delay": 2.0,
+                }
+            )
+
+        assert any(err["loc"] == ("autoload_models",) and err["type"] == "missing" for err in exc_info.value.errors())
+
+    @pytest.mark.parametrize("autoload_models", [False, True])
+    def test_model_autoload_accepts_explicit_booleans(self, autoload_models: bool) -> None:
+        config = LLMConfig(
+            models=["test-model"],
+            autoload_models=autoload_models,
+            api_base="http://localhost:1234/v1",
+            api_key="API_KEY",
+            context_window=100000,
+            max_tokens=2048,
+            temperature=0.7,
+            context_window_threshold=90,
+            max_retries=3,
+            retry_delay=2.0,
+        )
+
+        assert config.autoload_models is autoload_models
 
     def test_missing_models_field(self) -> None:
         """Test LLM config with missing models field."""
@@ -294,6 +333,7 @@ class TestLLMConfig:
         """Test that LLM config is frozen."""
         config = LLMConfig(
             models=["test-model"],
+            autoload_models=False,
             api_base="http://localhost:1234/v1",
             api_key="API_KEY",
             context_window=100000,
@@ -361,6 +401,7 @@ class TestLLMConfig:
         # Test 0
         config_0 = LLMConfig(
             models=["test-model"],
+            autoload_models=False,
             api_base="http://localhost:1234/v1",
             api_key="API_KEY",
             context_window=100000,
@@ -375,6 +416,7 @@ class TestLLMConfig:
         # Test 100
         config_100 = LLMConfig(
             models=["test-model"],
+            autoload_models=False,
             api_base="http://localhost:1234/v1",
             api_key="API_KEY",
             context_window=100000,
@@ -390,6 +432,7 @@ class TestLLMConfig:
 def _make_llm() -> LLMConfig:
     return LLMConfig(
         models=["openai/test-model"],
+        autoload_models=False,
         api_base="http://127.0.0.1:1234/v1",
         api_key="test-key",
         context_window=131072,

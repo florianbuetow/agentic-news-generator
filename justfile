@@ -133,6 +133,7 @@ help:
     @printf "  %-46s %s\n" "export-files <video-id> [<dest-dir>]" "Copy all files found for a video ID into a destination folder (default: ~/Downloads/export-<video-id>)"
     @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json (incl. archived videos); no args scans all"
     @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
+    @printf "  %-46s %s\n" "update-metadata-db" "Mirror all .info.json files into the SQLite metadata database (incremental)"
     @printf "  %-46s %s\n" "fetch-video-thumbnails [<channel> [<id...>]]" "Fetch missing thumbnails (scan all / scan channel / specific IDs)"
     @printf "  %-46s %s\n" "find-empty-transcripts" "List transcript files that are 100 bytes or smaller"
     @printf "  %-46s %s\n" "find-files-without-youtube-id" "Report data files missing a YouTube ID (writes to reports/)"
@@ -145,7 +146,7 @@ help:
     @printf "  %-46s %s\n" "disk-free" "Show free disk space for each drive used by config.yaml paths"
     @printf "  %-46s %s\n" "histogram-transcript-sizes" "Render a terminal histogram of pending transcript sizes in tokens"
     @printf "  %-46s %s\n" "histogram-video-dates" "Render terminal histograms of video release dates (2-week/30-day/7-day)"
-    @printf "  %-46s %s\n" "list-videos since <date>|<from> <to>|last <n>" "List videos published in the window (inclusive), grouped by channel, oldest first"
+    @printf "  %-46s %s\n" "list-videos since <date>|<from> <to>|last <n>" "List videos in the window (inclusive) from the metadata database, grouped by channel"
     @echo ""
     @printf "\033[0;33mCI & Testing:\033[0m\n"
     @printf "  %-38s %s\n" "test [<target>]" "Run Python unit tests; optional pytest file/class/function target"
@@ -458,12 +459,20 @@ histogram-video-dates:
     @printf "\033[0;32m✓ histogram-video-dates completed successfully\033[0m\n"
     @echo ""
 
-# List videos published in an inclusive date window, grouped by channel, oldest first
-# Forms: since <YYYY-MM-DD> | <YYYY-MM-DD> <YYYY-MM-DD> | last <days>
+# List videos published in an inclusive date window from the SQLite metadata database, grouped by channel, oldest first
+# Forms: since <YYYY-MM-DD> | <YYYY-MM-DD> <YYYY-MM-DD> | last <days>   (builds the database first when it is missing)
 list-videos *ARGS:
     #!/usr/bin/env bash
     set -e
     echo ""
+    db_state=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; from src.metadata_db import metadata_db_is_ready; p=Config(Path('config/config.yaml')).get_data_downloads_metadata_db_path(); print(int(metadata_db_is_ready(p)), p)")
+    db_ready=${db_state%% *}
+    db_path=${db_state#* }
+    if [ "$db_ready" != "1" ]; then
+        printf "\033[0;33mMetadata database not usable: %s\033[0m\n" "$db_path"
+        printf "\033[0;33mBuilding it first with 'just update-metadata-db'\033[0m\n"
+        just update-metadata-db
+    fi
     printf "\033[0;34m=== Listing Videos by Publish Date ===\033[0m\n"
     echo ""
     if ! uv run python scripts/analytics/list_videos.py {{ ARGS }}; then
@@ -1010,6 +1019,21 @@ check-missing-metadata:
     @echo ""
     @uv run python scripts/check-missing-metadata.py
     @echo ""
+
+# Mirror every video .info.json file into the SQLite metadata database (incremental; rows for vanished files are removed)
+update-metadata-db:
+    #!/usr/bin/env bash
+    set -e
+    echo ""
+    printf "\033[0;34m=== Updating Metadata Database ===\033[0m\n"
+    echo ""
+    if ! uv run python scripts/update-metadata-db.py; then
+        printf "\033[0;31m✗ update-metadata-db failed\033[0m\n"
+        echo ""
+        exit 1
+    fi
+    printf "\033[0;32m✓ update-metadata-db completed successfully\033[0m\n"
+    echo ""
 
 # Fetch missing video thumbnails. With no args, scans all .info.json files. With args: CHANNEL VIDEO_ID [...]
 fetch-video-thumbnails *ARGS:

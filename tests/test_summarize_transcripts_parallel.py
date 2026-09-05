@@ -11,9 +11,10 @@ from unittest.mock import MagicMock
 
 import pytest
 import tiktoken
-from litellm.exceptions import Timeout
+from litellm.exceptions import BadRequestError, Timeout
 
 from src.config import LLMConfig
+from src.llm.lm_studio import ModelNotLoadedError
 
 
 def load_summarize_module() -> Any:
@@ -114,9 +115,10 @@ def test_process_pending_logs_each_failure_with_its_reason(tmp_path: Path, monke
     assert "APITimeoutError: request to /chat/completions timed out" in caplog.text
 
 
-def _make_llm_config() -> LLMConfig:
+def _make_llm_config(*, autoload_models: bool = True) -> LLMConfig:
     return LLMConfig(
         models=["test/model"],
+        autoload_models=autoload_models,
         api_base=None,
         api_key="test",
         context_window=8192,
@@ -159,6 +161,7 @@ def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
 
     llm = LLMConfig(
         models=["test/model"],
+        autoload_models=True,
         api_base=None,
         api_key="test",
         context_window=8192,
@@ -173,6 +176,91 @@ def test_call_llm_passes_configured_request_timeout(monkeypatch: Any) -> None:
     module.call_llm("test prompt", llm, "test/model", 512)
 
     assert captured["timeout"] == 30.0
+
+
+def test_call_llm_blocks_unloaded_model_when_autoload_is_disabled(monkeypatch: Any) -> None:
+    """No completion request is sent after the selected model leaves memory."""
+    module = load_summarize_module()
+
+    def reject_unloaded_model(_api_base: str | None, _model: str) -> None:
+        raise ModelNotLoadedError("model autoload is disabled")
+
+    monkeypatch.setattr(
+        module,
+        "require_model_loaded",
+        reject_unloaded_model,
+    )
+    completion = MagicMock()
+    monkeypatch.setattr(module.litellm, "completion", completion)
+
+    with pytest.raises(ModelNotLoadedError, match="autoload is disabled"):
+        module.call_llm("test prompt", _make_llm_config(autoload_models=False), "test/model", 512)
+
+    completion.assert_not_called()
+
+
+def test_call_llm_allows_provider_autoload_when_enabled(monkeypatch: Any) -> None:
+    """Explicit opt-in preserves the direct completion behavior."""
+    module = load_summarize_module()
+
+    def unexpected_loaded_state_check(_api_base: str | None, _model: str) -> None:
+        raise AssertionError("unexpected loaded-state check")
+
+    monkeypatch.setattr(
+        module,
+        "require_model_loaded",
+        unexpected_loaded_state_check,
+    )
+    completion = MagicMock(return_value=_fake_litellm_response("a summary"))
+    monkeypatch.setattr(module.litellm, "completion", completion)
+
+    assert module.call_llm("test prompt", _make_llm_config(autoload_models=True), "test/model", 512) == "a summary"
+    completion.assert_called_once()
+
+
+def test_call_llm_classifies_post_check_model_loss_as_fatal(monkeypatch: Any) -> None:
+    """A race after preflight stops the batch instead of entering ordinary retries."""
+    module = load_summarize_module()
+
+    def accept_loaded_model(_api_base: str | None, _model: str) -> None:
+        return None
+
+    monkeypatch.setattr(module, "require_model_loaded", accept_loaded_model)
+
+    def model_unloaded(**_: object) -> MagicMock:
+        raise BadRequestError(message="Model unloaded.", model="test/model", llm_provider="openai")
+
+    monkeypatch.setattr(module.litellm, "completion", model_unloaded)
+
+    with pytest.raises(ModelNotLoadedError, match="lost 'test/model'"):
+        module.call_llm("test prompt", _make_llm_config(autoload_models=False), "test/model", 512)
+
+
+def test_process_pending_aborts_when_model_is_no_longer_loaded(monkeypatch: Any, tmp_path: Path) -> None:
+    """A lost model is fatal so later files cannot repeatedly trigger JIT loading."""
+    module = load_summarize_module()
+    calls = 0
+
+    def unavailable(*args: object, **kwargs: object) -> tuple[str, None]:
+        nonlocal calls
+        calls += 1
+        raise ModelNotLoadedError("model autoload is disabled")
+
+    monkeypatch.setattr(module, "process_single_file", unavailable)
+
+    with pytest.raises(ModelNotLoadedError, match="autoload is disabled"):
+        module.process_pending(
+            pending_files(tmp_path, 3),
+            "",
+            _make_llm_config(),
+            "test/model",
+            None,
+            8192,
+            80,
+            1,
+        )
+
+    assert calls == 1
 
 
 def test_call_llm_disables_client_internal_retries(monkeypatch: Any) -> None:
@@ -265,6 +353,7 @@ def test_process_single_file_logs_reason_when_retrying(tmp_path: Path, monkeypat
 
     llm = LLMConfig(
         models=["test/model"],
+        autoload_models=True,
         api_base=None,
         api_key="test",
         context_window=8192,

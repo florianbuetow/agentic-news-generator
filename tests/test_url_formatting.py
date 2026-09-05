@@ -1,11 +1,15 @@
 """Unit tests for URL content formatting."""
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 import tiktoken
+from litellm.exceptions import BadRequestError
 
 from src.config import LLMConfig
+from src.llm.lm_studio import ModelNotLoadedError
+from src.url_ingestion import formatting
 from src.url_ingestion.formatting import (
     FormattingAgent,
     LiteLlmClient,
@@ -59,10 +63,17 @@ class FailOnceLlmClient:
         return "# Recovered\n\nSource text"
 
 
-def make_llm_config(*, context_window: int = 1000, max_tokens: int = 100, max_retries: int = 1) -> LLMConfig:
+def make_llm_config(
+    *,
+    context_window: int = 1000,
+    max_tokens: int = 100,
+    max_retries: int = 1,
+    autoload_models: bool = True,
+) -> LLMConfig:
     """Build a valid LLM config for tests."""
     return LLMConfig(
         models=["openai/test-model"],
+        autoload_models=autoload_models,
         api_base="http://127.0.0.1:1234/v1",
         api_key="test-key",
         context_window=context_window,
@@ -118,6 +129,73 @@ def test_litellm_client_passes_configured_request_timeout(monkeypatch: pytest.Mo
 
     assert result == "# Done"
     assert captured_kwargs["timeout"] == 12.5
+    assert captured_kwargs["max_retries"] is None
+
+
+def test_litellm_client_disables_internal_retries_when_autoload_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every application retry must repeat the loaded-state guard."""
+    captured_kwargs: dict[str, object] = {}
+
+    def accept_loaded_model(_api_base: str | None, _model: str) -> None:
+        return None
+
+    def fake_completion(**kwargs: object) -> SimpleNamespace:
+        captured_kwargs.update(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(finish_reason="stop", message=SimpleNamespace(content="# Done"))])
+
+    monkeypatch.setattr(formatting, "require_model_loaded", accept_loaded_model)
+    monkeypatch.setattr(formatting.litellm, "completion", fake_completion)
+
+    result = LiteLlmClient(model="openai/test-model").complete(
+        "Format this",
+        make_llm_config(autoload_models=False),
+    )
+
+    assert result == "# Done"
+    assert captured_kwargs["max_retries"] == 0
+
+
+def test_litellm_client_blocks_unloaded_model_when_autoload_is_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """URL formatting shares the loaded-only request guard."""
+
+    def reject_unloaded_model(_api_base: str | None, _model: str) -> None:
+        raise ModelNotLoadedError("model autoload is disabled")
+
+    monkeypatch.setattr(
+        formatting,
+        "require_model_loaded",
+        reject_unloaded_model,
+    )
+    completion = MagicMock()
+    monkeypatch.setattr(formatting.litellm, "completion", completion)
+
+    with pytest.raises(ModelNotLoadedError, match="autoload is disabled"):
+        LiteLlmClient(model="openai/test-model").complete(
+            "Format this",
+            make_llm_config(autoload_models=False),
+        )
+
+    completion.assert_not_called()
+
+
+def test_litellm_client_classifies_post_check_model_loss_as_fatal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A model-loss response cannot enter the formatter's ordinary retry path."""
+
+    def accept_loaded_model(_api_base: str | None, _model: str) -> None:
+        return None
+
+    monkeypatch.setattr(formatting, "require_model_loaded", accept_loaded_model)
+
+    def model_unloaded(**_: object) -> SimpleNamespace:
+        raise BadRequestError(message="Model unloaded.", model="test/model", llm_provider="openai")
+
+    monkeypatch.setattr(formatting.litellm, "completion", model_unloaded)
+
+    with pytest.raises(ModelNotLoadedError, match="lost 'openai/test-model'"):
+        LiteLlmClient(model="openai/test-model").complete(
+            "Format this",
+            make_llm_config(autoload_models=False),
+        )
 
 
 def test_litellm_client_raises_when_output_window_is_exhausted(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -48,6 +48,7 @@ def get_valid_llm_config() -> dict[str, object]:
     """Return a valid LLM config dictionary."""
     return {
         "models": ["openai/test-model"],
+        "autoload_models": False,
         "api_base": "http://127.0.0.1:1234/v1",
         "api_key": "test-key",
         "context_window": 1000,
@@ -324,3 +325,40 @@ class TestConfigPaths:
             assert clean_config.llm.models == ["openai/test-model"]
         finally:
             temp_path.unlink()
+
+
+class TestMetadataDbPath:
+    """The SQLite metadata database path, relative to data_dir."""
+
+    def test_relative_database_path_is_accepted(self) -> None:
+        """A path relative to data_dir validates."""
+        paths_data: dict[str, str] = {**get_valid_paths_config(), "data_downloads_metadata_db": "downloads/metadata/metadata.sqlite"}
+        assert PathsConfig.model_validate(paths_data).data_downloads_metadata_db == "downloads/metadata/metadata.sqlite"
+
+    def test_absolute_database_path_raises_error(self) -> None:
+        """The database path must be relative to data_dir."""
+        paths_data: dict[str, str] = {**get_valid_paths_config(), "data_downloads_metadata_db": "/abs/metadata.sqlite"}
+        with pytest.raises(Exception, match="relative to data_dir"):
+            PathsConfig.model_validate(paths_data)
+
+    def test_getter_joins_data_dir_and_relative_path(self, tmp_path: Path) -> None:
+        """The helper resolves the database under data_dir."""
+        config_data: dict[str, Any] = {
+            "paths": {
+                **get_valid_paths_config(),
+                "data_dir": "/data/root",
+                "data_downloads_metadata_db": "downloads/metadata/metadata.sqlite",
+            },
+            "channels": [],
+        }
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(yaml.safe_dump(config_data), encoding="utf-8")
+        assert Config(config_path).get_data_downloads_metadata_db_path() == Path("/data/root/downloads/metadata/metadata.sqlite")
+
+    def test_getter_without_key_raises_key_error(self, tmp_path: Path) -> None:
+        """The helper names the missing key instead of guessing a location."""
+        config_data: dict[str, Any] = {"paths": get_valid_paths_config(), "channels": []}
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(yaml.safe_dump(config_data), encoding="utf-8")
+        with pytest.raises(KeyError, match="data_downloads_metadata_db"):
+            Config(config_path).get_data_downloads_metadata_db_path()
