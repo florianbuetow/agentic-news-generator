@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added `get-video-summary` justfile target: prints `<video-id> -> <absolute summary path>` for one or more video IDs, one line per ID, exiting non-zero when any ID has no summary.
 - Added `classify-audio` justfile target: writes one speech/music/other JSON map per WAV on a 100 ms grid, using Silero VAD and YAMNet one-vs-rest ONNX classifiers (`scripts/classify-audio.py`, `src/audio_classification/`).
 
 ### Changed

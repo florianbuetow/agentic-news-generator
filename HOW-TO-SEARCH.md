@@ -17,6 +17,7 @@ Both directories are resolved at runtime from `config/config.yaml`, so the comma
 | Rank summaries by a query | `just search "<query>"` |
 | Ranked report across **both** corpora for several keywords | `just research "<kw1>, <kw2>, ..."` |
 | List recent video titles in a date window | `just list-videos last <n>` |
+| Print the summary path for known video IDs | `just get-video-summary <id>...` |
 
 ## At a Glance
 
@@ -87,3 +88,4 @@ Both bounds are inclusive and publish times are UTC. The listing comes from the 
 - Want to see which files mention a single term, ranked → `just find "<query>"` or `just search "<query>"`.
 - Exploring a topic across everything with several related terms → `just research "<kw1>, <kw2>, ..."`.
 - Wanting to see which videos are recent, by title → `just list-videos last <n>`.
+- Already know the video ID(s) and want the summary path(s) → `just get-video-summary <id>...` (prints `<id> -> <absolute path>`, one line per ID).

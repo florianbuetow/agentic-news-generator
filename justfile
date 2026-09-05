@@ -130,6 +130,7 @@ help:
     @printf "  %-46s %s\n" "search [query]" "Interactively search summary files; with query, list matching files"
     @printf "  %-46s %s\n" "research \"<keywords>\"" "List transcripts & summaries matching comma-separated keywords"
     @printf "  %-46s %s\n" "find-files <video-id>" "Find all files for a video ID across data directories"
+    @printf "  %-46s %s\n" "get-video-summary <video-id>..." "Print '<video-id> -> <absolute summary path>', one line per ID"
     @printf "  %-46s %s\n" "export-files <video-id> [<dest-dir>]" "Copy all files found for a video ID into a destination folder (default: ~/Downloads/export-<video-id>)"
     @printf "  %-46s %s\n" "fetch-video-metadata [<channel> <id...>]" "Fetch missing .info.json (incl. archived videos); no args scans all"
     @printf "  %-46s %s\n" "check-missing-metadata" "Check all channels for WAV files missing .info.json and fetch them"
@@ -1159,6 +1160,40 @@ find-files VIDEO_ID:
     @echo ""
     @bash scripts/find-files.sh {{ VIDEO_ID }}
     @echo ""
+
+# Print "<video-id> -> <absolute summary path>" for one or more video IDs (read-only)
+get-video-summary +VIDEO_IDS:
+    #!/usr/bin/env bash
+    echo ""
+    printf "\033[0;34m=== Getting Video Summaries ===\033[0m\n"
+    echo ""
+    summaries_dir=$(uv run python -c "from pathlib import Path; import sys; sys.path.insert(0,'src'); from src.config import Config; c=Config(Path('config/config.yaml')); print(c.get_data_downloads_transcripts_summaries_dir().absolute())")
+    video_ids=({{ VIDEO_IDS }})
+    if [[ ${#video_ids[@]} -eq 0 ]]; then
+        printf "\033[0;31m✗ get-video-summary failed: no video ID provided\033[0m\n"
+        echo ""
+        exit 1
+    fi
+    missing=()
+    for video_id in "${video_ids[@]}"; do
+        matches=$(find "$summaries_dir" -type f -name "*${video_id}*.md" 2>/dev/null | sort)
+        if [[ -n "$matches" ]]; then
+            while IFS= read -r file; do
+                printf "%s -> %s\n" "$video_id" "$file"
+            done <<< "$matches"
+        else
+            printf "%s -> (no summary found)\n" "$video_id"
+            missing+=("$video_id")
+        fi
+    done
+    echo ""
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        printf "\033[0;31m✗ get-video-summary failed: no summary found for %s\033[0m\n" "${missing[*]}"
+        echo ""
+        exit 1
+    fi
+    printf "\033[0;32m✓ get-video-summary completed successfully\033[0m\n"
+    echo ""
 
 # Copy all files found for a video ID into a destination folder (default: ~/Downloads/export-<video-id>)
 export-files VIDEO_ID DEST_DIR="":

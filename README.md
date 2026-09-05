@@ -195,6 +195,7 @@ just help
 
 #### Tools
 - `just find-files <video-id>` - Find all files for a video ID across all data directories
+- `just get-video-summary <video-id>...` - Print `<video-id> -> <absolute summary path>`, one line per ID; exits non-zero if any ID has no summary
 - `just check-audio-track <channel> <video-id>` - Probe a downloaded video for audio stream presence + mean/max volume (flags `LOW_VOLUME` below a `-40 dB` threshold hardcoded in `scripts/check-audio-track.sh`)
 - `just filter-videos` - Scan videos + audio dirs, add any file shorter than `transcription.min_duration` (or any video with no audio stream) to `config/filefilter.json`, then delete every referenced file together with its upstream copies (video → audio → transcript pipeline)
 
