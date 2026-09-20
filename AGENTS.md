@@ -2,6 +2,10 @@
 
 For coding conventions, git rules, and project standards, see [`CONVENTIONS.md`](CONVENTIONS.md).
 
+## AI Attribution
+
+Never add AI attribution lines to git commits. All commit messages should contain only the substantive work description without crediting AI tools or co-authors.
+
 <!-- progressive-disclosure:index:start -->
 ## Documentation Index
 
