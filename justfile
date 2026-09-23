@@ -76,7 +76,7 @@ help:
     @printf "  %-38s %s\n" "download-videos [<channel>]" "Download YouTube videos from channels in config.yaml"
     @printf "  %-38s %s\n" "check-video-integrity" "Check video files for corruption"
     @printf "  %-38s %s\n" "filter-videos" "Filter and delete videos shorter than transcription.min_duration"
-    @printf "  %-38s %s\n" "extract-audio" "Convert downloaded videos to WAV audio files"
+    @printf "  %-38s %s\n" "extract-audio [<channel>]" "Convert downloaded videos to WAV audio files"
     @printf "  %-38s %s\n" "transcribe" "Transcribe audio files to text"
     @printf "  %-38s %s\n" "classify-audio" "Map speech/music/other segments per WAV (100ms grid)"
     @printf "  %-38s %s\n" "archive-videos" "Archive processed videos"
@@ -355,11 +355,11 @@ download-videos channel="":
     printf "\033[0;32m✓ download-videos completed successfully\033[0m\n"
     echo ""
 
-# Convert downloaded videos to WAV audio files
-extract-audio:
+# Convert downloaded videos to WAV audio files (optional: just extract-audio <channel>)
+extract-audio channel="":
     @echo ""
     @printf "\033[0;34m=== Converting Videos to Audio ===\033[0m\n"
-    @bash scripts/convert_to_audio.sh
+    @bash scripts/convert_to_audio.sh {{ channel }}
     @echo ""
 
 # Check video files for corruption

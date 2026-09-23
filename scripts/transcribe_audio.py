@@ -87,6 +87,11 @@ def channels_by_pending_count(
     return sorted(channels, key=lambda ch: pending_counts.get(ch["sanitized_name"], 0))
 
 
+def wav_files_by_size(wav_files: list[Path]) -> list[Path]:
+    """Return WAV files ordered by file size, smallest first."""
+    return sorted(wav_files, key=lambda f: f.stat().st_size)
+
+
 def sanitize_channel_name(name: str) -> str:
     """Sanitize channel name for filesystem use.
 
@@ -477,6 +482,9 @@ def main() -> int:  # noqa: C901
         # Find WAV files (filter out hidden files: macOS ._ and extract-audio in-progress .temp.wav)
         wav_files = FSUtil.find_files_by_extension(channel_audio_dir, ".wav", recursive=False)
         wav_files = [f for f in wav_files if not f.name.startswith(".")]
+
+        # Transcribe the smallest audio files first
+        wav_files = wav_files_by_size(wav_files)
 
         for i, wav_file in enumerate(wav_files):
             if transcribe_limit is not None and total_processed >= transcribe_limit:

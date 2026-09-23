@@ -20,6 +20,13 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
+# Optional single-channel filter (just extract-audio [<channel>])
+channel_filter="${1:-}"
+if [ -n "$channel_filter" ] && [ ! -d "$videos_dir/$channel_filter" ]; then
+    echo "🚨 ERROR: Channel directory not found: $videos_dir/$channel_filter"
+    exit 1
+fi
+
 # Detect number of CPU cores for optimal threading
 num_threads=$(detect_cpu_cores)
 
@@ -190,7 +197,11 @@ count_channel_work() {
 
 # ============================================================================
 
-echo "Converting videos to audio files"
+if [ -n "$channel_filter" ]; then
+    echo "Converting videos to audio files (channel: $channel_filter)"
+else
+    echo "Converting videos to audio files"
+fi
 echo "=========================================="
 echo ""
 
@@ -212,8 +223,8 @@ while IFS=$'\t' read -r to_process total_files channel_dir; do
     skipped_count=0
     fail_count=0
 
-    # Process all video files matching the whitelist
-    while IFS= read -r -d '' input_file; do
+    # Process all video files matching the whitelist, smallest file first
+    while IFS=$'\t' read -r -d '' file_size input_file; do
 
         # Get the base filename and extension
         filename=$(basename "$input_file")
@@ -276,6 +287,13 @@ while IFS=$'\t' read -r to_process total_files channel_dir; do
             if [ "$available_kb" -lt "$min_free_disk_kb" ]; then
                 available_mb=$((available_kb / 1024))
                 echo "  🚨 ERROR: Less than $min_free_disk_gb GB disk space remaining on target device (${available_mb} MB available)"
+                exit 1
+            fi
+
+            # Stop when the free space is smaller than the video we are about to convert
+            file_size_kb=$((file_size / 1024))
+            if [ "$available_kb" -lt "$file_size_kb" ]; then
+                echo "  🚨 ERROR: Not enough disk space for $filename (video: $((file_size_kb / 1024)) MB, available: $((available_kb / 1024)) MB)"
                 exit 1
             fi
 
@@ -456,7 +474,13 @@ while IFS=$'\t' read -r to_process total_files channel_dir; do
             echo "  ---"
         fi
 
-    done < <(find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -print0)
+    done < <(
+        find "$channel_dir" -maxdepth 1 -type f \( -name "*.mp4" -o -name "*.mkv" -o -name "*.wav" -o -name "*.webm" -o -name "*.m4a" -o -name "*.mov" -o -name "*.m4v" -o -name "*.mp3" -o -name "*.ogg" \) -print0 \
+        | while IFS= read -r -d '' video_file; do
+            printf '%s\t%s\0' "$(stat -f %z "$video_file" 2>/dev/null || stat -c %s "$video_file" 2>/dev/null)" "$video_file"
+        done \
+        | sort -z -t$'\t' -k1,1n
+    )
 
     # Print skip summary if any files were skipped
     if [ $skipped_count -gt 0 ]; then
@@ -472,7 +496,13 @@ while IFS=$'\t' read -r to_process total_files channel_dir; do
 done < <(
     while IFS= read -r channel_dir; do
         printf '%s\t%s\n' "$(count_channel_work "$channel_dir" "$(basename "$channel_dir")")" "$channel_dir"
-    done < <(find "$videos_dir" -mindepth 1 -maxdepth 1 -type d) | sort -t$'\t' -k1,1n
+    done < <(
+        if [ -n "$channel_filter" ]; then
+            printf '%s\n' "$videos_dir/$channel_filter"
+        else
+            find "$videos_dir" -mindepth 1 -maxdepth 1 -type d
+        fi
+    ) | sort -t$'\t' -k1,1n
 )
 
 if [ $total_fail_count -gt 0 ]; then

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from scripts.transcribe_audio import find_metadata_file, transcript_outputs_complete
+from scripts.transcribe_audio import find_metadata_file, transcript_outputs_complete, wav_files_by_size
 from src.file_processing_filter import add_no_speech_to_filefilter
 
 
@@ -116,3 +116,16 @@ def test_find_metadata_file_ignores_appledouble_sidecar(tmp_path: Path) -> None:
     result = find_metadata_file(metadata_dir, "Some Video [abc123XYZ].f251")
 
     assert result == metadata_file
+
+
+def test_wav_files_by_size_orders_smallest_first(tmp_path: Path) -> None:
+    large = tmp_path / "a large [aaa111].wav"
+    small = tmp_path / "b small [bbb222].wav"
+    medium = tmp_path / "c medium [ccc333].wav"
+    large.write_bytes(b"x" * 300)
+    small.write_bytes(b"x" * 10)
+    medium.write_bytes(b"x" * 100)
+
+    result = wav_files_by_size([large, small, medium])
+
+    assert result == [small, medium, large]
