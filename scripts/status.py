@@ -90,13 +90,25 @@ def _sum_channel_cleaned_srt_seconds(channel_dir: Path) -> int:
 
 
 def _format_seconds_as_dhm(total_seconds: int) -> str:
-    """Format absolute seconds as `<days>d<hours>h<minutes>m`."""
+    """Format absolute seconds as `[<years>y]<days>d<hours>h<minutes>m`, omitting 0d and 0h."""
     if total_seconds < 0:
         total_seconds = 0
-    days, rem = divmod(total_seconds, 86400)
+
+    years, rem = divmod(total_seconds, 31536000)  # 365 days
+    days, rem = divmod(rem, 86400)
     hours, rem = divmod(rem, 3600)
     minutes, _ = divmod(rem, 60)
-    return f"{days}d{hours}h{minutes}m"
+
+    parts = []
+    if years > 0:
+        parts.append(f"{years}y")
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    parts.append(f"{minutes}m")
+
+    return "".join(parts)
 
 
 def _compute_channel_time_seconds_map(transcripts_cleaned_dir: Path, show_progress: bool = False) -> dict[str, int]:
